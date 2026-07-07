@@ -149,11 +149,11 @@ private struct MacRootView: View {
         let store = try LocalStatusStore.openApplicationSupportStore()
         let configuration = try WebsitePluginSetup.configuredAccount(pluginID: pluginID, store: store)
         let service = PluginRuntimeService(store: store)
-        let result = try await service.runConfiguredPluginRequest(
+        let job = try service.enqueueManualConfiguredPluginRun(
             pluginID: pluginID,
-            requestID: WebsitePluginSetup.requestID,
             accountID: configuration.id
         )
+        let result = try await service.runQueuedPluginJob(jobID: job.id)
         return "\(configuration.variables["host", default: configuration.accountName]): \(result.mappingOutput.resources.count) resource stored, \(result.mappingOutput.events.count) events processed."
     }
 

@@ -98,6 +98,7 @@ import Testing
     let triggers = try store.triggers()
     #expect(triggers.map(\.id) == ["trg_com_status_github_poll_workflows", "trg_com_status_github_refresh_activity"])
     #expect(triggers.first?.intervalSeconds == 900)
+    #expect(triggers.map(\.requestID) == ["list_workflow_runs", "list_repository_activity"])
 
     let rules = try store.rules()
     #expect(rules.count == 1)

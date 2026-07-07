@@ -31,10 +31,11 @@ The same pipeline is used for:
 
 - `TriggerDefinition` and `TriggerScheduler` classify cron/manual/push/event/app-lifecycle triggers.
 - Cron triggers can be evaluated deterministically and enqueue jobs when due.
-- Manual triggers enqueue only when explicitly requested.
+- Manual triggers enqueue only when explicitly requested, and installed plugin trigger metadata now retains the declarative request ID needed to execute the queued job.
 - Failure backoff and success reset logic are implemented in core.
 - `InMemoryJobQueue` tracks queued/running/success/failed job lifecycle for tests and app scaffolding.
 - `StatusPersistenceStore` can round-trip trigger definitions and job records through SQLite.
+- `PluginRuntimeService` can enqueue a configured manual plugin job and execute a specific queued job, preserving `Trigger → Job → request/mapping → audit` provenance for app-initiated refreshes.
 - Audit entries can now attach job, event, and action-run provenance; persisted event ingestion and job lifecycle audit rows use those references.
 - The core action runner executes safe built-in local actions, records deterministic action-run rows, and denies review-required or unsupported actions until explicit permission/provider support exists.
 - `AutomationPipeline` evaluates inserted events against rules, runs matching actions, and persists both action-run records and audit entries.

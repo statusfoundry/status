@@ -413,6 +413,8 @@ CREATE UNIQUE INDEX idx_metric_points_metric_time
 
 Configured trigger instances: a plugin-declared trigger bound to an account with a user-adjustable schedule and scheduler state.
 
+Current implementation note: schema v0 stores the trigger label/type/schedule as first-class columns and keeps scheduler/request metadata in `metadata_json`. The plugin package `triggers.json` `request` value is persisted there as `requestID` so a queued job can resolve which declarative request to execute.
+
 ```sql
 CREATE TABLE triggers (
   id                TEXT PRIMARY KEY,           -- trg_

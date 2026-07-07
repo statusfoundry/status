@@ -25,6 +25,7 @@ public struct TriggerDefinition: Identifiable, Codable, Equatable, Sendable {
     public var label: String
     public var enabled: Bool
     public var intervalSeconds: TimeInterval?
+    public var requestID: String?
     public var failureCount: Int
     public var lastRunAt: Date?
     public var nextRunAt: Date?
@@ -37,6 +38,7 @@ public struct TriggerDefinition: Identifiable, Codable, Equatable, Sendable {
         label: String,
         enabled: Bool = true,
         intervalSeconds: TimeInterval? = nil,
+        requestID: String? = nil,
         failureCount: Int = 0,
         lastRunAt: Date? = nil,
         nextRunAt: Date? = nil
@@ -48,6 +50,7 @@ public struct TriggerDefinition: Identifiable, Codable, Equatable, Sendable {
         self.label = label
         self.enabled = enabled
         self.intervalSeconds = intervalSeconds
+        self.requestID = requestID
         self.failureCount = failureCount
         self.lastRunAt = lastRunAt
         self.nextRunAt = nextRunAt

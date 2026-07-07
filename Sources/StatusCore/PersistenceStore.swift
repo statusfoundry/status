@@ -448,6 +448,7 @@ public final class StatusPersistenceStore {
 
     public func upsertTrigger(_ trigger: TriggerDefinition, updatedAt: Date) throws {
         let metadata = TriggerMetadata(
+            requestID: trigger.requestID,
             failureCount: trigger.failureCount,
             lastRunAt: trigger.lastRunAt.map(ISO8601.string(from:)),
             nextRunAt: trigger.nextRunAt.map(ISO8601.string(from:))
@@ -730,7 +731,8 @@ public final class StatusPersistenceStore {
                     kind: trigger.type,
                     label: trigger.label,
                     enabled: true,
-                    intervalSeconds: trigger.defaultSchedule.flatMap(cronIntervalSeconds)
+                    intervalSeconds: trigger.defaultSchedule.flatMap(cronIntervalSeconds),
+                    requestID: trigger.request
                 ),
                 updatedAt: installedAt
             )
@@ -1000,6 +1002,7 @@ public final class StatusPersistenceStore {
             label: row.requiredText("label"),
             enabled: row.optionalInteger("enabled") != 0,
             intervalSeconds: row.optionalText("schedule").flatMap(TimeInterval.init),
+            requestID: metadata.requestID,
             failureCount: metadata.failureCount,
             lastRunAt: try metadata.lastRunAt.map(ISO8601.date(from:)),
             nextRunAt: try metadata.nextRunAt.map(ISO8601.date(from:))
@@ -1108,6 +1111,7 @@ public final class StatusPersistenceStore {
 }
 
 private struct TriggerMetadata: Codable {
+    var requestID: String?
     var failureCount: Int = 0
     var lastRunAt: String?
     var nextRunAt: String?
