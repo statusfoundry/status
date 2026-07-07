@@ -140,6 +140,39 @@ import Testing
     ])
 }
 
+@Test func websitePluginSetupNormalizesAndSavesHostConfiguration() throws {
+    let database = try temporaryRuntimeDatabase()
+    try insertRuntimePluginFixture(database, pluginID: WebsitePluginSetup.pluginID)
+    let store = StatusPersistenceStore(database: database)
+    let service = PluginRuntimeService(store: store)
+
+    let message = try WebsitePluginSetup.saveHost(
+        " HTTPS://Status-Registry.Hakobs.Com/ ",
+        service: service
+    )
+
+    #expect(message == "Saved status-registry.hakobs.com.")
+    #expect(try WebsitePluginSetup.configuredHost(store: store) == "status-registry.hakobs.com")
+    #expect(try WebsitePluginSetup.configuredAccount(store: store) == PluginAccountConfiguration(
+        id: "acct_website_status_registry_hakobs_com",
+        pluginID: "com.status.website",
+        accountName: "status-registry.hakobs.com",
+        variables: ["host": "status-registry.hakobs.com"]
+    ))
+}
+
+@Test func websitePluginSetupRejectsInvalidHosts() throws {
+    #expect(throws: WebsitePluginSetupError.invalidHost) {
+        try WebsitePluginSetup.normalizedHost("localhost")
+    }
+    #expect(throws: WebsitePluginSetupError.invalidHost) {
+        try WebsitePluginSetup.normalizedHost("example.com:443")
+    }
+    #expect(throws: WebsitePluginSetupError.invalidHost) {
+        try WebsitePluginSetup.normalizedHost("example.com/path")
+    }
+}
+
 private struct RuntimeFakeTransport: PluginRequestHTTPTransport {
     var responses: [URL: PluginHTTPResponse]
 
@@ -155,6 +188,18 @@ private func temporaryRuntimeDatabase() throws -> SQLiteDatabase {
     let database = try SQLiteDatabase(path: path)
     try StatusDatabaseMigrator.migrate(database)
     return database
+}
+
+private func insertRuntimePluginFixture(_ database: SQLiteDatabase, pluginID: String) throws {
+    let now = "2026-07-07T12:00:00Z"
+    try database.execute(
+        """
+        INSERT INTO plugins
+        (id, name, author, description, category, trust_level, installed_version, install_path, installed_at, updated_at)
+        VALUES (?, ?, 'Status Foundry', 'Fixture plugin', 'monitoring', 'official', '0.1.0', '/tmp/plugin', ?, ?)
+        """,
+        bindings: [.text(pluginID), .text(pluginID), .text(now), .text(now)]
+    )
 }
 
 private func runtimeStoredZip(files: [(String, Data)]) -> Data {

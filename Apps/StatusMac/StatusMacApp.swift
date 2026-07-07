@@ -88,11 +88,11 @@ private struct MacRootView: View {
                 trustLevel: plugin.trustLevel
             )
         } canRunPlugin: { plugin in
-            plugin.id == "com.status.website"
+            plugin.id == WebsitePluginSetup.pluginID
         } runPlugin: { plugin in
             try await runConfiguredWebsiteCheck(pluginID: plugin.id)
         } canConfigurePlugin: { plugin in
-            plugin.id == "com.status.website"
+            plugin.id == WebsitePluginSetup.pluginID
         } loadConfigurationValue: { plugin in
             try configuredWebsiteHost(pluginID: plugin.id)
         } saveConfigurationValue: { plugin, value in
@@ -126,7 +126,7 @@ private struct MacRootView: View {
             detail: "Runs the installed Website plugin against status-registry.hakobs.com and stores the result locally.",
             buttonTitle: "Run check"
         ) {
-            try await runRegistryCheck(pluginID: "com.status.website")
+            try await runRegistryCheck(pluginID: WebsitePluginSetup.pluginID)
         }
     }
 
@@ -136,7 +136,7 @@ private struct MacRootView: View {
         let result = try await service.runInstalledPluginRequest(
             PluginRuntimeRequest(
                 pluginID: pluginID,
-                requestID: "check_site",
+                requestID: WebsitePluginSetup.requestID,
                 accountID: "acct_status_registry",
                 accountName: "Status registry",
                 variables: ["host": "status-registry.hakobs.com"]
@@ -147,11 +147,11 @@ private struct MacRootView: View {
 
     private func runConfiguredWebsiteCheck(pluginID: String) async throws -> String {
         let store = try LocalStatusStore.openApplicationSupportStore()
-        let configuration = try configuredWebsiteConfiguration(pluginID: pluginID, store: store)
+        let configuration = try WebsitePluginSetup.configuredAccount(pluginID: pluginID, store: store)
         let service = PluginRuntimeService(store: store)
         let result = try await service.runConfiguredPluginRequest(
             pluginID: pluginID,
-            requestID: "check_site",
+            requestID: WebsitePluginSetup.requestID,
             accountID: configuration.id
         )
         return "\(configuration.variables["host", default: configuration.accountName]): \(result.mappingOutput.resources.count) resource stored, \(result.mappingOutput.events.count) events processed."
@@ -159,45 +159,13 @@ private struct MacRootView: View {
 
     private func configuredWebsiteHost(pluginID: String) throws -> String? {
         let store = try LocalStatusStore.openApplicationSupportStore()
-        return try store.accountConfigurations(pluginID: pluginID).first?.variables["host"]
-    }
-
-    private func configuredWebsiteConfiguration(pluginID: String, store: StatusPersistenceStore) throws -> PluginAccountConfiguration {
-        guard let configuration = try store.accountConfigurations(pluginID: pluginID).first,
-              configuration.variables["host"]?.isEmpty == false else {
-            throw WebsiteSetupError.missingHost
-        }
-        return configuration
+        return try WebsitePluginSetup.configuredHost(pluginID: pluginID, store: store)
     }
 
     private func saveWebsiteHost(pluginID: String, value: String) throws -> String {
-        let host = try normalizedWebsiteHost(value)
         let store = try LocalStatusStore.openApplicationSupportStore()
         let service = PluginRuntimeService(store: store)
-        try service.saveAccountConfiguration(
-            PluginAccountConfiguration(
-                id: "acct_website_\(host.replacingOccurrences(of: #"[^a-zA-Z0-9]+"#, with: "_", options: .regularExpression))",
-                pluginID: pluginID,
-                accountName: host,
-                variables: ["host": host]
-            )
-        )
-        return "Saved \(host)."
-    }
-
-    private func normalizedWebsiteHost(_ value: String) throws -> String {
-        var host = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if host.hasPrefix("https://") || host.hasPrefix("http://") {
-            host = URL(string: host)?.host ?? host
-        }
-        host = host.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard host.contains("."),
-              host.contains(" ") == false,
-              host.contains("/") == false,
-              host.contains(":") == false else {
-            throw WebsiteSetupError.invalidHost
-        }
-        return host
+        return try WebsitePluginSetup.saveHost(value, pluginID: pluginID, service: service)
     }
 
     private func pluginInstallRoot() throws -> URL {
@@ -214,18 +182,4 @@ private enum MacSection: Hashable {
     case rules
     case audit
     case settings
-}
-
-private enum WebsiteSetupError: Error, LocalizedError {
-    case missingHost
-    case invalidHost
-
-    var errorDescription: String? {
-        switch self {
-        case .missingHost:
-            "Save a website host before running this plugin."
-        case .invalidHost:
-            "Enter a host name without scheme, path, port, or spaces."
-        }
-    }
 }
