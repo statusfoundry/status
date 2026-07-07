@@ -40,6 +40,28 @@ Never store these in:
 
 SQLite may store references to Keychain entries.
 
+Current StatusCore implementation:
+
+```txt
+CredentialStore
+→ protocol used by core code paths
+
+KeychainCredentialStore
+→ stores secret bytes as generic-password Keychain items
+→ returns only kc_ references to callers
+
+InMemoryCredentialStore
+→ deterministic test double for unit tests and non-Keychain environments
+```
+
+Credential references use this shape:
+
+```txt
+kc_<26 lowercase base32 characters>
+```
+
+Plugin-facing code should receive only the `kc_` reference. Request/auth code is responsible for resolving the reference at execution time and must not log or persist the raw secret.
+
 ## Plugin package verification
 
 Before installing a plugin, Status should verify:

@@ -23,7 +23,7 @@ Expected test types:
 - golden tests for the mapping engine (see below);
 - round-trip persistence tests for every record type against an in-memory or temporary database.
 
-No StatusCore test may hit a live network endpoint or a real Keychain. Both get test doubles: a fixture-backed request runner and a test keychain.
+No StatusCore test may hit a live network endpoint. Credential tests use `InMemoryCredentialStore` for deterministic unit coverage, while the app runtime uses `KeychainCredentialStore`. A separate opt-in integration suite may exercise the real Keychain on developer machines, but CI should not depend on an unlocked user keychain.
 
 ### StatusUI
 
@@ -174,7 +174,7 @@ Two standing guarantees get automated checks:
 
 - a request to a domain not in the plugin's `domains` list is rejected before any network activity, and the rejection is audited;
 - redirects to undeclared domains are also rejected;
-- the Keychain wrapper (WP-1.3) is tested against a test keychain, and plugin-facing code paths are asserted to receive references, never raw secret values.
+- the credential wrapper (WP-1.3) is tested with `InMemoryCredentialStore`, and plugin-facing code paths are asserted to receive references, never raw secret values. Real-Keychain integration tests are opt-in only.
 
 ## Plugin compatibility test suite
 
