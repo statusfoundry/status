@@ -198,6 +198,7 @@ Current implementation status:
 - macOS and iOS open the local SQLite database from Application Support at launch.
 - The dashboard renders persisted status items, events, metrics, accounts, and audit entries through `StatusPersistenceStore.dashboardSnapshot`.
 - Shared SwiftUI now includes focused read-only operational surfaces for alerts, disabled/enabled rules, audit entries, and local runtime settings. macOS exposes Overview, Integrations, Rules, Audit Log, and Settings in the sidebar; iOS exposes Overview, Alerts, Integrations, Rules, and Settings as companion tabs.
+- The app shells can run an installed declarative plugin request through `PluginRuntimeService`: load the installed package, upsert the account, create a manual job, execute the request/mapping pipeline, persist resources/events/status items, and write a job audit entry.
 - Empty local databases render a calm empty state; `MockDashboard` is reserved for previews and tests.
 
 ## Plugin registry

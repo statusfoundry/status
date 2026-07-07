@@ -128,11 +128,13 @@ public struct StatusSettingsView: View {
     private let registryURL: URL
     private let databasePath: String
     private let pluginInstallPath: String
+    private let runtimeAction: RuntimeAction?
 
-    public init(registryURL: URL, databasePath: String, pluginInstallPath: String) {
+    public init(registryURL: URL, databasePath: String, pluginInstallPath: String, runtimeAction: RuntimeAction? = nil) {
         self.registryURL = registryURL
         self.databasePath = databasePath
         self.pluginInstallPath = pluginInstallPath
+        self.runtimeAction = runtimeAction
     }
 
     public var body: some View {
@@ -144,6 +146,93 @@ public struct StatusSettingsView: View {
                 SettingsRow(label: "Automation default", value: "Suggested rules install disabled")
                 SettingsRow(label: "Write actions", value: "Require explicit permission")
             }
+            if let runtimeAction {
+                RuntimeActionPanel(action: runtimeAction)
+            }
+        }
+    }
+}
+
+public struct RuntimeAction: Sendable {
+    public var title: String
+    public var detail: String
+    public var buttonTitle: String
+    public var run: @Sendable () async throws -> String
+
+    public init(
+        title: String,
+        detail: String,
+        buttonTitle: String,
+        run: @escaping @Sendable () async throws -> String
+    ) {
+        self.title = title
+        self.detail = detail
+        self.buttonTitle = buttonTitle
+        self.run = run
+    }
+}
+
+private struct RuntimeActionPanel: View {
+    let action: RuntimeAction
+    @State private var isRunning = false
+    @State private var result: String?
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(action.title)
+                        .font(.headline)
+                    Text(action.detail)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 12)
+                Button {
+                    Task {
+                        await run()
+                    }
+                } label: {
+                    if isRunning {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text(action.buttonTitle)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isRunning)
+            }
+
+            if let result {
+                Text(result)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let error {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Color.statusSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    @MainActor
+    private func run() async {
+        isRunning = true
+        result = nil
+        error = nil
+        defer { isRunning = false }
+
+        do {
+            result = try await action.run()
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 }

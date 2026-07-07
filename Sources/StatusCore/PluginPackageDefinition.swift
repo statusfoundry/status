@@ -90,6 +90,14 @@ public struct PackagedPluginRequest: Decodable, Equatable, Sendable {
     public var query: [String: String]
     public var timeoutSeconds: TimeInterval?
 
+    enum CodingKeys: String, CodingKey {
+        case method
+        case url
+        case auth
+        case query
+        case timeoutSeconds
+    }
+
     public init(
         method: String = "GET",
         url: String,
@@ -102,6 +110,15 @@ public struct PackagedPluginRequest: Decodable, Equatable, Sendable {
         self.auth = auth
         self.query = query
         self.timeoutSeconds = timeoutSeconds
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        method = try container.decodeIfPresent(String.self, forKey: .method) ?? "GET"
+        url = try container.decode(String.self, forKey: .url)
+        auth = try container.decodeIfPresent(String.self, forKey: .auth)
+        query = try container.decodeIfPresent([String: String].self, forKey: .query) ?? [:]
+        timeoutSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .timeoutSeconds)
     }
 }
 

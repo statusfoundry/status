@@ -50,7 +50,8 @@ private struct IOSRootView: View {
                 StatusSettingsView(
                     registryURL: registryBaseURL,
                     databasePath: applicationDatabasePath(),
-                    pluginInstallPath: applicationPluginInstallPath()
+                    pluginInstallPath: applicationPluginInstallPath(),
+                    runtimeAction: makeRegistryCheckAction()
                 )
                     .navigationTitle("Settings")
             }
@@ -108,6 +109,27 @@ private struct IOSRootView: View {
 
     private func applicationPluginInstallPath() -> String {
         (try? pluginInstallRoot().path) ?? "Unavailable"
+    }
+
+    private func makeRegistryCheckAction() -> RuntimeAction {
+        RuntimeAction(
+            title: "Registry health check",
+            detail: "Runs the installed Website plugin against status-registry.hakobs.com and stores the result locally.",
+            buttonTitle: "Run check"
+        ) {
+            let store = try LocalStatusStore.openApplicationSupportStore()
+            let service = PluginRuntimeService(store: store)
+            let result = try await service.runInstalledPluginRequest(
+                PluginRuntimeRequest(
+                    pluginID: "com.status.website",
+                    requestID: "check_site",
+                    accountID: "acct_status_registry",
+                    accountName: "Status registry",
+                    variables: ["host": "status-registry.hakobs.com"]
+                )
+            )
+            return "\(result.mappingOutput.resources.count) resource stored, \(result.mappingOutput.events.count) events processed."
+        }
     }
 
     private func pluginInstallRoot() throws -> URL {

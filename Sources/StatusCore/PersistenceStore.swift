@@ -255,6 +255,42 @@ public final class StatusPersistenceStore {
         ).map(auditEntry(from:))
     }
 
+    public func upsertAccount(_ account: Account, authType: String = "none", credentialRef: String? = nil, status: String = "connected", updatedAt: Date) throws {
+        try database.execute(
+            """
+            INSERT INTO accounts
+            (id, plugin_id, provider, display_name, auth_type, credential_ref, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              provider = excluded.provider,
+              display_name = excluded.display_name,
+              auth_type = excluded.auth_type,
+              credential_ref = excluded.credential_ref,
+              status = excluded.status,
+              last_error = NULL,
+              updated_at = excluded.updated_at
+            """,
+            bindings: [
+                .text(account.id),
+                .text(account.pluginID),
+                .text(account.provider),
+                .text(account.displayName),
+                .text(authType),
+                credentialRef.map { .text($0) } ?? .null,
+                .text(status),
+                .text(ISO8601.string(from: updatedAt)),
+                .text(ISO8601.string(from: updatedAt))
+            ]
+        )
+    }
+
+    public func account(id: String) throws -> Account? {
+        guard let row = try database.query("SELECT * FROM accounts WHERE id = ?", bindings: [.text(id)]).first else {
+            return nil
+        }
+        return try account(from: row)
+    }
+
     public func upsertResource(_ resource: Resource, externalID: String, fields: [String: String] = [:], seenAt: Date) throws {
         try database.execute(
             """
@@ -733,6 +769,15 @@ public final class StatusPersistenceStore {
             permission: PluginPermission(rawValue: row.requiredText("permission")) ?? .network,
             granted: row.optionalInteger("granted") != 0,
             grantedAt: try row.optionalText("granted_at").map(ISO8601.date(from:))
+        )
+    }
+
+    private func account(from row: [String: SQLiteValue]) throws -> Account {
+        try Account(
+            id: row.requiredText("id"),
+            pluginID: row.requiredText("plugin_id"),
+            provider: row.requiredText("provider"),
+            displayName: row.requiredText("display_name")
         )
     }
 
