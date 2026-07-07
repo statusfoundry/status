@@ -260,12 +260,43 @@ The app should check revocations before install, before update, and periodically
 
 ## Domains
 
-Current working domains:
+Current target domains:
 
 ```txt
 status.hakobs.com
 status-registry.hakobs.com
 ```
+
+Current deployment state as of 2026-07-07:
+
+```txt
+Cloudflare Pages project
+→ name: status
+→ production hostname: status-9d4.pages.dev
+→ latest deployed preview: c8b4d202.status-9d4.pages.dev
+→ custom domain: status.hakobs.com
+→ custom domain status: pending
+→ pending reason: CNAME record not set
+
+Cloudflare Worker
+→ name: status-registry
+→ custom domain: status-registry.hakobs.com
+→ current version id: 773f4f92-2ac8-4e77-a301-130b1706e91e
+
+Cloudflare R2
+→ bucket: status-plugins
+```
+
+Required DNS record for the marketing website:
+
+```txt
+type: CNAME
+name: status
+target: status-9d4.pages.dev
+proxied: true
+```
+
+The existing Wrangler OAuth token can create Pages domains and deploy Workers/Pages, but Cloudflare returned `403` for DNS record API access when checking `status.hakobs.com`. If DNS write access is added to the token, create the CNAME above and the Pages custom domain should move from pending to active after certificate validation.
 
 If the final brand changes, keep the same structure:
 
