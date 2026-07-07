@@ -70,7 +70,24 @@ public enum MockDashboard {
                 IntegrationSummary(id: "int_uptime", name: "Website uptime", provider: "website", state: "Okay", severity: .ok, lastSyncDescription: "1 min ago")
             ],
             auditEntries: [
-                AuditEntry(id: "aud_01notification", title: "Notification queued", detail: "Rule matched github.workflow.failed and queued a local notification.", timestamp: now, status: "success")
+                AuditEntry(
+                    id: "aud_01notification",
+                    title: "Notification queued",
+                    detail: "Rule matched github.workflow.failed and queued a local notification.",
+                    timestamp: now,
+                    status: "success",
+                    eventID: "evt_01workflowfailed",
+                    actionRunID: "run_rul_notify_evt_01workflowfailed_0"
+                ),
+                AuditEntry(
+                    id: "aud_01job",
+                    title: "Job completed",
+                    detail: "com.status.github job job_poll_01 from trigger trg_github is success. Emitted events: evt_01workflowfailed.",
+                    timestamp: now.addingTimeInterval(-120),
+                    status: "success",
+                    jobID: "job_poll_01",
+                    eventID: "evt_01workflowfailed"
+                )
             ]
         )
     }()

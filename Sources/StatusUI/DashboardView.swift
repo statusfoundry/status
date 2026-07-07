@@ -167,19 +167,50 @@ private struct AuditSection: View {
         SectionBlock(title: "Audit log") {
             VStack(spacing: 10) {
                 ForEach(entries) { entry in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(entry.title)
-                            .font(.headline)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text(entry.title)
+                                .font(.headline)
+                            Spacer(minLength: 12)
+                            Text(entry.status)
+                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .foregroundStyle(entry.statusColor)
+                                .background(entry.statusColor.opacity(0.12))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            Text(entry.timestamp, style: .relative)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                         Text(entry.detail)
                             .foregroundStyle(.secondary)
-                        Text(entry.status)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        AuditProvenance(entry: entry)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
                     .background(Color.statusSurface)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+    }
+}
+
+private struct AuditProvenance: View {
+    let entry: AuditEntry
+
+    var body: some View {
+        let references = entry.provenanceReferences
+        if references.isEmpty == false {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(references, id: \.self) { reference in
+                    Text(reference)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
             }
         }
@@ -219,6 +250,29 @@ private extension Severity {
         case .warning: .orange
         case .critical: .red
         }
+    }
+}
+
+private extension AuditEntry {
+    var statusColor: Color {
+        switch status {
+        case "success":
+            .green
+        case "failed", "denied":
+            .red
+        case "suppressed", "skipped", "unsupported":
+            .orange
+        default:
+            .secondary
+        }
+    }
+
+    var provenanceReferences: [String] {
+        [
+            jobID.map { "job \($0)" },
+            eventID.map { "event \($0)" },
+            actionRunID.map { "action \($0)" }
+        ].compactMap { $0 }
     }
 }
 
