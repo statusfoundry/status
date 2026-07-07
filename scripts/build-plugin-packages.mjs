@@ -125,6 +125,17 @@ async function readJSON(filePath) {
   return JSON.parse(await readFile(filePath, "utf8"));
 }
 
+async function readOptionalJSON(filePath) {
+  try {
+    return await readJSON(filePath);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
 function fail(message) {
   throw new Error(message);
 }
@@ -180,6 +191,139 @@ function validateManifest(manifest, sourceName) {
   }
 }
 
+function validateRequestDefinitions(manifest, requestsFile, sourceName) {
+  if (!requestsFile) {
+    return new Set();
+  }
+  if (!requestsFile.requests || typeof requestsFile.requests !== "object" || Array.isArray(requestsFile.requests)) {
+    fail(`${sourceName}: requests.json must contain a requests object`);
+  }
+
+  const requestIDs = new Set(Object.keys(requestsFile.requests));
+  const declaredDomains = new Set(manifest.domains.map((domain) => domain.toLowerCase()));
+  const usesUserConfiguredDomains = manifest.permissions.includes("user-configured-domains");
+
+  for (const [requestID, request] of Object.entries(requestsFile.requests)) {
+    if (/^[a-z][a-z0-9_]*$/.test(requestID) === false) {
+      fail(`${sourceName}: invalid request id ${requestID}`);
+    }
+    if (!request || typeof request !== "object") {
+      fail(`${sourceName}: request ${requestID} must be an object`);
+    }
+    if (typeof request.url !== "string" || request.url.trim() === "") {
+      fail(`${sourceName}: request ${requestID} must define a url`);
+    }
+    let url;
+    try {
+      url = new URL(request.url);
+    } catch {
+      if (request.url.startsWith("https://{{") && usesUserConfiguredDomains) {
+        continue;
+      }
+      fail(`${sourceName}: request ${requestID} has invalid url ${request.url}`);
+    }
+    if (url.hostname.includes("{{")) {
+      if (usesUserConfiguredDomains === false) {
+        fail(`${sourceName}: request ${requestID} uses a templated host without user-configured-domains`);
+      }
+      continue;
+    }
+    if (url.protocol !== "https:") {
+      fail(`${sourceName}: request ${requestID} must use https`);
+    }
+    if (usesUserConfiguredDomains === false && declaredDomains.has(url.hostname.toLowerCase()) === false) {
+      fail(`${sourceName}: request ${requestID} uses undeclared domain ${url.hostname}`);
+    }
+  }
+
+  return requestIDs;
+}
+
+function validateTriggers(triggersFile, requestIDs, sourceName) {
+  if (!triggersFile) {
+    return;
+  }
+  if (!Array.isArray(triggersFile.triggers) || triggersFile.triggers.length === 0) {
+    fail(`${sourceName}: triggers.json must contain triggers`);
+  }
+  for (const trigger of triggersFile.triggers) {
+    if (!trigger?.id || !trigger?.type || !trigger?.label) {
+      fail(`${sourceName}: every trigger needs id, type, and label`);
+    }
+    if (trigger.request && requestIDs.has(trigger.request) === false) {
+      fail(`${sourceName}: trigger ${trigger.id} references missing request ${trigger.request}`);
+    }
+  }
+}
+
+function validateEvents(eventsFile, sourceName) {
+  if (!eventsFile) {
+    return new Set();
+  }
+  if (!Array.isArray(eventsFile.events) || eventsFile.events.length === 0) {
+    fail(`${sourceName}: events.json must contain events`);
+  }
+  const eventTypes = new Set();
+  for (const event of eventsFile.events) {
+    if (typeof event.type !== "string" || /^[a-z0-9_]+(\.[a-z0-9_]+)+$/.test(event.type) === false) {
+      fail(`${sourceName}: invalid event type ${event.type}`);
+    }
+    eventTypes.add(event.type);
+  }
+  return eventTypes;
+}
+
+function validateMappings(mappingsFile, requestIDs, eventTypes, sourceName) {
+  if (!mappingsFile) {
+    return;
+  }
+  for (const resource of mappingsFile.resources ?? []) {
+    if (resource.request && requestIDs.has(resource.request) === false) {
+      fail(`${sourceName}: resource mapping references missing request ${resource.request}`);
+    }
+  }
+  for (const event of mappingsFile.events ?? []) {
+    if (eventTypes.has(event.type) === false) {
+      fail(`${sourceName}: mapping references undeclared event ${event.type}`);
+    }
+    if (event.request && requestIDs.has(event.request) === false) {
+      fail(`${sourceName}: event mapping ${event.type} references missing request ${event.request}`);
+    }
+  }
+}
+
+function validateRulePresets(presetsFile, eventTypes, sourceName) {
+  if (!presetsFile) {
+    return;
+  }
+  if (!Array.isArray(presetsFile.presets) || presetsFile.presets.length === 0) {
+    fail(`${sourceName}: rules.presets.json must contain presets`);
+  }
+  for (const preset of presetsFile.presets) {
+    const eventType = preset?.when?.eventType;
+    if (eventTypes.has(eventType) === false) {
+      fail(`${sourceName}: rule preset ${preset?.name ?? "(unnamed)"} references undeclared event ${eventType}`);
+    }
+    if (!Array.isArray(preset.then) || preset.then.length === 0) {
+      fail(`${sourceName}: rule preset ${preset?.name ?? "(unnamed)"} must define actions`);
+    }
+  }
+}
+
+async function validatePluginPackage(pluginDirectory, manifest, sourceName) {
+  const requestsFile = await readOptionalJSON(path.join(pluginDirectory, "requests.json"));
+  const triggersFile = await readOptionalJSON(path.join(pluginDirectory, "triggers.json"));
+  const eventsFile = await readOptionalJSON(path.join(pluginDirectory, "events.json"));
+  const mappingsFile = await readOptionalJSON(path.join(pluginDirectory, "mappings.json"));
+  const presetsFile = await readOptionalJSON(path.join(pluginDirectory, "rules.presets.json"));
+
+  const requestIDs = validateRequestDefinitions(manifest, requestsFile, sourceName);
+  const eventTypes = validateEvents(eventsFile, sourceName);
+  validateTriggers(triggersFile, requestIDs, sourceName);
+  validateMappings(mappingsFile, requestIDs, eventTypes, sourceName);
+  validateRulePresets(presetsFile, eventTypes, sourceName);
+}
+
 async function pluginFiles(pluginDirectory) {
   const names = (await readdir(pluginDirectory)).filter((name) => name.endsWith(".json")).sort();
   return Promise.all(names.map(async (name) => ({
@@ -206,6 +350,7 @@ async function build() {
     const manifest = await readJSON(path.join(pluginDirectory, "manifest.json"));
     const metadata = await readJSON(path.join(pluginDirectory, "registry.json"));
     validateManifest(manifest, directoryName);
+    await validatePluginPackage(pluginDirectory, manifest, directoryName);
 
     const files = await pluginFiles(pluginDirectory);
     const packageData = deterministicZip(files);
