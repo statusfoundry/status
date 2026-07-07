@@ -7,6 +7,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginsRoot = path.join(root, "plugins", "bundled");
 const registryDataPath = path.join(root, "workers", "registry", "src", "registry-data.js");
 const artifactsPath = path.join(root, "workers", "registry", "src", "plugin-artifacts.js");
+const webRegistryPath = path.join(root, "web", "src", "generated", "registry.json");
 const packageDistRoot = path.join(root, "workers", "registry", "dist", "plugins");
 const registryBaseURL = "https://status-registry.hakobs.com";
 const checkOnly = process.argv.includes("--check");
@@ -259,11 +260,13 @@ async function build() {
     revokedSigningKeys: []
   })}`;
   const artifactModule = jsModule("pluginArtifacts", artifacts);
+  const webRegistryJSON = JSON.stringify({ schemaVersion: "1.0.0", plugins }, null, 2) + "\n";
 
   if (checkOnly) {
-    const [currentRegistry, currentArtifacts] = await Promise.all([
+    const [currentRegistry, currentArtifacts, currentWebRegistry] = await Promise.all([
       readFile(registryDataPath, "utf8"),
-      readFile(artifactsPath, "utf8")
+      readFile(artifactsPath, "utf8"),
+      readFile(webRegistryPath, "utf8")
     ]);
     if (currentRegistry !== registryModule) {
       fail("workers/registry/src/registry-data.js is out of date. Run npm run plugins:build.");
@@ -271,9 +274,14 @@ async function build() {
     if (currentArtifacts !== artifactModule) {
       fail("workers/registry/src/plugin-artifacts.js is out of date. Run npm run plugins:build.");
     }
+    if (currentWebRegistry !== webRegistryJSON) {
+      fail("web/src/generated/registry.json is out of date. Run npm run plugins:build.");
+    }
   } else {
+    await mkdir(path.dirname(webRegistryPath), { recursive: true });
     await writeFile(registryDataPath, registryModule);
     await writeFile(artifactsPath, artifactModule);
+    await writeFile(webRegistryPath, webRegistryJSON);
   }
 
   console.log(`${checkOnly ? "Checked" : "Built"} ${plugins.length} plugin package(s).`);
