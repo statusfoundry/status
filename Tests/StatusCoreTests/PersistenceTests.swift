@@ -203,6 +203,77 @@ import Testing
     #expect(try store.resourceStateSnapshot(resourceID: "res_app") == snapshot)
 }
 
+@Test func emptyDashboardSnapshotUsesLocalFirstEmptyState() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+
+    let snapshot = try store.dashboardSnapshot()
+
+    #expect(snapshot == .empty)
+}
+
+@Test func dashboardSnapshotReadsPersistedRows() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    try insertResourceFixture(database, resourceID: "res_app")
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let url = try #require(URL(string: "https://appstoreconnect.apple.com/apps/123"))
+    let event = Event(
+        id: "evt_review_rejected",
+        provider: "appstoreconnect",
+        type: "app.review.rejected",
+        resourceID: "res_app",
+        resourceName: "Example App",
+        severity: .critical,
+        title: "App rejected",
+        summary: "Example App needs a reviewer reply.",
+        timestamp: now,
+        actionURL: url,
+        fingerprint: "appstoreconnect:app.review.rejected:res_app:REJECTED"
+    )
+    let item = StatusItem(
+        id: "sti_review_rejected",
+        resourceID: "res_app",
+        severity: .critical,
+        title: "App rejected",
+        summary: "Example App needs a reviewer reply.",
+        state: .open,
+        updatedAt: now,
+        actionLink: ActionLink(id: "open", label: "Open", url: url)
+    )
+    let audit = AuditEntry(
+        id: "aud_review_rejected",
+        title: "Event ingested",
+        detail: "app.review.rejected entered the event pipeline.",
+        timestamp: now,
+        status: "success",
+        eventID: event.id
+    )
+
+    try store.insertEvent(event)
+    try store.insertStatusItem(item)
+    try store.insertAuditEntry(audit)
+    try database.execute(
+        """
+        INSERT INTO metrics
+        (id, resource_id, label, value, delta, severity, updated_at)
+        VALUES ('met_review', 'res_app', 'Review state', 'Rejected', 'now', 'critical', ?)
+        """,
+        bindings: [.text("2026-07-07T12:00:00Z")]
+    )
+
+    let snapshot = try store.dashboardSnapshot(now: now)
+
+    #expect(snapshot.headline == "1 critical item")
+    #expect(snapshot.statusItems == [item])
+    #expect(snapshot.recentEvents == [event])
+    #expect(snapshot.metrics.map(\.label) == ["Review state"])
+    #expect(snapshot.integrations.map(\.name) == ["Example Account"])
+    #expect(snapshot.auditEntries == [audit])
+}
+
 @Test func triggerDefinitionRoundTripsThroughSQLite() throws {
     let database = try temporaryDatabase()
     try StatusDatabaseMigrator.migrate(database)

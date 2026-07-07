@@ -119,17 +119,19 @@ public final class StatusPersistenceStore {
         guard let row = try database.query("SELECT * FROM status_items WHERE id = ?", bindings: [.text(id)]).first else {
             return nil
         }
-        let actionURL = row.optionalURL("action_url")
-        return try StatusItem(
-            id: row.requiredText("id"),
-            resourceID: row.requiredText("resource_id"),
-            severity: Severity(rawValue: row.requiredText("severity")) ?? .notice,
-            title: row.requiredText("title"),
-            summary: row.requiredText("summary"),
-            state: StatusItemState(rawValue: row.requiredText("state")) ?? .open,
-            updatedAt: ISO8601.date(from: row.requiredText("updated_at")),
-            actionLink: actionURL.map { ActionLink(id: "open", label: "Open", url: $0) }
-        )
+        return try statusItem(from: row)
+    }
+
+    public func statusItems(limit: Int = 20) throws -> [StatusItem] {
+        try database.query(
+            """
+            SELECT * FROM status_items
+            WHERE state IN ('open', 'snoozed')
+            ORDER BY updated_at DESC, id ASC
+            LIMIT ?
+            """,
+            bindings: [.integer(Int64(limit))]
+        ).map(statusItem(from:))
     }
 
     public func insertAuditEntry(_ entry: AuditEntry) throws {
@@ -239,16 +241,18 @@ public final class StatusPersistenceStore {
         guard let row = try database.query("SELECT * FROM audit_entries WHERE id = ?", bindings: [.text(id)]).first else {
             return nil
         }
-        return try AuditEntry(
-            id: row.requiredText("id"),
-            title: row.requiredText("title"),
-            detail: row.requiredText("detail"),
-            timestamp: ISO8601.date(from: row.requiredText("timestamp")),
-            status: row.requiredText("status"),
-            jobID: row.optionalText("job_id"),
-            eventID: row.optionalText("event_id"),
-            actionRunID: row.optionalText("action_run_id")
-        )
+        return try auditEntry(from: row)
+    }
+
+    public func auditEntries(limit: Int = 20) throws -> [AuditEntry] {
+        try database.query(
+            """
+            SELECT * FROM audit_entries
+            ORDER BY timestamp DESC, id ASC
+            LIMIT ?
+            """,
+            bindings: [.integer(Int64(limit))]
+        ).map(auditEntry(from:))
     }
 
     public func upsertResourceStateSnapshot(_ snapshot: ResourceStateSnapshot) throws {
@@ -375,6 +379,55 @@ public final class StatusPersistenceStore {
         .first
     }
 
+    public func recentEvents(limit: Int = 20) throws -> [Event] {
+        try database.query(
+            """
+            SELECT * FROM events
+            ORDER BY timestamp DESC, id ASC
+            LIMIT ?
+            """,
+            bindings: [.integer(Int64(limit))]
+        ).map(event(from:))
+    }
+
+    public func metrics() throws -> [Metric] {
+        try database.query("SELECT * FROM metrics ORDER BY label ASC").map(metric(from:))
+    }
+
+    public func integrationSummaries() throws -> [IntegrationSummary] {
+        try database.query(
+            """
+            SELECT id, provider, display_name, status, last_error, last_refreshed_at
+            FROM accounts
+            ORDER BY display_name ASC, id ASC
+            """
+        ).map(integrationSummary(from:))
+    }
+
+    public func dashboardSnapshot(now: Date = Date()) throws -> DashboardSnapshot {
+        let items = try statusItems()
+        let events = try recentEvents(limit: 10)
+        let metrics = try metrics()
+        let integrations = try integrationSummaries()
+        let audit = try auditEntries(limit: 10)
+
+        return DashboardSnapshot(
+            headline: dashboardHeadline(statusItems: items, integrations: integrations),
+            summary: dashboardSummary(
+                statusItems: items,
+                recentEvents: events,
+                integrations: integrations,
+                auditEntries: audit,
+                now: now
+            ),
+            statusItems: items,
+            recentEvents: events,
+            metrics: metrics,
+            integrations: integrations,
+            auditEntries: audit
+        )
+    }
+
     public func statusItemCount() throws -> Int {
         try count("status_items")
     }
@@ -389,6 +442,128 @@ public final class StatusPersistenceStore {
             return 0
         }
         return Int(count)
+    }
+
+    private func statusItem(from row: [String: SQLiteValue]) throws -> StatusItem {
+        let actionURL = row.optionalURL("action_url")
+        return try StatusItem(
+            id: row.requiredText("id"),
+            resourceID: row.requiredText("resource_id"),
+            severity: Severity(rawValue: row.requiredText("severity")) ?? .notice,
+            title: row.requiredText("title"),
+            summary: row.requiredText("summary"),
+            state: StatusItemState(rawValue: row.requiredText("state")) ?? .open,
+            updatedAt: ISO8601.date(from: row.requiredText("updated_at")),
+            actionLink: actionURL.map { ActionLink(id: "open", label: "Open", url: $0) }
+        )
+    }
+
+    private func auditEntry(from row: [String: SQLiteValue]) throws -> AuditEntry {
+        return try AuditEntry(
+            id: row.requiredText("id"),
+            title: row.requiredText("title"),
+            detail: row.requiredText("detail"),
+            timestamp: ISO8601.date(from: row.requiredText("timestamp")),
+            status: row.requiredText("status"),
+            jobID: row.optionalText("job_id"),
+            eventID: row.optionalText("event_id"),
+            actionRunID: row.optionalText("action_run_id")
+        )
+    }
+
+    private func metric(from row: [String: SQLiteValue]) throws -> Metric {
+        try Metric(
+            id: row.requiredText("id"),
+            resourceID: row.requiredText("resource_id"),
+            label: row.requiredText("label"),
+            value: row.requiredText("value"),
+            delta: row.optionalText("delta"),
+            severity: Severity(rawValue: row.requiredText("severity")) ?? .notice
+        )
+    }
+
+    private func integrationSummary(from row: [String: SQLiteValue]) throws -> IntegrationSummary {
+        let lastError = row.optionalText("last_error")
+        let status = try row.requiredText("status")
+        let severity: Severity = if lastError?.isEmpty == false {
+            .warning
+        } else if status == "connected" {
+            .ok
+        } else {
+            .notice
+        }
+        return try IntegrationSummary(
+            id: row.requiredText("id"),
+            name: row.requiredText("display_name"),
+            provider: row.requiredText("provider"),
+            state: lastError?.isEmpty == false ? "Needs attention" : status.capitalized,
+            severity: severity,
+            lastSyncDescription: lastRefreshDescription(row.optionalText("last_refreshed_at"))
+        )
+    }
+
+    private func dashboardHeadline(statusItems: [StatusItem], integrations: [IntegrationSummary]) -> String {
+        let criticalCount = statusItems.filter { $0.severity == .critical }.count
+        if criticalCount == 1 {
+            return "1 critical item"
+        }
+        if criticalCount > 1 {
+            return "\(criticalCount) critical items"
+        }
+
+        let attentionCount = statusItems.filter { $0.severity >= .warning }.count
+        if attentionCount == 1 {
+            return "1 item needs attention"
+        }
+        if attentionCount > 1 {
+            return "\(attentionCount) items need attention"
+        }
+        if integrations.isEmpty {
+            return "All clear"
+        }
+        return "Everything tracked is okay"
+    }
+
+    private func dashboardSummary(
+        statusItems: [StatusItem],
+        recentEvents: [Event],
+        integrations: [IntegrationSummary],
+        auditEntries: [AuditEntry],
+        now: Date
+    ) -> String {
+        if statusItems.isEmpty, recentEvents.isEmpty, integrations.isEmpty, auditEntries.isEmpty {
+            return "No tracked events or integrations are stored on this device yet."
+        }
+
+        let openCount = statusItems.count
+        let integrationCount = integrations.count
+        let eventCount = recentEvents.count
+        if openCount == 0 {
+            return "\(integrationCount) integrations tracked, \(eventCount) recent events, no open attention items."
+        }
+
+        let newest = statusItems.map(\.updatedAt).max() ?? now
+        return "\(openCount) open attention items across \(integrationCount) integrations. Newest update: \(lastRefreshDescription(ISO8601.string(from: newest)))."
+    }
+
+    private func lastRefreshDescription(_ isoDate: String?) -> String {
+        guard let isoDate, let date = try? ISO8601.date(from: isoDate) else {
+            return "Never synced"
+        }
+        let seconds = max(0, Int(Date().timeIntervalSince(date)))
+        if seconds < 60 {
+            return "Just now"
+        }
+        let minutes = seconds / 60
+        if minutes < 60 {
+            return "\(minutes) min ago"
+        }
+        let hours = minutes / 60
+        if hours < 24 {
+            return "\(hours) hr ago"
+        }
+        let days = hours / 24
+        return "\(days) day\(days == 1 ? "" : "s") ago"
     }
 
     private func trigger(from row: [String: SQLiteValue]) throws -> TriggerDefinition {

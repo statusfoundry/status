@@ -13,8 +13,6 @@ struct StatusMacApp: App {
 }
 
 private struct MacRootView: View {
-    private let snapshot = MockDashboard.snapshot
-
     var body: some View {
         NavigationSplitView {
             List(selection: .constant("overview")) {
@@ -33,8 +31,14 @@ private struct MacRootView: View {
             }
             .navigationTitle("Status")
         } detail: {
-            DashboardView(snapshot: snapshot)
+            DashboardContainerView(viewModel: makeDashboardViewModel())
                 .navigationTitle("Overview")
+        }
+    }
+
+    private func makeDashboardViewModel() -> DashboardViewModel {
+        DashboardViewModel {
+            try LocalStatusStore.openApplicationSupportStore().dashboardSnapshot()
         }
     }
 }

@@ -259,4 +259,14 @@ public struct DashboardSnapshot: Codable, Equatable, Sendable {
         self.integrations = integrations
         self.auditEntries = auditEntries
     }
+
+    public static let empty = DashboardSnapshot(
+        headline: "All clear",
+        summary: "No tracked events or integrations are stored on this device yet.",
+        statusItems: [],
+        recentEvents: [],
+        metrics: [],
+        integrations: [],
+        auditEntries: []
+    )
 }

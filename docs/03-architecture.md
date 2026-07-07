@@ -193,6 +193,12 @@ sync_state
 
 Secrets are never stored in the database. Store only references to Keychain entries.
 
+Current implementation status:
+
+- macOS and iOS open the local SQLite database from Application Support at launch.
+- The dashboard renders persisted status items, events, metrics, accounts, and audit entries through `StatusPersistenceStore.dashboardSnapshot`.
+- Empty local databases render a calm empty state; `MockDashboard` is reserved for previews and tests.
+
 ## Plugin registry
 
 The registry will be hosted on Cloudflare. The initial shape is static registry metadata plus signed ZIP packages, with a Cloudflare Worker providing the registry API.

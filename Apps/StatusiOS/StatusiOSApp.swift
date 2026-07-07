@@ -12,12 +12,10 @@ struct StatusiOSApp: App {
 }
 
 private struct IOSRootView: View {
-    private let snapshot = MockDashboard.snapshot
-
     var body: some View {
         TabView {
             NavigationStack {
-                DashboardView(snapshot: snapshot)
+                DashboardContainerView(viewModel: makeDashboardViewModel())
                     .navigationTitle("Overview")
             }
             .tabItem {
@@ -25,7 +23,7 @@ private struct IOSRootView: View {
             }
 
             NavigationStack {
-                DashboardView(snapshot: snapshot)
+                DashboardContainerView(viewModel: makeDashboardViewModel())
                     .navigationTitle("Alerts")
             }
             .tabItem {
@@ -33,7 +31,7 @@ private struct IOSRootView: View {
             }
 
             NavigationStack {
-                DashboardView(snapshot: snapshot)
+                DashboardContainerView(viewModel: makeDashboardViewModel())
                     .navigationTitle("Integrations")
             }
             .tabItem {
@@ -47,6 +45,12 @@ private struct IOSRootView: View {
             .tabItem {
                 Label("Settings", systemImage: "gearshape")
             }
+        }
+    }
+
+    private func makeDashboardViewModel() -> DashboardViewModel {
+        DashboardViewModel {
+            try LocalStatusStore.openApplicationSupportStore().dashboardSnapshot()
         }
     }
 }
