@@ -219,6 +219,13 @@ coreVersion=1.0.0
 installedPluginIds=...
 ```
 
+Current implementation status:
+
+- The registry Worker implements `GET /v1/plugins`, `GET /v1/plugins/{pluginId}`, `GET /v1/plugins/{pluginId}/versions`, `GET /v1/plugins/{pluginId}/versions/{version}`, `GET /v1/registry`, `GET /v1/revocations`, and `/health`.
+- The initial static registry metadata includes official App Store Connect, GitHub, and Website Uptime plugin listings.
+- Platform and minimum core-version filtering are supported for list/detail version responses.
+- Public direct upload is intentionally not implemented; third-party plugins remain review-based as described above.
+
 The Worker can return only compatible plugins, but the native app must still verify compatibility locally.
 
 ## Download flow

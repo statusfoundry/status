@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 web",
     "build": "npm run web:build",
-    "check": "npm run typecheck && npm run web:build && npm run registry:check",
+    "check": "npm run typecheck && npm run web:build && npm run registry:test && npm run registry:check",
     "typecheck": "vue-tsc --noEmit",
     "web:build": "vite build web",
     "web:preview": "vite preview --host 0.0.0.0 --outDir web/dist",
+    "registry:test": "node --test workers/registry/src/*.test.js",
     "registry:check": "WRANGLER_WRITE_LOGS=false wrangler deploy --config workers/registry/wrangler.toml --dry-run",
     "registry:deploy": "WRANGLER_WRITE_LOGS=false wrangler deploy --config workers/registry/wrangler.toml",
     "pages:deploy": "wrangler pages deploy web/dist --project-name status"
