@@ -120,6 +120,43 @@ public final class PluginRuntimeService: @unchecked Sendable {
         return try await runQueuedPluginJob(jobID: job.id, headers: headers, now: now)
     }
 
+    @discardableResult
+    public func enqueueDueConfiguredPluginJobs(now: Date = Date()) throws -> [JobRecord] {
+        var jobs: [JobRecord] = []
+        for var trigger in try store.triggers() where isDueCronTrigger(trigger, at: now) {
+            guard let requestID = trigger.requestID,
+                  let accountID = try configuredAccountID(for: trigger) else {
+                continue
+            }
+            let job = JobRecord(
+                id: jobID(pluginID: trigger.pluginID, requestID: requestID, accountID: accountID, date: now),
+                pluginID: trigger.pluginID,
+                triggerID: trigger.id,
+                accountID: accountID,
+                status: .queued,
+                queuedAt: now
+            )
+            try store.upsertJob(job)
+            trigger.lastRunAt = now
+            trigger.nextRunAt = nextRunDate(for: trigger, from: now)
+            try store.upsertTrigger(trigger, updatedAt: now)
+            jobs.append(job)
+        }
+        return jobs
+    }
+
+    public func runDueConfiguredPluginJobs(
+        headers: [String: String] = [:],
+        now: Date = Date()
+    ) async throws -> [PluginRequestJobResult] {
+        let jobs = try enqueueDueConfiguredPluginJobs(now: now)
+        var results: [PluginRequestJobResult] = []
+        for job in jobs {
+            results.append(try await runQueuedPluginJob(jobID: job.id, headers: headers, now: now))
+        }
+        return results
+    }
+
     public func runQueuedPluginJob(
         jobID: String,
         headers: [String: String] = [:],
@@ -328,6 +365,37 @@ public final class PluginRuntimeService: @unchecked Sendable {
         for event in result.mappingOutput.events where insertedEventIDs.contains(event.id) {
             _ = try pipeline.processStoredRules(for: event)
         }
+    }
+
+    private func isDueCronTrigger(_ trigger: TriggerDefinition, at date: Date) -> Bool {
+        guard trigger.enabled, trigger.kind == .cron else {
+            return false
+        }
+        if let nextRunAt = trigger.nextRunAt {
+            return nextRunAt <= date
+        }
+        guard let lastRunAt = trigger.lastRunAt else {
+            return true
+        }
+        guard let intervalSeconds = trigger.intervalSeconds else {
+            return false
+        }
+        return lastRunAt.addingTimeInterval(intervalSeconds) <= date
+    }
+
+    private func nextRunDate(for trigger: TriggerDefinition, from date: Date) -> Date? {
+        guard trigger.kind == .cron, let intervalSeconds = trigger.intervalSeconds else {
+            return nil
+        }
+        return date.addingTimeInterval(intervalSeconds)
+    }
+
+    private func configuredAccountID(for trigger: TriggerDefinition) throws -> String? {
+        if let accountID = trigger.accountID,
+           try store.accountConfiguration(accountID: accountID) != nil {
+            return accountID
+        }
+        return try store.accountConfigurations(pluginID: trigger.pluginID).first?.id
     }
 
     private func jobID(pluginID: String, requestID: String, accountID: String, date: Date) -> String {

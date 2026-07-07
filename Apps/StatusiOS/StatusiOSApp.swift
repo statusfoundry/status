@@ -2,7 +2,7 @@ import StatusCore
 import StatusUI
 import SwiftUI
 import UIKit
-import UserNotifications
+@preconcurrency import UserNotifications
 
 @main
 struct StatusiOSApp: App {
@@ -60,6 +60,9 @@ private struct IOSRootView: View {
             .tabItem {
                 Label("Settings", systemImage: "gearshape")
             }
+        }
+        .task {
+            await runBackgroundPluginLoop()
         }
     }
 
@@ -169,6 +172,28 @@ private struct IOSRootView: View {
         let store = try LocalStatusStore.openApplicationSupportStore()
         let service = PluginRuntimeService(store: store)
         return try WebsitePluginSetup.saveHost(value, pluginID: pluginID, service: service)
+    }
+
+    private func runBackgroundPluginLoop() async {
+        await runDueConfiguredPluginJobs()
+        while Task.isCancelled == false {
+            do {
+                try await Task.sleep(nanoseconds: 300 * 1_000_000_000)
+            } catch {
+                return
+            }
+            await runDueConfiguredPluginJobs()
+        }
+    }
+
+    private func runDueConfiguredPluginJobs() async {
+        do {
+            let store = try LocalStatusStore.openApplicationSupportStore()
+            let service = PluginRuntimeService(store: store, effectDispatcher: IOSActionEffectDispatcher())
+            _ = try await service.runDueConfiguredPluginJobs()
+        } catch {
+            // Background refresh errors are recorded on individual jobs where possible.
+        }
     }
 
     private func pluginInstallRoot() throws -> URL {
