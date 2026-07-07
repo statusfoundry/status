@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugins.status.app/schemas/plugin/v1/actions.schema.json",
+  "title": "Status plugin actions (actions.json)",
+  "description": "Controlled write outputs a plugin offers. Actions must be permissioned and every run is audited. Dangerous actions are unsupported in v1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["actions"],
+  "properties": {
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/action" }
+    }
+  },
+  "$defs": {
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "request"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Namespaced action id, e.g. jira.createIssue.",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)*$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "requiresWritePermission": {
+          "type": "boolean",
+          "default": false,
+          "description": "Must be true for any action that writes to an external service. The manifest must then declare the write-actions permission."
+        },
+        "safety": {
+          "description": "Action safety level. Defaults to review-required for write actions. `dangerous` actions are declared but unsupported in v1.",
+          "enum": ["safe", "review-required", "dangerous"]
+        },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fields"],
+          "properties": {
+            "fields": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/inputField" }
+            }
+          }
+        },
+        "request": {
+          "type": "string",
+          "description": "Name of the request in requests.json that performs the action."
+        }
+      }
+    },
+    "inputField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "type"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "description": "`template` fields accept {{...}} placeholders resolved against the triggering event; grammar in docs/16-mapping-language.md.",
+          "enum": ["text", "template", "select", "number", "toggle"]
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "help": {
+          "type": "string"
+        },
+        "default": {
+          "type": ["string", "number", "boolean"]
+        },
+        "options": {
+          "type": "array",
+          "description": "Static choices for `select` fields. When omitted on a select field, the app resolves options at runtime (for example, listing Jira projects).",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "label"],
+            "properties": {
+              "value": { "type": "string" },
+              "label": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -239,7 +239,7 @@ MVP is acceptable when:
 - at least one safe action can run;
 - audit log explains the action;
 - plugin docs and schema exist;
-- iOS app can read the same data model in companion form.
+- iOS app renders the same shared models in companion form, with mocked or locally refreshed data; cross-device sync is explicitly out of MVP scope.
 
 ## Product quality bar
 

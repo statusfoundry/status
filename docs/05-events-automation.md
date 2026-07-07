@@ -263,8 +263,13 @@ Plugin actions:
 jira.createIssue
 github.createIssue
 github.comment
-slack.sendMessage
 email.createDraft
+```
+
+Future illustrative examples, not planned for v1 and not backed by any planned integration:
+
+```txt
+slack.sendMessage
 calendar.createEvent
 ```
 

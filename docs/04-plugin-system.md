@@ -11,6 +11,10 @@ The app is the operating system.
 Plugins are adapters.
 ```
 
+## Formal schemas
+
+Every package file has a formal JSON Schema (draft 2020-12) under `schemas/plugin/v1/`. The loader validates each file against its schema before install; unknown fields fail validation. See `schemas/plugin/v1/README.md` for the unknown-field policy and versioning rules. The examples in this document validate against those schemas.
+
 ## Plugin package shape
 
 A plugin package is a signed archive:
@@ -48,13 +52,11 @@ Example:
   "minCoreVersion": "1.0.0",
   "platforms": ["macOS", "iOS"],
   "permissions": ["network", "keychain", "background-refresh"],
-  "domains": ["api.appstoreconnect.apple.com"],
-  "capabilities": {
-    "sources": ["app.review.rejected", "app.review.in_review", "app.version.ready_for_sale"],
-    "actions": []
-  }
+  "domains": ["api.appstoreconnect.apple.com"]
 }
 ```
+
+The manifest does not list emitted events or actions. `events.json` is the single source of truth for event declarations and `actions.json` for actions, so the two lists cannot drift apart.
 
 ## Permissions
 
@@ -102,10 +104,12 @@ none
 api-key
 bearer-token
 basic-auth
-oauth2
+oauth2   ← defined but deferred past MVP — see docs/07-security-privacy.md
 jwt-api-key
 private-key-jwt
 ```
+
+`oauth2` stays in the schema but no v1 plugin may use it; the auth decision and MVP auth paths live in `docs/07-security-privacy.md`.
 
 The plugin defines the auth shape. The app renders the setup form and stores secrets in Keychain.
 

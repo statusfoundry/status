@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugins.status.app/schemas/plugin/v1/manifest.schema.json",
+  "title": "Status plugin manifest (manifest.json)",
+  "description": "Identity, compatibility, permissions, and declared domains for a Status plugin package. Emitted events are declared in events.json and actions in actions.json; the manifest does not duplicate them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "version", "description", "minCoreVersion", "platforms", "permissions"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Reverse-DNS plugin identifier.",
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9][a-z0-9-]*)+$",
+      "examples": ["com.status.appstoreconnect"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable plugin name.",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "version": {
+      "$ref": "#/$defs/semver",
+      "description": "Package version."
+    },
+    "author": {
+      "type": "string",
+      "description": "Author or publisher name.",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "description": "Store category, e.g. Developer, Business, Content.",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "description": "Short human-readable summary of what the plugin shows and does.",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "minCoreVersion": {
+      "$ref": "#/$defs/semver",
+      "description": "Minimum Status core version this plugin requires."
+    },
+    "platforms": {
+      "type": "array",
+      "description": "Platforms the plugin supports.",
+      "items": { "enum": ["macOS", "iOS"] },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "permissions": {
+      "type": "array",
+      "description": "Every capability the plugin requests. Shown before install and during account setup.",
+      "items": {
+        "enum": [
+          "network",
+          "keychain",
+          "oauth",
+          "api-key",
+          "private-key",
+          "background-refresh",
+          "push-webhook",
+          "write-actions",
+          "local-notification-suggestion"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "domains": {
+      "type": "array",
+      "description": "Every domain the plugin intends to call. The request engine rejects undeclared domains.",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    }
+  }
+}

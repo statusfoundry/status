@@ -53,6 +53,7 @@ Start here:
 
 Detailed docs:
 
+- [Glossary](docs/00-glossary.md)
 - [Product soul](docs/01-product-soul.md)
 - [Requirements](docs/02-requirements.md)
 - [Architecture](docs/03-architecture.md)
@@ -67,8 +68,14 @@ Detailed docs:
 - [Ideas backlog](docs/12-ideas-backlog.md)
 - [Implementation plan](docs/13-implementation-plan.md)
 - [Documentation checkup](docs/14-documentation-checkup.md)
+- [Data model](docs/15-data-model.md)
+- [Mapping language](docs/16-mapping-language.md)
+- [Event semantics](docs/17-event-semantics.md)
+- [Testing](docs/18-testing.md)
 - [Cloudflare platform](docs/19-cloudflare-platform.md)
 - [Handoff checklist](docs/20-handoff-checklist.md)
+
+Plugin package schemas live in [`schemas/plugin/v1/`](schemas/plugin/v1/).
 
 ## Suggested MVP
 

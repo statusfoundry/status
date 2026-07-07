@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugins.status.app/schemas/plugin/v1/requests.schema.json",
+  "title": "Status plugin requests (requests.json)",
+  "description": "Declarative HTTP request definitions. Every URL host must appear in the manifest `domains` list; the request engine rejects undeclared domains.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["requests"],
+  "properties": {
+    "requests": {
+      "type": "object",
+      "description": "Named request definitions, referenced by triggers and actions.",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": { "$ref": "#/$defs/request" }
+    }
+  },
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "url"],
+      "properties": {
+        "method": {
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]
+        },
+        "url": {
+          "$ref": "#/$defs/templateString",
+          "description": "Absolute HTTPS URL. May contain template placeholders."
+        },
+        "auth": {
+          "type": "string",
+          "description": "Which auth configuration to apply. `default` uses the plugin's auth.json definition.",
+          "default": "default"
+        },
+        "headers": {
+          "type": "object",
+          "description": "Extra request headers. Values may contain template placeholders.",
+          "additionalProperties": { "$ref": "#/$defs/templateString" }
+        },
+        "query": {
+          "type": "object",
+          "description": "Query parameters. Values may contain template placeholders.",
+          "additionalProperties": { "$ref": "#/$defs/templateString" }
+        },
+        "body": {
+          "description": "Request body: a JSON object whose string values may contain template placeholders, or a raw template string.",
+          "type": ["object", "string"]
+        },
+        "pagination": {
+          "$ref": "#/$defs/pagination"
+        },
+        "timeoutSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 300
+        }
+      }
+    },
+    "pagination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": ["jsonapi-next-link", "next-link", "cursor", "page"]
+        },
+        "path": {
+          "$ref": "#/$defs/selector",
+          "description": "Selector for the next link or cursor in the response."
+        },
+        "param": {
+          "type": "string",
+          "description": "Query parameter name for cursor or page based pagination."
+        },
+        "pageSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxPages": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Safety cap on pages fetched per job."
+        }
+      }
+    },
+    "selector": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque selector expression. Grammar is defined in docs/16-mapping-language.md."
+    },
+    "templateString": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque template string; {{...}} placeholder grammar is defined in docs/16-mapping-language.md."
+    }
+  }
+}

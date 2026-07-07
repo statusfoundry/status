@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugins.status.app/schemas/plugin/v1/setup.schema.json",
+  "title": "Status plugin setup form (setup.schema.json)",
+  "description": "Non-credential account setup form, rendered natively by the app after auth. Use auth.json for credentials; use this file for configuration such as choosing a project, workspace, or refresh scope.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["fields"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Optional form title. Defaults to the plugin name."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional short explanation shown above the form."
+    },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/field" }
+    }
+  },
+  "$defs": {
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "type"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": ["text", "secret", "secret-file", "url", "number", "toggle", "select"]
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "help": {
+          "type": "string"
+        },
+        "default": {
+          "type": ["string", "number", "boolean"]
+        },
+        "options": {
+          "type": "array",
+          "description": "Choices for `select` fields.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "label"],
+            "properties": {
+              "value": { "type": "string" },
+              "label": { "type": "string" }
+            }
+          }
+        }
+      },
+      "if": {
+        "properties": { "type": { "const": "select" } }
+      },
+      "then": {
+        "required": ["options"]
+      }
+    }
+  }
+}

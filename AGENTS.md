@@ -11,7 +11,11 @@ This repository currently contains documentation only. There is no code, build s
 1. This file — work rules, non-negotiables, definition of done, decision hierarchy.
 2. `DOCTRINE.md` — non-negotiable product beliefs.
 3. `SPEC.md` — canonical product and technical spec: the core pipeline (`Trigger → Job → Event → Rule → Action → Notification → Audit log`), the common object model all plugins normalize into, storage, and MVP scope.
-4. `docs/01`–`docs/12` — detailed docs (architecture in `03`, plugin system in `04`, events/automation in `05`).
+4. `docs/00`–`docs/12` — detailed docs (glossary in `00`, architecture in `03`, plugin system in `04`, events/automation in `05`).
+5. `docs/13-implementation-plan.md` — the execution plan: work packages, dependencies, agent assignments.
+6. `docs/20-handoff-checklist.md` — the operational runbook and non-stop defaults for implementation runs.
+
+Implementation contracts: data model in `docs/15`, mapping language in `docs/16`, event semantics in `docs/17`, testing strategy in `docs/18`, plugin schemas in `schemas/plugin/v1/`.
 
 ## Mission
 

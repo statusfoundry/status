@@ -46,6 +46,8 @@ Responsibilities:
 
 Do not assume iOS can act as an always-on automation runner.
 
+v1 data posture: the iOS app is a dashboard shell built on the same shared models, using mocked or locally refreshed data. Real cross-device data sync (iCloud or relay-based) is deferred and must be specced before it is claimed anywhere. See `docs/00-glossary.md` and `docs/02-requirements.md`.
+
 ## Core pipeline
 
 Everything enters one pipeline:
@@ -344,7 +346,7 @@ Minimum MVP integrations:
 
 - Website uptime;
 - App Store Connect;
-- GitHub or Jira;
+- GitHub (Jira follows as the second external target in Phase 7);
 - Generic webhook.
 
 ## Naming

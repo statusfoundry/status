@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugins.status.app/schemas/plugin/v1/auth.schema.json",
+  "title": "Status plugin auth definition (auth.json)",
+  "description": "Declares how the plugin authenticates. The app renders the setup form from `fields` and stores secrets in Keychain. Plugins never access Keychain directly.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type"],
+  "properties": {
+    "type": {
+      "description": "Auth mechanism. `oauth2` is accepted by this schema but deferred for v1 pending the auth decision in docs/07-security-privacy.md.",
+      "enum": ["none", "api-key", "bearer-token", "basic-auth", "oauth2", "jwt-api-key", "private-key-jwt"]
+    },
+    "fields": {
+      "type": "array",
+      "description": "Credential fields the user must provide during setup.",
+      "items": { "$ref": "#/$defs/field" }
+    }
+  },
+  "$defs": {
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "type"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "description": "How the app renders and stores the field. `secret` and `secret-file` values go to Keychain.",
+          "enum": ["text", "secret", "secret-file", "url"]
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "help": {
+          "type": "string",
+          "description": "Short help text shown under the field."
+        }
+      }
+    }
+  }
+}

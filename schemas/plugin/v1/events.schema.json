@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugins.status.app/schemas/plugin/v1/events.schema.json",
+  "title": "Status plugin event declarations (events.json)",
+  "description": "The single source of truth for the events a plugin can emit. Every event type used in mappings.json and rules.presets.json must be declared here. Plugins do not send notifications directly; they suggest defaults, and the core and user preferences decide.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["events"],
+  "properties": {
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/eventDeclaration" }
+    }
+  },
+  "$defs": {
+    "eventDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "label"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Dotted lowercase event type, e.g. app.review.rejected.",
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "resourceType": {
+          "type": "string",
+          "description": "Resource type this event attaches to, matching a mappings.json resource type.",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "defaultSeverity": {
+          "enum": ["ok", "notice", "warning", "critical"],
+          "default": "notice"
+        },
+        "notificationDefault": {
+          "description": "Suggested notification mode. The core notification engine and user rules make the final decision.",
+          "enum": ["immediate", "digest", "dashboard-only", "silent-automation", "disabled"],
+          "default": "dashboard-only"
+        }
+      }
+    }
+  }
+}

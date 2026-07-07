@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugins.status.app/schemas/plugin/v1/mappings.schema.json",
+  "title": "Status plugin mappings (mappings.json)",
+  "description": "Converts service-specific payloads into Status common objects (resources and events). Selector, condition, and template strings are opaque here; their grammar is defined in docs/16-mapping-language.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "minProperties": 1,
+  "properties": {
+    "resources": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/resourceMapping" }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/eventMapping" }
+    }
+  },
+  "$defs": {
+    "resourceMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "name"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Resource type this mapping produces, e.g. app, repo, site.",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "request": {
+          "type": "string",
+          "description": "Optional name of the request in requests.json whose responses this mapping applies to. When omitted, the mapping applies to every payload the trigger routes to it."
+        },
+        "items": {
+          "$ref": "#/$defs/selector",
+          "description": "Optional selector for the array of items in the payload. Each item becomes one resource."
+        },
+        "id": { "$ref": "#/$defs/selector" },
+        "name": { "$ref": "#/$defs/selector" },
+        "fields": {
+          "type": "object",
+          "description": "Extra normalized fields, each a selector into the item payload.",
+          "propertyNames": { "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$" },
+          "additionalProperties": { "$ref": "#/$defs/selector" }
+        },
+        "actionUrl": {
+          "$ref": "#/$defs/templateString",
+          "description": "Deep link into the source tool."
+        }
+      }
+    },
+    "eventMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "title"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Event type emitted when this mapping matches. Must be declared in events.json.",
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$"
+        },
+        "request": {
+          "type": "string",
+          "description": "Optional name of the request in requests.json whose responses this mapping applies to."
+        },
+        "items": {
+          "$ref": "#/$defs/selector",
+          "description": "Optional selector for the array of items to evaluate."
+        },
+        "when": {
+          "$ref": "#/$defs/condition",
+          "description": "Condition that must hold for the event to be emitted. When omitted, the event is emitted for every item."
+        },
+        "resourceId": { "$ref": "#/$defs/selector" },
+        "title": { "$ref": "#/$defs/templateString" },
+        "summary": { "$ref": "#/$defs/templateString" },
+        "severity": {
+          "enum": ["ok", "notice", "warning", "critical"],
+          "description": "Severity for emitted events. Defaults to the event's defaultSeverity in events.json."
+        },
+        "actionUrl": { "$ref": "#/$defs/templateString" },
+        "timestamp": {
+          "$ref": "#/$defs/selector",
+          "description": "Selector for the event timestamp. Defaults to the job time."
+        }
+      }
+    },
+    "selector": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque selector expression. Grammar is defined in docs/16-mapping-language.md."
+    },
+    "condition": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque condition expression. Grammar is defined in docs/16-mapping-language.md."
+    },
+    "templateString": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque template string; {{...}} placeholder grammar is defined in docs/16-mapping-language.md."
+    }
+  }
+}

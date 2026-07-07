@@ -56,6 +56,128 @@ Before installing a plugin, Status should verify:
 
 Unsigned local plugins should require Developer Mode and clear warnings.
 
+## Plugin signing
+
+This section is the implementable specification for package signing. It aligns with the hosting and trust model in `docs/19-cloudflare-platform.md`.
+
+### Algorithm
+
+Plugin packages are signed with Ed25519.
+
+- Signature: Ed25519 over the raw bytes of the package ZIP.
+- Checksum: SHA-256 of the same ZIP bytes, published alongside the signature.
+- The signature is detached. The ZIP itself is never modified after signing.
+
+Package artifacts per version:
+
+```txt
+{pluginId}-{version}.statusplugin.zip
+{pluginId}-{version}.statusplugin.zip.sig   ← detached Ed25519 signature over ZIP bytes
+sha256 checksum                             ← in registry metadata and version manifest
+```
+
+Registry metadata for a version must include `sha256` and `signature` (base64), plus the `keyId` of the signing key that produced the signature.
+
+### Signing authority and key custody
+
+Status holds the signing key. Plugin authors do not sign for the public registry; approved third-party packages are countersigned by Status after review, per `docs/19-cloudflare-platform.md`.
+
+Custody model:
+
+- The Ed25519 private key is generated offline and never lives in the repository or on developer laptops.
+- The active signing key is stored as a CI release secret (or a hardware token for manual releases). Only the release workflow that publishes to R2 can read it.
+- An offline backup of the key material lives outside CI (encrypted, offline storage).
+- Each key has a stable `keyId` (short identifier derived from the public key) so signatures, registry metadata, and revocations can name it.
+
+### Pinned public key and rotation
+
+The app ships with the registry public key compiled into the binary, keyed by `keyId`:
+
+```json
+{
+  "trustedKeys": [
+    { "keyId": "status-signing-1", "algorithm": "ed25519", "publicKey": "base64..." }
+  ]
+}
+```
+
+Rules:
+
+- The app never fetches trust roots from the network. A key becomes trusted only through an app update.
+- The pinned set is a list, so rotation works by shipping an app version that trusts both the old and new key, re-signing new packages with the new key, and later removing the old key from the pinned set.
+- A compromised key is handled by revoking its `keyId` (see revocation) and shipping an app update with the key removed.
+
+### Verification order
+
+Before installing or updating any registry package, the app verifies locally, in this order, failing closed at the first failure:
+
+```txt
+1. Hash        → SHA-256 of downloaded ZIP bytes equals the registry-declared sha256
+2. Signature   → detached .sig verifies over the same ZIP bytes with a pinned trusted key
+3. Revocation  → plugin ID, plugin ID + version, package hash, and signing keyId
+                 are all absent from the current revocation list
+4. Compatibility → plugin ID matches metadata, version matches, minCoreVersion
+                 and platforms are satisfied
+5. Permissions → requested permissions and declared domains are shown to the user;
+                 install proceeds only after approval
+```
+
+The registry Worker may pre-filter, but Cloudflare never makes the trust decision. Verification always runs on device.
+
+### Trust levels
+
+Per `docs/19-cloudflare-platform.md`:
+
+```txt
+official                → built or maintained by Status, signed by Status
+verified-third-party    → externally maintained, reviewed and countersigned by Status
+local-dev               → Developer Mode only, unsigned or self-signed
+```
+
+Only `official` and `verified-third-party` packages appear in the hosted registry, and both must pass the full verification order above. `local-dev` plugins are never silently upgraded from the public registry.
+
+### Revocation list
+
+The revocation list is JSON, served by the registry Worker with a static fallback:
+
+```txt
+https://plugins.status.app/v1/revocations
+https://plugins.status.app/registry/revocations.json
+```
+
+Format:
+
+```json
+{
+  "updatedAt": "2026-07-07T00:00:00Z",
+  "revocations": [
+    { "pluginId": "com.example.bad" },
+    { "pluginId": "com.example.buggy", "version": "1.2.0" },
+    { "sha256": "..." },
+    { "keyId": "status-signing-0" }
+  ]
+}
+```
+
+Each entry targets exactly one of: plugin ID (all versions), plugin ID + version, package hash, or signing key ID. Entries may carry an optional `reason` string for user-facing messaging.
+
+Check timing:
+
+- before every install;
+- before every update;
+- periodically for installed plugins: on app launch and at least every 24 hours.
+
+If a periodic check matches an installed plugin, the app disables the plugin, keeps its Keychain secrets untouched, and tells the user why. If the revocation list is unreachable, installs of new packages should warn or fail closed; already-installed plugins keep running against the last successfully fetched list.
+
+### Unsigned and local-dev plugins
+
+Unsigned plugins install only through Developer Mode:
+
+- Developer Mode is off by default and enabled in settings with an explanation of the risk.
+- Installing an unsigned plugin shows a blocking warning naming the plugin ID, requested permissions, and declared domains.
+- Local-dev plugins are visibly badged in the plugin list.
+- Local-dev plugins skip signature verification but not schema validation, domain enforcement, or the permission model.
+
 ## Network boundary
 
 Plugins must declare allowed domains.
@@ -92,6 +214,69 @@ Modify external resource
 ```
 
 Write permissions should not be granted simply because a plugin is installed. They should be requested when a rule/action requires them.
+
+## Authentication flows
+
+This section is the auth decision for v1. It resolves the open question from `docs/04-plugin-system.md`.
+
+### v1 auth types
+
+Plugins may declare these auth types in `auth.json`:
+
+```txt
+none
+api-key
+bearer-token
+basic-auth
+jwt-api-key
+private-key-jwt
+```
+
+`oauth2` is defined in the plugin schema but deferred past MVP. The app should reject registry plugins that declare `oauth2` until the OAuth design below is written.
+
+All auth types share the same model: the plugin declares the fields, the app renders the setup form natively, secrets go to Keychain, and the request engine injects credentials at request time. Plugins never read secrets directly.
+
+### MVP auth paths per integration
+
+Every roadmapped integration through Phase 7 has a feasible non-OAuth path:
+
+```txt
+Website uptime     → none
+Generic webhook    → none, or shared secret (HMAC/token) for incoming payloads
+RSS/feed           → none
+Manual status      → none
+Network check      → none
+Weather            → none, or provider api-key
+App Store Connect  → jwt-api-key (issuer ID + key ID + .p8 private key;
+                     app builds short-lived ES256 JWTs per request window)
+GitHub             → bearer-token (fine-grained personal access token;
+                     classic PAT acceptable for early local testing)
+Jira               → basic-auth (Atlassian account email + API token)
+```
+
+Later phases, for reference: Cloudflare uses an API token (bearer), Stripe uses a restricted API key. Neither needs OAuth.
+
+### OAuth deferral
+
+OAuth2 is deferred past MVP. A declarative plugin package cannot ship an OAuth client secret, and none of the MVP integrations need OAuth. Deferring removes an entire class of secret-distribution and redirect-handling work from v1.
+
+Consequence: the YouTube plugin (and any other Google integration) depends on OAuth and moves after the OAuth decision. It leaves the Phase 6–7 window and is scheduled only once the design below is settled.
+
+A future OAuth design must answer, before any OAuth plugin ships:
+
+- Client ID ownership: does Status register one client per provider and embed it in the app, or does the user supply their own client? Embedded client IDs are public by nature on native apps; the design must not rely on a confidential client secret.
+- PKCE: native flows must use authorization code + PKCE (S256), no implicit flow.
+- Redirect URI scheme: a custom URL scheme or universal link owned by the app, registered with each provider, and how the app validates state on callback.
+- Refresh responsibility: the core request engine owns token refresh, transparently, per account. Plugins never see refresh tokens.
+- Keychain storage: access token, refresh token, expiry, and scopes stored per account in Keychain, same rules as all other secrets.
+
+### Token refresh and failure behavior
+
+- Credentials that expire (JWT API keys, future OAuth tokens) are refreshed by the core request engine, never by plugin logic.
+- On auth failure (401/403, expired key, revoked token) the request fails closed: no retry storm, no credential guessing, no fallback host.
+- The affected account enters a `needs-reconnect` state. The app surfaces this as a status item on the dashboard and in the account settings, with a direct path to re-enter credentials.
+- Sync for that account pauses until the user reconnects. Other accounts and plugins are unaffected.
+- Auth failures are logged without the credential material.
 
 ## Action safety
 
@@ -236,14 +421,16 @@ Important risks:
 
 Mitigations:
 
-- plugin signatures;
+- Ed25519 plugin signatures verified against an app-pinned registry key;
 - declared domains;
 - Keychain-only secrets;
 - user-visible permissions;
 - read-only-first integrations;
 - action safety levels;
 - audit log;
-- revocation/blocklist;
+- revocation checks before install, before update, and periodically;
+- OAuth deferred past MVP, removing embedded-client-secret risk from v1;
+- fail-closed auth with a visible reconnect state;
 - limited relay storage;
 - no arbitrary plugin code in v1.
 

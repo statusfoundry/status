@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugins.status.app/schemas/plugin/v1/rules.presets.schema.json",
+  "title": "Status plugin rule presets (rules.presets.json)",
+  "description": "Suggested automations a plugin ships. Presets are optional, must explain their permissions, and follow the rule structure: when this happens, and these conditions match, then do these actions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["presets"],
+  "properties": {
+    "presets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/preset" }
+    }
+  },
+  "$defs": {
+    "preset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "when", "then"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "when": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["eventType"],
+          "properties": {
+            "eventType": {
+              "type": "string",
+              "description": "Status event type, declared in events.json.",
+              "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$"
+            },
+            "provider": {
+              "type": "string",
+              "description": "Restrict to a provider. Defaults to this plugin."
+            }
+          }
+        },
+        "if": {
+          "type": "array",
+          "description": "Conditions that must all match.",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/condition" }
+        },
+        "then": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/actionStep" }
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "operator"],
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operator": {
+          "enum": [
+            "equals",
+            "not_equals",
+            "contains",
+            "not_contains",
+            "starts_with",
+            "ends_with",
+            "greater_than",
+            "less_than",
+            "is_empty",
+            "is_not_empty",
+            "matches_severity"
+          ]
+        },
+        "value": {
+          "type": ["string", "number", "boolean"],
+          "description": "Comparison value. Not used with is_empty / is_not_empty."
+        }
+      }
+    },
+    "actionStep": {
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "Built-in action (e.g. notification.show) or a plugin action id declared in actions.json.",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)*$"
+        }
+      },
+      "additionalProperties": {
+        "type": ["string", "number", "boolean"],
+        "description": "Action input parameters, keyed by the action's input field keys. String values may contain {{...}} template placeholders; grammar in docs/16-mapping-language.md. This is the one deliberate exception to the closed-schema policy."
+      }
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugins.status.app/schemas/plugin/v1/views.schema.json",
+  "title": "Status plugin views (views.json)",
+  "description": "Which built-in app-owned view types the plugin uses and what data feeds them. Plugins never render custom UI; the app renders every view natively.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["views"],
+  "properties": {
+    "views": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/view" }
+    }
+  },
+  "$defs": {
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$"
+        },
+        "type": {
+          "enum": [
+            "overview_cards",
+            "resource_list",
+            "resource_detail",
+            "timeline",
+            "metric_grid",
+            "alert_list"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resourceType": {
+          "type": "string",
+          "description": "Resource type feeding this view. Required for resource_list and resource_detail.",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "fields": {
+          "type": "array",
+          "description": "Normalized resource fields to show, in order.",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "enum": ["resource_list", "resource_detail"] } }
+          },
+          "then": {
+            "required": ["id", "type", "resourceType"]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -348,6 +348,15 @@ Purpose:
 - support secret/token verification;
 - bridge unsupported services.
 
+### Local model before the relay
+
+Until the relay exists (roadmap Phase 10), a local-only Mac has no public URL, so "generic webhook" in v1 means:
+
+- a local HTTP listener on localhost, off by default and opt-in, for scripts and tools running on the same machine or LAN;
+- manual payload import (paste or file) for testing mappings and rules.
+
+Payloads still require the shared-secret/token check. True public inbound webhooks arrive with the relay and reuse the same payload shape, so nothing built against the local model changes later.
+
 Event shape:
 
 ```json

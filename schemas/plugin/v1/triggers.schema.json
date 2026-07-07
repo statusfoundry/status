@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plugins.status.app/schemas/plugin/v1/triggers.schema.json",
+  "title": "Status plugin triggers (triggers.json)",
+  "description": "Trigger definitions. Every trigger enters the same pipeline: Trigger → Job → Event → Rule → Action → Notification → Audit log.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["triggers"],
+  "properties": {
+    "triggers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/cronTrigger" },
+          { "$ref": "#/$defs/manualTrigger" },
+          { "$ref": "#/$defs/pushTrigger" },
+          { "$ref": "#/$defs/eventTrigger" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "triggerId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$"
+    },
+    "cronTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "label", "defaultSchedule", "request"],
+      "properties": {
+        "id": { "$ref": "#/$defs/triggerId" },
+        "type": { "const": "cron" },
+        "label": { "type": "string", "minLength": 1 },
+        "defaultSchedule": {
+          "type": "string",
+          "description": "Five-field cron expression. The user can override the schedule per account.",
+          "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$"
+        },
+        "request": {
+          "type": "string",
+          "description": "Name of the request in requests.json to run."
+        }
+      }
+    },
+    "manualTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "label", "request"],
+      "properties": {
+        "id": { "$ref": "#/$defs/triggerId" },
+        "type": { "const": "manual" },
+        "label": { "type": "string", "minLength": 1 },
+        "request": { "type": "string" }
+      }
+    },
+    "pushTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "label", "path"],
+      "properties": {
+        "id": { "$ref": "#/$defs/triggerId" },
+        "type": { "const": "push" },
+        "label": { "type": "string", "minLength": 1 },
+        "path": {
+          "type": "string",
+          "description": "Webhook path, routed through the optional Status Relay.",
+          "pattern": "^/[a-zA-Z0-9/_-]*$"
+        },
+        "signature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "enum": ["hmac-sha256", "hmac-sha1", "token", "none"] },
+            "header": {
+              "type": "string",
+              "description": "Header carrying the signature or token."
+            }
+          }
+        },
+        "events": {
+          "type": "array",
+          "description": "Provider-side event names this webhook subscribes to (source tool vocabulary, not Status event types).",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "eventTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "label", "eventType"],
+      "properties": {
+        "id": { "$ref": "#/$defs/triggerId" },
+        "type": { "const": "event" },
+        "label": { "type": "string", "minLength": 1 },
+        "eventType": {
+          "type": "string",
+          "description": "Status event type that starts this trigger.",
+          "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$"
+        },
+        "request": { "type": "string" }
+      }
+    }
+  }
+}
