@@ -34,8 +34,9 @@ The same pipeline is used for:
 - Manual triggers enqueue only when explicitly requested.
 - Failure backoff and success reset logic are implemented in core.
 - `InMemoryJobQueue` tracks queued/running/success/failed job lifecycle for tests and app scaffolding.
+- `StatusPersistenceStore` can round-trip trigger definitions and job records through SQLite.
 
-Persisted trigger/job storage, background timers, retry execution, timeouts, and job audit wiring remain planned work.
+Background timers, retry execution, timeouts, and job audit wiring remain planned work.
 
 ## Triggers
 

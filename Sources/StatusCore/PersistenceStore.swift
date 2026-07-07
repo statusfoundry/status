@@ -4,6 +4,8 @@ public final class StatusPersistenceStore {
     private let database: SQLiteDatabase
     private let stateEncoder = JSONEncoder()
     private let stateDecoder = JSONDecoder()
+    private let jsonEncoder = JSONEncoder()
+    private let jsonDecoder = JSONDecoder()
 
     public init(database: SQLiteDatabase) {
         self.database = database
@@ -197,6 +199,93 @@ public final class StatusPersistenceStore {
         )
     }
 
+    public func upsertTrigger(_ trigger: TriggerDefinition, updatedAt: Date) throws {
+        let metadata = TriggerMetadata(
+            failureCount: trigger.failureCount,
+            lastRunAt: trigger.lastRunAt.map(ISO8601.string(from:)),
+            nextRunAt: trigger.nextRunAt.map(ISO8601.string(from:))
+        )
+        try database.execute(
+            """
+            INSERT OR REPLACE INTO triggers
+            (id, plugin_id, account_id, type, label, enabled, schedule, metadata_json, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM triggers WHERE id = ?), ?), ?)
+            """,
+            bindings: [
+                .text(trigger.id),
+                .text(trigger.pluginID),
+                trigger.accountID.map { .text($0) } ?? .null,
+                .text(trigger.kind.rawValue),
+                .text(trigger.label),
+                .integer(trigger.enabled ? 1 : 0),
+                trigger.intervalSeconds.map { .text(String($0)) } ?? .null,
+                .text(try jsonString(metadata)),
+                .text(trigger.id),
+                .text(ISO8601.string(from: updatedAt)),
+                .text(ISO8601.string(from: updatedAt))
+            ]
+        )
+    }
+
+    public func trigger(id: String) throws -> TriggerDefinition? {
+        guard let row = try database.query("SELECT * FROM triggers WHERE id = ?", bindings: [.text(id)]).first else {
+            return nil
+        }
+        return try trigger(from: row)
+    }
+
+    public func triggers() throws -> [TriggerDefinition] {
+        try database.query("SELECT * FROM triggers ORDER BY id").map(trigger(from:))
+    }
+
+    public func upsertJob(_ job: JobRecord) throws {
+        let metadata = JobMetadata(queuedAt: ISO8601.string(from: job.queuedAt))
+        try database.execute(
+            """
+            INSERT OR REPLACE INTO jobs
+            (id, plugin_id, trigger_id, account_id, status, started_at, finished_at, error, emitted_event_ids, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            bindings: [
+                .text(job.id),
+                .text(job.pluginID),
+                .text(job.triggerID),
+                job.accountID.map { .text($0) } ?? .null,
+                .text(job.status.rawValue),
+                job.startedAt.map { .text(ISO8601.string(from: $0)) } ?? .null,
+                job.finishedAt.map { .text(ISO8601.string(from: $0)) } ?? .null,
+                job.error.map { .text($0) } ?? .null,
+                .text(try jsonString(job.emittedEventIDs)),
+                .text(try jsonString(metadata))
+            ]
+        )
+    }
+
+    public func job(id: String) throws -> JobRecord? {
+        guard let row = try database.query("SELECT * FROM jobs WHERE id = ?", bindings: [.text(id)]).first else {
+            return nil
+        }
+        return try job(from: row)
+    }
+
+    public func nextQueuedJob() throws -> JobRecord? {
+        try database.query(
+            """
+            SELECT * FROM jobs
+            WHERE status = ?
+            """,
+            bindings: [.text(JobStatus.queued.rawValue)]
+        )
+        .map(job(from:))
+        .sorted { lhs, rhs in
+            if lhs.queuedAt == rhs.queuedAt {
+                return lhs.id < rhs.id
+            }
+            return lhs.queuedAt < rhs.queuedAt
+        }
+        .first
+    }
+
     public func statusItemCount() throws -> Int {
         try count("status_items")
     }
@@ -212,6 +301,58 @@ public final class StatusPersistenceStore {
         }
         return Int(count)
     }
+
+    private func trigger(from row: [String: SQLiteValue]) throws -> TriggerDefinition {
+        let metadata = try optionalJSON(TriggerMetadata.self, from: row.optionalText("metadata_json")) ?? TriggerMetadata()
+        return try TriggerDefinition(
+            id: row.requiredText("id"),
+            pluginID: row.requiredText("plugin_id"),
+            accountID: row.optionalText("account_id"),
+            kind: TriggerKind(rawValue: row.requiredText("type")) ?? .manual,
+            label: row.requiredText("label"),
+            enabled: row.optionalInteger("enabled") != 0,
+            intervalSeconds: row.optionalText("schedule").flatMap(TimeInterval.init),
+            failureCount: metadata.failureCount,
+            lastRunAt: try metadata.lastRunAt.map(ISO8601.date(from:)),
+            nextRunAt: try metadata.nextRunAt.map(ISO8601.date(from:))
+        )
+    }
+
+    private func job(from row: [String: SQLiteValue]) throws -> JobRecord {
+        let metadata = try optionalJSON(JobMetadata.self, from: row.optionalText("metadata_json")) ?? JobMetadata()
+        let emittedEventIDs = try optionalJSON([String].self, from: row.optionalText("emitted_event_ids")) ?? []
+        return try JobRecord(
+            id: row.requiredText("id"),
+            pluginID: row.requiredText("plugin_id"),
+            triggerID: row.requiredText("trigger_id"),
+            accountID: row.optionalText("account_id"),
+            status: JobStatus(rawValue: row.requiredText("status")) ?? .queued,
+            queuedAt: ISO8601.date(from: metadata.queuedAt ?? row.optionalText("started_at") ?? "1970-01-01T00:00:00Z"),
+            startedAt: try row.optionalText("started_at").map(ISO8601.date(from:)),
+            finishedAt: try row.optionalText("finished_at").map(ISO8601.date(from:)),
+            error: row.optionalText("error"),
+            emittedEventIDs: emittedEventIDs
+        )
+    }
+
+    private func jsonString<T: Encodable>(_ value: T) throws -> String {
+        try String(decoding: jsonEncoder.encode(value), as: UTF8.self)
+    }
+
+    private func optionalJSON<T: Decodable>(_ type: T.Type, from string: String?) throws -> T? {
+        guard let string else { return nil }
+        return try jsonDecoder.decode(T.self, from: Data(string.utf8))
+    }
+}
+
+private struct TriggerMetadata: Codable {
+    var failureCount: Int = 0
+    var lastRunAt: String?
+    var nextRunAt: String?
+}
+
+private struct JobMetadata: Codable {
+    var queuedAt: String?
 }
 
 private enum ISO8601 {
@@ -249,6 +390,13 @@ private extension Dictionary where Key == String, Value == SQLiteValue {
     func optionalText(_ column: String) -> String? {
         guard case .text(let value)? = self[column] else {
             return nil
+        }
+        return value
+    }
+
+    func optionalInteger(_ column: String) -> Int64 {
+        guard case .integer(let value)? = self[column] else {
+            return 0
         }
         return value
     }

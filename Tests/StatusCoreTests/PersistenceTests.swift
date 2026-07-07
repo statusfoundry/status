@@ -120,6 +120,88 @@ import Testing
     #expect(try store.resourceStateSnapshot(resourceID: "res_app") == snapshot)
 }
 
+@Test func triggerDefinitionRoundTripsThroughSQLite() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let trigger = TriggerDefinition(
+        id: "trg_appstore_poll",
+        pluginID: "com.status.appstoreconnect",
+        accountID: "acc_asc",
+        kind: .cron,
+        label: "Poll App Store Connect",
+        enabled: true,
+        intervalSeconds: 900,
+        failureCount: 2,
+        lastRunAt: now,
+        nextRunAt: now.addingTimeInterval(120)
+    )
+
+    try store.upsertTrigger(trigger, updatedAt: now)
+
+    #expect(try store.trigger(id: trigger.id) == trigger)
+    #expect(try store.triggers() == [trigger])
+}
+
+@Test func jobRecordRoundTripsThroughSQLite() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let job = JobRecord(
+        id: "job_poll_01",
+        pluginID: "com.status.github",
+        triggerID: "trg_github",
+        accountID: "acc_github",
+        status: .success,
+        queuedAt: now,
+        startedAt: now.addingTimeInterval(1),
+        finishedAt: now.addingTimeInterval(3),
+        emittedEventIDs: ["evt_01", "evt_02"]
+    )
+
+    try store.upsertJob(job)
+
+    #expect(try store.job(id: job.id) == job)
+}
+
+@Test func nextQueuedJobReadsOldestQueuedSQLiteJob() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let first = JobRecord(
+        id: "job_01",
+        pluginID: "com.status.github",
+        triggerID: "trg_github",
+        status: .queued,
+        queuedAt: now
+    )
+    let second = JobRecord(
+        id: "job_02",
+        pluginID: "com.status.github",
+        triggerID: "trg_github",
+        status: .queued,
+        queuedAt: now.addingTimeInterval(60)
+    )
+    let failed = JobRecord(
+        id: "job_00_failed",
+        pluginID: "com.status.github",
+        triggerID: "trg_github",
+        status: .failed,
+        queuedAt: now.addingTimeInterval(-60),
+        finishedAt: now,
+        error: "Unauthorized"
+    )
+
+    try store.upsertJob(second)
+    try store.upsertJob(failed)
+    try store.upsertJob(first)
+
+    #expect(try store.nextQueuedJob() == first)
+}
+
 private func temporaryDatabase() throws -> SQLiteDatabase {
     let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("status-\(UUID().uuidString).sqlite")
