@@ -68,6 +68,7 @@ Detailed docs:
 - [Implementation plan](docs/13-implementation-plan.md)
 - [Documentation checkup](docs/14-documentation-checkup.md)
 - [Cloudflare platform](docs/19-cloudflare-platform.md)
+- [Handoff checklist](docs/20-handoff-checklist.md)
 
 ## Suggested MVP
 

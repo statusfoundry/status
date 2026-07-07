@@ -33,6 +33,8 @@ Summary:
 
 Use the checkup as the rationale for Milestone 0. Use this file as the execution plan.
 
+For a no-questions implementation run, use `docs/20-handoff-checklist.md`. It defines the working target, default decisions, first-pass checklist, validation expectations, and stop conditions.
+
 ## Milestone 0 — Spec hardening (docs only, no code)
 
 The existing docs define the product well but leave implementation-blocking gaps. Close them first. All WPs in this milestone are parallel except where noted.
