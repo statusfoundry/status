@@ -98,4 +98,14 @@ iOS should initially be a companion dashboard, not the primary always-on automat
 
 ## Current status
 
-This repository currently contains product, architecture, and implementation documentation only. Code should follow the docs, not redefine the product.
+This repository now contains the initial working foundation:
+
+- Swift shared core and shared SwiftUI package;
+- macOS and iOS app shells generated with XcodeGen;
+- mocked native dashboard;
+- plugin manifest, event, rule, and fingerprint primitives;
+- SQLite schema v0 migrator and first persistence store;
+- Vue/TypeScript/Sass website using `@sil/ui` and `bemm`;
+- Cloudflare registry Worker and deployment workflows.
+
+The product is not complete yet. Code must continue to follow the docs, not redefine the product.

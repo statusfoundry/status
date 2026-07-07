@@ -115,6 +115,24 @@ Schema changes are ordered, named, forward-only migrations run by a migration ru
 
 Schema v0 is a single initial migration creating everything below.
 
+## Implementation status
+
+StatusCore currently includes a dependency-light SQLite foundation using the Apple SDK `SQLite3` module:
+
+```txt
+SQLiteDatabase
+→ small statement/binding/query wrapper
+
+StatusDatabaseMigrator
+→ applies schema v0
+→ sets PRAGMA user_version = 1
+
+StatusPersistenceStore
+→ first round-trip store for events, status items, and audit entries
+```
+
+This is an implementation starting point, not a rejection of GRDB. GRDB can still replace or wrap this layer later if it materially reduces persistence complexity. The schema contract in this document remains authoritative either way.
+
 ## Tables
 
 Types shown are SQLite storage types. `NOT NULL` is stated explicitly; everything else is nullable.

@@ -4,7 +4,7 @@ This repository is documentation-first. Agents should preserve the product doctr
 
 ## Repository status
 
-This repository now contains documentation plus initial web/registry tooling. App code, when added, must follow the docs — not redefine the product.
+This repository now contains documentation, initial web/registry tooling, and the native Swift foundation. App code must follow the docs — not redefine the product.
 
 ## Build and validation commands
 
