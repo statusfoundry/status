@@ -40,6 +40,56 @@ import Testing
     #expect(RuleEngine.matchingRules(for: event, rules: [rule]).isEmpty)
 }
 
+@Test func actionRunnerRunsSafeNotificationAndCreatesAudit() throws {
+    let event = workflowFailedEvent()
+    let rule = Rule(
+        id: "rul_notify",
+        name: "Notify workflow failure",
+        enabled: true,
+        provider: "github",
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [
+            RuleActionDefinition(action: "notification.show", parameters: ["title": "Build failed"])
+        ]
+    )
+    let match = try #require(RuleEngine.matchingRules(for: event, rules: [rule]).first)
+    let now = Date(timeIntervalSince1970: 1_783_433_530)
+    let runner = ActionRunner(now: { now })
+
+    let results = runner.run(match)
+
+    #expect(results.count == 1)
+    #expect(runner.effects.notifications == [ActionRuntimeNotification(title: "Build failed", body: event.summary)])
+    #expect(results[0].actionRun.status == .success)
+    #expect(results[0].actionRun.action == "notification.show")
+    #expect(results[0].auditEntry.actionRunID == results[0].actionRun.id)
+    #expect(results[0].auditEntry.eventID == event.id)
+}
+
+@Test func actionRunnerDeniesReviewRequiredActionsWithoutPermission() throws {
+    let event = workflowFailedEvent()
+    let rule = Rule(
+        id: "rul_webhook",
+        name: "Webhook workflow failure",
+        enabled: true,
+        provider: "github",
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [
+            RuleActionDefinition(action: "webhook.post", parameters: ["url": "https://example.com/hooks/status"])
+        ]
+    )
+    let match = try #require(RuleEngine.matchingRules(for: event, rules: [rule]).first)
+    let runner = ActionRunner(now: { Date(timeIntervalSince1970: 1_783_433_530) })
+
+    let result = try #require(runner.run(match).first)
+
+    #expect(result.actionRun.status == .denied)
+    #expect(result.actionRun.error == "webhook.post requires explicit write permission before it can run.")
+    #expect(result.auditEntry.status == "denied")
+}
+
 @Test func fingerprintIsStableAndStateSensitive() {
     let first = EventFingerprint.make(
         EventFingerprintInput(

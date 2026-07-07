@@ -36,6 +36,7 @@ The same pipeline is used for:
 - `InMemoryJobQueue` tracks queued/running/success/failed job lifecycle for tests and app scaffolding.
 - `StatusPersistenceStore` can round-trip trigger definitions and job records through SQLite.
 - Audit entries can now attach job, event, and action-run provenance; persisted event ingestion and job lifecycle audit rows use those references.
+- The core action runner executes safe built-in local actions, records deterministic action-run rows, and denies review-required or unsupported actions until explicit permission/provider support exists.
 
 Background timers, retry execution, timeouts, and full action-run audit wiring remain planned work.
 
@@ -288,6 +289,12 @@ calendar.createEvent
 ```
 
 Actions must declare permissions.
+
+Current implementation status:
+
+- `notification.show`, `status.inbox.add`, `status.open_url`, and `audit.note` are safe local core actions.
+- `webhook.post`, `jira.createIssue`, `github.createIssue`, `github.comment`, and `email.createDraft` are review-required and are denied by the core runner until explicit write permission and provider execution are wired.
+- Unknown actions are recorded as unsupported rather than executed.
 
 ## Action safety levels
 

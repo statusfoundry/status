@@ -131,6 +131,28 @@ import Testing
     )
 }
 
+@Test func actionRunRoundTripsThroughSQLite() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let actionRun = ActionRunRecord(
+        id: "run_rul_notify_evt_01_0",
+        ruleID: "rul_notify",
+        eventID: "evt_01",
+        action: "notification.show",
+        status: .success,
+        input: ["title": "Build failed"],
+        result: ["delivered": "local"],
+        startedAt: now,
+        finishedAt: now.addingTimeInterval(1)
+    )
+
+    try store.upsertActionRun(actionRun)
+
+    #expect(try store.actionRun(id: actionRun.id) == actionRun)
+}
+
 @Test func resourceStateSnapshotRoundTripsThroughSQLite() throws {
     let database = try temporaryDatabase()
     try StatusDatabaseMigrator.migrate(database)

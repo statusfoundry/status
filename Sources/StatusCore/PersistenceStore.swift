@@ -166,6 +166,35 @@ public final class StatusPersistenceStore {
         )
     }
 
+    public func upsertActionRun(_ actionRun: ActionRunRecord) throws {
+        try database.execute(
+            """
+            INSERT OR REPLACE INTO action_runs
+            (id, rule_id, event_id, action, status, input_json, result_json, error, started_at, finished_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            bindings: [
+                .text(actionRun.id),
+                .text(actionRun.ruleID),
+                .text(actionRun.eventID),
+                .text(actionRun.action),
+                .text(actionRun.status.rawValue),
+                .text(try jsonString(actionRun.input)),
+                .text(try jsonString(actionRun.result)),
+                actionRun.error.map { .text($0) } ?? .null,
+                .text(ISO8601.string(from: actionRun.startedAt)),
+                actionRun.finishedAt.map { .text(ISO8601.string(from: $0)) } ?? .null
+            ]
+        )
+    }
+
+    public func actionRun(id: String) throws -> ActionRunRecord? {
+        guard let row = try database.query("SELECT * FROM action_runs WHERE id = ?", bindings: [.text(id)]).first else {
+            return nil
+        }
+        return try actionRun(from: row)
+    }
+
     public func auditEntry(id: String) throws -> AuditEntry? {
         guard let row = try database.query("SELECT * FROM audit_entries WHERE id = ?", bindings: [.text(id)]).first else {
             return nil
@@ -352,6 +381,23 @@ public final class StatusPersistenceStore {
             finishedAt: try row.optionalText("finished_at").map(ISO8601.date(from:)),
             error: row.optionalText("error"),
             emittedEventIDs: emittedEventIDs
+        )
+    }
+
+    private func actionRun(from row: [String: SQLiteValue]) throws -> ActionRunRecord {
+        let input = try optionalJSON([String: String].self, from: row.optionalText("input_json")) ?? [:]
+        let result = try optionalJSON([String: String].self, from: row.optionalText("result_json")) ?? [:]
+        return try ActionRunRecord(
+            id: row.requiredText("id"),
+            ruleID: row.requiredText("rule_id"),
+            eventID: row.requiredText("event_id"),
+            action: row.requiredText("action"),
+            status: ActionRunStatus(rawValue: row.requiredText("status")) ?? .failed,
+            input: input,
+            result: result,
+            error: row.optionalText("error"),
+            startedAt: ISO8601.date(from: row.requiredText("started_at")),
+            finishedAt: try row.optionalText("finished_at").map(ISO8601.date(from:))
         )
     }
 
