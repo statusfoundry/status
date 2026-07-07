@@ -15,8 +15,9 @@ The current `StatusCore` implementation contains the first ingestion slice:
 - New warning and critical events create event-backed `StatusItem` rows.
 - New notice events are stored and audited, but do not create inbox items by default.
 - `StateChangeDetector` records resource state snapshots and classifies observations as first sighting, unchanged, or changed.
+- `MappingConditionEvaluator` evaluates `changed`, `changed_to`, and `changed_from` against current and previous resource state.
 
-The remaining semantics in this document are still planned work: mapping-language integration for `changed_to`/`changed_from`, first-observation event policy, date-bucketed fingerprints, incident open/close handling, status item attachment/update, auto-resolution, notification decisions, and rule evaluation integration.
+The remaining semantics in this document are still planned work: full mapping-engine integration, first-observation event policy, date-bucketed fingerprints, incident open/close handling, status item attachment/update, auto-resolution, notification decisions, and rule evaluation integration.
 
 ## Three emission models
 

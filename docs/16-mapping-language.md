@@ -10,6 +10,10 @@ Related documents:
 - `docs/05-events-automation.md` — rule conditions, which share the operator set defined here;
 - `docs/17-event-semantics.md` — state-change detection, deduplication, and StatusItem lifecycle (the runtime semantics behind the `changed_to` operators defined below).
 
+## Implementation status
+
+`StatusCore` currently includes `MappingConditionEvaluator`, a small evaluator for single mapping conditions and AND groups over normalized resource state. It supports the plain operators and the transition operators (`changed`, `changed_to`, `changed_from`) against current and previous resource snapshots. It does not yet include the full JSON selector parser, source iteration, shorthand string parser, template rendering, severity mapping, or pagination runtime.
+
 ## Design rules
 
 ```txt
