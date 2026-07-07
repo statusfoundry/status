@@ -50,6 +50,9 @@ Start here:
 - [Doctrine](DOCTRINE.md)
 - [Canonical specification](SPEC.md)
 - [Agent instructions](AGENTS.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
+- [Changelog](CHANGELOG.md)
 
 Detailed docs:
 
@@ -77,6 +80,77 @@ Detailed docs:
 
 Plugin package schemas live in [`schemas/plugin/v1/`](schemas/plugin/v1/).
 
+## Repository layout
+
+```txt
+Apps/
+  StatusMac/
+  StatusiOS/
+Sources/
+  StatusCore/
+  StatusUI/
+Tests/
+schemas/plugin/v1/
+plugins/bundled/
+web/
+workers/registry/
+docs/
+```
+
+`Status.xcodeproj` is generated from `project.yml` with XcodeGen and is intentionally ignored.
+
+## Build and validation
+
+Install dependencies:
+
+```sh
+npm ci
+```
+
+Validate the website, plugin packages, registry Worker, and Wrangler dry-run:
+
+```sh
+npm run check
+```
+
+Validate the Swift package:
+
+```sh
+swift test
+```
+
+Generate and build the native apps:
+
+```sh
+xcodegen generate
+xcodebuild -project Status.xcodeproj -scheme StatusMac -destination 'platform=macOS' -derivedDataPath /tmp/status-mac-derived build
+xcodebuild -project Status.xcodeproj -scheme StatusiOS -destination 'generic/platform=iOS' -derivedDataPath /tmp/status-ios-derived CODE_SIGNING_ALLOWED=NO build
+```
+
+Rebuild bundled plugin packages and generated registry data:
+
+```sh
+npm run plugins:build
+```
+
+## Cloudflare surfaces
+
+Current deployed surfaces:
+
+- Website: `https://status-9d4.pages.dev`
+- Registry API: `https://status-registry.hakobs.com`
+- Registry health: `https://status-registry.hakobs.com/health`
+- Plugin list: `https://status-registry.hakobs.com/v1/plugins`
+
+Deployment commands:
+
+```sh
+npm run registry:deploy
+npm run pages:deploy
+```
+
+`status.hakobs.com` is the intended website custom domain. It still needs the Cloudflare Pages custom-domain/DNS attachment; the current Wrangler version can deploy Pages but does not expose Pages custom-domain management.
+
 ## Suggested MVP
 
 The first usable version should focus on one clean path:
@@ -98,14 +172,20 @@ iOS should initially be a companion dashboard, not the primary always-on automat
 
 ## Current status
 
-This repository now contains the initial working foundation:
+This repository now contains a working foundation:
 
 - Swift shared core and shared SwiftUI package;
 - macOS and iOS app shells generated with XcodeGen;
-- mocked native dashboard;
-- plugin manifest, event, rule, and fingerprint primitives;
-- SQLite schema v0 migrator and first persistence store;
+- native dashboard backed by local SQLite state;
+- plugin manifest, event, rule, fingerprint, automation, and audit primitives;
+- SQLite schema v0 migrator and persistence store;
+- registry client, package verifier, and plugin installer;
+- native plugin store UI that browses and installs registry plugins;
 - Vue/TypeScript/Sass website using `@sil/ui` and `bemm`;
-- Cloudflare registry Worker and deployment workflows.
+- public docs, plugin, and developer website pages;
+- bundled App Store Connect, GitHub, and Website Uptime plugin sources;
+- deterministic plugin package builder and generated registry artifacts;
+- Cloudflare registry Worker and deployment workflows;
+- GitHub Actions CI for Node/web/registry checks and native app builds.
 
 The product is not complete yet. Code must continue to follow the docs, not redefine the product.

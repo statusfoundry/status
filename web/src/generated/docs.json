@@ -1,0 +1,54 @@
+{
+  "documents": [
+    {
+      "title": "Doctrine",
+      "path": "https://github.com/statusfoundry/status/blob/main/DOCTRINE.md",
+      "summary": "Non-negotiable product beliefs for the native app, plugin model, local-first posture, and automation boundaries."
+    },
+    {
+      "title": "Canonical specification",
+      "path": "https://github.com/statusfoundry/status/blob/main/SPEC.md",
+      "summary": "The product and technical source of truth for the core event pipeline, object model, plugin scope, and MVP."
+    },
+    {
+      "title": "Architecture",
+      "path": "https://github.com/statusfoundry/status/blob/main/docs/03-architecture.md",
+      "summary": "System boundaries, shared core responsibilities, persistence, app shells, registry, and future cloud relay boundaries."
+    },
+    {
+      "title": "Plugin system",
+      "path": "https://github.com/statusfoundry/status/blob/main/docs/04-plugin-system.md",
+      "summary": "Declarative plugin package shape, permissions, registry hosting, publishing, trust levels, and install flow."
+    },
+    {
+      "title": "Events and automation",
+      "path": "https://github.com/statusfoundry/status/blob/main/docs/05-events-automation.md",
+      "summary": "Explainable rules, controlled actions, notification decisions, action runs, and audit output."
+    },
+    {
+      "title": "Integrations",
+      "path": "https://github.com/statusfoundry/status/blob/main/docs/06-integrations.md",
+      "summary": "Planned providers, MVP auth paths, normalized resources, events, metrics, and action boundaries."
+    },
+    {
+      "title": "Security and privacy",
+      "path": "https://github.com/statusfoundry/status/blob/main/docs/07-security-privacy.md",
+      "summary": "Local-first data handling, credential storage, plugin trust, signing, OAuth posture, and action safety."
+    },
+    {
+      "title": "Testing",
+      "path": "https://github.com/statusfoundry/status/blob/main/docs/18-testing.md",
+      "summary": "Required checks for StatusCore, StatusUI, schemas, registry, website, package fixtures, and CI."
+    },
+    {
+      "title": "Cloudflare platform",
+      "path": "https://github.com/statusfoundry/status/blob/main/docs/19-cloudflare-platform.md",
+      "summary": "Pages, Workers, R2, registry API, package hosting, revocations, and deployment responsibilities."
+    },
+    {
+      "title": "Handoff checklist",
+      "path": "https://github.com/statusfoundry/status/blob/main/docs/20-handoff-checklist.md",
+      "summary": "Operational runbook for agents and maintainers continuing implementation without product questions."
+    }
+  ]
+}

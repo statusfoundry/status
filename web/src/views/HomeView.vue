@@ -33,7 +33,7 @@ const pillars = [
         </p>
         <div :class="bemm('actions')">
           <Button href="/plugins/" variant="primary">Browse plugins</Button>
-          <Button href="/developers/" variant="outline">Developer docs</Button>
+          <Button href="/docs/" variant="outline">Read docs</Button>
         </div>
       </div>
       <SignalPanel />

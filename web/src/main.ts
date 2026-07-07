@@ -6,6 +6,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import App from './App.vue'
 import DevelopersView from './views/DevelopersView.vue'
+import DocsView from './views/DocsView.vue'
 import HomeView from './views/HomeView.vue'
 import PluginsView from './views/PluginsView.vue'
 
@@ -15,6 +16,7 @@ const router = createRouter({
     { path: '/', component: HomeView },
     { path: '/plugins/', component: PluginsView },
     { path: '/developers/', component: DevelopersView },
+    { path: '/docs/', component: DocsView },
   ],
   scrollBehavior() {
     return { top: 0 }
