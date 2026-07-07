@@ -37,6 +37,42 @@ public final class StatusPersistenceStore {
         guard let row = try database.query("SELECT * FROM events WHERE id = ?", bindings: [.text(id)]).first else {
             return nil
         }
+        return try event(from: row)
+    }
+
+    public func event(fingerprint: String) throws -> Event? {
+        guard let row = try database.query("SELECT * FROM events WHERE fingerprint = ?", bindings: [.text(fingerprint)]).first else {
+            return nil
+        }
+        return try event(from: row)
+    }
+
+    public func incrementDedupCount(fingerprint: String, seenAt: Date) throws {
+        try database.execute(
+            """
+            UPDATE events
+            SET dedup_count = dedup_count + 1,
+                last_seen_at = ?
+            WHERE fingerprint = ?
+            """,
+            bindings: [
+                .text(ISO8601.string(from: seenAt)),
+                .text(fingerprint)
+            ]
+        )
+    }
+
+    public func dedupCount(fingerprint: String) throws -> Int {
+        guard let row = try database.query("SELECT dedup_count FROM events WHERE fingerprint = ?", bindings: [.text(fingerprint)]).first else {
+            return 0
+        }
+        guard case .integer(let count)? = row["dedup_count"] else {
+            return 0
+        }
+        return Int(count)
+    }
+
+    private func event(from row: [String: SQLiteValue]) throws -> Event {
         return try Event(
             id: row.requiredText("id"),
             provider: row.requiredText("provider"),
@@ -119,6 +155,22 @@ public final class StatusPersistenceStore {
             timestamp: ISO8601.date(from: row.requiredText("timestamp")),
             status: row.requiredText("status")
         )
+    }
+
+    public func statusItemCount() throws -> Int {
+        try count("status_items")
+    }
+
+    public func auditEntryCount() throws -> Int {
+        try count("audit_entries")
+    }
+
+    private func count(_ table: String) throws -> Int {
+        guard let row = try database.query("SELECT COUNT(*) AS count FROM \(table)").first,
+              case .integer(let count)? = row["count"] else {
+            return 0
+        }
+        return Int(count)
     }
 }
 

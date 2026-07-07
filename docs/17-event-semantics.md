@@ -6,6 +6,17 @@ The rule this document exists to enforce: polling every 15 minutes must not re-e
 
 Storage for the objects described here (resource state snapshots, events, incidents, status items) is defined in `docs/15-data-model.md`. The mapping syntax plugins use to declare transition conditions (`changed`, `changed_to`, `changed_from`) is defined in `docs/16-mapping-language.md`. This document defines semantics, not tables or syntax.
 
+## Implementation status
+
+The current `StatusCore` implementation contains the first ingestion slice:
+
+- `EventIngestor` accepts normalized events after mapping and before rules.
+- Existing fingerprints are suppressed as duplicates, increment `dedup_count`, update `last_seen_at`, and write an audit entry.
+- New warning and critical events create event-backed `StatusItem` rows.
+- New notice events are stored and audited, but do not create inbox items by default.
+
+The remaining semantics in this document are still planned work: snapshot comparison, date-bucketed fingerprints, incident open/close handling, status item attachment/update, auto-resolution, notification decisions, and rule evaluation integration.
+
 ## Three emission models
 
 Every event enters the pipeline through exactly one of three emission models. A plugin declares the model per event type; the core enforces the behavior.
