@@ -16,21 +16,32 @@ public final class PluginStoreViewModel: ObservableObject {
     @Published public private(set) var catalog: PluginStoreCatalog
     @Published public private(set) var loadError: String?
     @Published public private(set) var installingPluginID: String?
+    @Published public private(set) var runningPluginID: String?
+    @Published public private(set) var runResults: [String: String]
+    @Published public private(set) var runErrors: [String: String]
 
     private let loadInstalled: () throws -> [InstalledPlugin]
     private let loadAvailable: () async throws -> [RegistryPluginSummary]
     private let installPlugin: (RegistryPluginSummary) async throws -> Void
+    private let canRunPlugin: (InstalledPlugin) -> Bool
+    private let runPlugin: (InstalledPlugin) async throws -> String
 
     public init(
         initialCatalog: PluginStoreCatalog = PluginStoreCatalog(),
         loadInstalled: @escaping () throws -> [InstalledPlugin],
         loadAvailable: @escaping () async throws -> [RegistryPluginSummary],
-        installPlugin: @escaping (RegistryPluginSummary) async throws -> Void
+        installPlugin: @escaping (RegistryPluginSummary) async throws -> Void,
+        canRunPlugin: @escaping (InstalledPlugin) -> Bool = { _ in false },
+        runPlugin: @escaping (InstalledPlugin) async throws -> String = { _ in "" }
     ) {
         self.catalog = initialCatalog
+        self.runResults = [:]
+        self.runErrors = [:]
         self.loadInstalled = loadInstalled
         self.loadAvailable = loadAvailable
         self.installPlugin = installPlugin
+        self.canRunPlugin = canRunPlugin
+        self.runPlugin = runPlugin
     }
 
     public func reload() async {
@@ -62,6 +73,25 @@ public final class PluginStoreViewModel: ObservableObject {
             loadError = error.localizedDescription
         }
     }
+
+    public func canRun(_ plugin: InstalledPlugin) -> Bool {
+        canRunPlugin(plugin)
+    }
+
+    public func run(_ plugin: InstalledPlugin) async {
+        guard runningPluginID == nil else { return }
+        runningPluginID = plugin.id
+        runResults[plugin.id] = nil
+        runErrors[plugin.id] = nil
+        defer { runningPluginID = nil }
+
+        do {
+            runResults[plugin.id] = try await runPlugin(plugin)
+            await reload()
+        } catch {
+            runErrors[plugin.id] = error.localizedDescription
+        }
+    }
 }
 
 public struct PluginStoreContainerView: View {
@@ -75,6 +105,17 @@ public struct PluginStoreContainerView: View {
         PluginStoreView(
             catalog: viewModel.catalog,
             installingPluginID: viewModel.installingPluginID,
+            runningPluginID: viewModel.runningPluginID,
+            runResults: viewModel.runResults,
+            runErrors: viewModel.runErrors,
+            canRun: { plugin in
+                viewModel.canRun(plugin)
+            },
+            run: { plugin in
+                Task {
+                    await viewModel.run(plugin)
+                }
+            },
             install: { plugin in
                 Task {
                     await viewModel.install(plugin)
@@ -104,15 +145,30 @@ public struct PluginStoreContainerView: View {
 public struct PluginStoreView: View {
     private let catalog: PluginStoreCatalog
     private let installingPluginID: String?
+    private let runningPluginID: String?
+    private let runResults: [String: String]
+    private let runErrors: [String: String]
+    private let canRun: (InstalledPlugin) -> Bool
+    private let run: (InstalledPlugin) -> Void
     private let install: (RegistryPluginSummary) -> Void
 
     public init(
         catalog: PluginStoreCatalog,
         installingPluginID: String? = nil,
+        runningPluginID: String? = nil,
+        runResults: [String: String] = [:],
+        runErrors: [String: String] = [:],
+        canRun: @escaping (InstalledPlugin) -> Bool = { _ in false },
+        run: @escaping (InstalledPlugin) -> Void = { _ in },
         install: @escaping (RegistryPluginSummary) -> Void = { _ in }
     ) {
         self.catalog = catalog
         self.installingPluginID = installingPluginID
+        self.runningPluginID = runningPluginID
+        self.runResults = runResults
+        self.runErrors = runErrors
+        self.canRun = canRun
+        self.run = run
         self.install = install
     }
 
@@ -120,7 +176,14 @@ public struct PluginStoreView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 PluginStoreHeader(installedCount: catalog.installed.count, availableCount: catalog.available.count)
-                InstalledPluginSection(plugins: catalog.installed)
+                InstalledPluginSection(
+                    plugins: catalog.installed,
+                    runningPluginID: runningPluginID,
+                    runResults: runResults,
+                    runErrors: runErrors,
+                    canRun: canRun,
+                    run: run
+                )
                 AvailablePluginSection(
                     plugins: catalog.available,
                     installedPluginIDs: Set(catalog.installed.map(\.id)),
@@ -154,6 +217,11 @@ private struct PluginStoreHeader: View {
 
 private struct InstalledPluginSection: View {
     let plugins: [InstalledPlugin]
+    let runningPluginID: String?
+    let runResults: [String: String]
+    let runErrors: [String: String]
+    let canRun: (InstalledPlugin) -> Bool
+    let run: (InstalledPlugin) -> Void
 
     var body: some View {
         PluginSection(title: "Installed") {
@@ -165,7 +233,14 @@ private struct InstalledPluginSection: View {
             } else {
                 VStack(spacing: 10) {
                     ForEach(plugins) { plugin in
-                        InstalledPluginRow(plugin: plugin)
+                        InstalledPluginRow(
+                            plugin: plugin,
+                            canRun: canRun(plugin),
+                            isRunning: runningPluginID == plugin.id,
+                            runResult: runResults[plugin.id],
+                            runError: runErrors[plugin.id],
+                            run: run
+                        )
                     }
                 }
             }
@@ -204,28 +279,61 @@ private struct AvailablePluginSection: View {
 
 private struct InstalledPluginRow: View {
     let plugin: InstalledPlugin
+    let canRun: Bool
+    let isRunning: Bool
+    let runResult: String?
+    let runError: String?
+    let run: (InstalledPlugin) -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            PluginTrustIcon(trustLevel: plugin.trustLevel)
-                .padding(.top, 4)
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(plugin.name)
-                        .font(.headline)
-                    Text(plugin.installedVersion)
-                        .font(.caption.monospaced())
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                PluginTrustIcon(trustLevel: plugin.trustLevel)
+                    .padding(.top, 4)
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(plugin.name)
+                            .font(.headline)
+                        Text(plugin.installedVersion)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(plugin.description)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(plugin.enabled ? "Enabled" : "Disabled")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(plugin.enabled ? .green : .orange)
                 }
-                Text(plugin.description)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(plugin.enabled ? "Enabled" : "Disabled")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(plugin.enabled ? .green : .orange)
+                Spacer(minLength: 12)
+                VStack(alignment: .trailing, spacing: 8) {
+                    PluginTrustLabel(trustLevel: plugin.trustLevel)
+                    if canRun {
+                        Button {
+                            run(plugin)
+                        } label: {
+                            if isRunning {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Text("Run")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isRunning)
+                    }
+                }
             }
-            Spacer(minLength: 12)
-            PluginTrustLabel(trustLevel: plugin.trustLevel)
+            if let runResult {
+                Text(runResult)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let runError {
+                Text(runError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         }
         .padding(14)
         .background(Color.statusSurface)
