@@ -1,6 +1,80 @@
 import StatusCore
 import SwiftUI
 
+@MainActor
+public final class RulesViewModel: ObservableObject {
+    @Published public private(set) var rules: [Rule]
+    @Published public private(set) var loadError: String?
+
+    private let loadRules: () throws -> [Rule]
+    private let saveRule: (Rule) throws -> Void
+
+    public init(
+        initialRules: [Rule] = [],
+        loadRules: @escaping () throws -> [Rule],
+        saveRule: @escaping (Rule) throws -> Void
+    ) {
+        self.rules = initialRules
+        self.loadRules = loadRules
+        self.saveRule = saveRule
+    }
+
+    public func reload() {
+        do {
+            rules = try loadRules()
+            loadError = nil
+        } catch {
+            rules = []
+            loadError = error.localizedDescription
+        }
+    }
+
+    public func setEnabled(_ enabled: Bool, for rule: Rule) {
+        var updated = rule
+        updated.enabled = enabled
+        do {
+            try saveRule(updated)
+            reload()
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+}
+
+public struct RulesContainerView: View {
+    @StateObject private var viewModel: RulesViewModel
+
+    public init(viewModel: @autoclosure @escaping () -> RulesViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel())
+    }
+
+    public var body: some View {
+        RulesListView(
+            rules: viewModel.rules,
+            setRuleEnabled: { rule, enabled in
+                viewModel.setEnabled(enabled, for: rule)
+            }
+        )
+        .overlay(alignment: .bottom) {
+            if let loadError = viewModel.loadError {
+                Text(loadError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(10)
+                    .background(.thinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding()
+            }
+        }
+        .task {
+            viewModel.reload()
+        }
+        .refreshable {
+            viewModel.reload()
+        }
+    }
+}
+
 public struct AlertsView: View {
     private let items: [StatusItem]
 
@@ -30,9 +104,11 @@ public struct AlertsView: View {
 
 public struct RulesListView: View {
     private let rules: [Rule]
+    private let setRuleEnabled: ((Rule, Bool) -> Void)?
 
-    public init(rules: [Rule]) {
+    public init(rules: [Rule], setRuleEnabled: ((Rule, Bool) -> Void)? = nil) {
         self.rules = rules
+        self.setRuleEnabled = setRuleEnabled
     }
 
     public var body: some View {
@@ -47,13 +123,7 @@ public struct RulesListView: View {
                                 Text(rule.name)
                                     .font(.headline)
                                 Spacer(minLength: 12)
-                                Text(rule.enabled ? "Enabled" : "Disabled")
-                                    .font(.caption.weight(.semibold))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .foregroundStyle(rule.enabled ? .green : .orange)
-                                    .background((rule.enabled ? Color.green : Color.orange).opacity(0.12))
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                RuleEnabledControl(rule: rule, setRuleEnabled: setRuleEnabled)
                             }
                             Text(rule.eventType)
                                 .font(.caption.monospaced())
@@ -68,6 +138,35 @@ public struct RulesListView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+private struct RuleEnabledControl: View {
+    let rule: Rule
+    let setRuleEnabled: ((Rule, Bool) -> Void)?
+
+    var body: some View {
+        if let setRuleEnabled {
+            Toggle(
+                isOn: Binding(
+                    get: { rule.enabled },
+                    set: { setRuleEnabled(rule, $0) }
+                )
+            ) {
+                Text(rule.enabled ? "Enabled" : "Disabled")
+            }
+            .toggleStyle(.switch)
+            .labelsHidden()
+            .accessibilityLabel(Text(rule.enabled ? "Enabled" : "Disabled"))
+        } else {
+            Text(rule.enabled ? "Enabled" : "Disabled")
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .foregroundStyle(rule.enabled ? .green : .orange)
+                .background((rule.enabled ? Color.green : Color.orange).opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
         }
     }
 }

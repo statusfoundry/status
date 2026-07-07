@@ -42,6 +42,7 @@ The same pipeline is used for:
 - The core action runner executes safe built-in local actions, records deterministic action-run rows, and denies review-required or unsupported actions until explicit permission/provider support exists.
 - `AutomationPipeline` evaluates inserted events against rules, runs matching actions, persists both action-run records and audit entries, and dispatches newly produced runtime effects through a platform-owned effect dispatcher.
 - Rules persist to SQLite with structured condition/action JSON, and the automation pipeline can evaluate the stored local rule set for an event.
+- macOS and iOS expose app-owned rule toggles so suggested plugin rules remain disabled by default but can be explicitly enabled by the user.
 - macOS and iOS provide first platform adapters for safe runtime effects: local notifications and opening URLs. Notification permission is requested by the app shell, not by plugins.
 - The native shells start an app-alive background loop that asks the core to run due configured plugin jobs every five minutes. Due checks still respect each trigger's stored schedule.
 

@@ -201,6 +201,7 @@ Current implementation status:
 - The app shells can run installed declarative plugin requests through `PluginRuntimeService`: load the installed package, enqueue a configured manual job from the plugin trigger, execute the queued request/mapping pipeline, persist resources/events/status items, evaluate inserted events against stored rules, dispatch safe local action effects, and write job/action audit entries. Website Uptime also has the first native setup path for a user-configured host, persisted as non-secret account configuration.
 - macOS and iOS pass platform action effect dispatchers into the shared core runtime. The core decides which actions are allowed and records the audit trail; the shells deliver local notifications and open URLs with platform APIs.
 - macOS and iOS also run a lightweight app-alive scheduler loop. The loop asks `PluginRuntimeService` to enqueue and run due configured cron triggers from the local database, so background refresh uses the same persisted job and automation pipeline as manual refresh.
+- The shared Rules view now reloads persisted rules and lets the user enable or disable suggested rules with native toggles. Rule defaults still come from plugin packages and install disabled.
 - Empty local databases render a calm empty state; `MockDashboard` is reserved for previews and tests.
 
 ## Plugin registry

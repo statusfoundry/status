@@ -41,7 +41,7 @@ private struct IOSRootView: View {
             }
 
             NavigationStack {
-                RulesListView(rules: loadRules())
+                RulesContainerView(viewModel: makeRulesViewModel())
                     .navigationTitle("Rules")
             }
             .tabItem {
@@ -114,8 +114,12 @@ private struct IOSRootView: View {
             .filter { $0.severity >= .warning }
     }
 
-    private func loadRules() -> [Rule] {
-        (try? LocalStatusStore.openApplicationSupportStore().rules()) ?? []
+    private func makeRulesViewModel() -> RulesViewModel {
+        RulesViewModel {
+            try LocalStatusStore.openApplicationSupportStore().rules()
+        } saveRule: { rule in
+            try LocalStatusStore.openApplicationSupportStore().upsertRule(rule, updatedAt: Date())
+        }
     }
 
     private func applicationDatabasePath() -> String {

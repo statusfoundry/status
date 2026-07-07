@@ -46,7 +46,7 @@ private struct MacRootView: View {
                 PluginStoreContainerView(viewModel: makePluginStoreViewModel(platform: .macOS))
                     .navigationTitle("Integrations")
             case .rules:
-                RulesListView(rules: loadRules())
+                RulesContainerView(viewModel: makeRulesViewModel())
                     .navigationTitle("Rules")
             case .audit:
                 AuditLogView(entries: loadAuditEntries())
@@ -109,8 +109,12 @@ private struct MacRootView: View {
         URL(string: "https://status-registry.hakobs.com")!
     }
 
-    private func loadRules() -> [Rule] {
-        (try? LocalStatusStore.openApplicationSupportStore().rules()) ?? []
+    private func makeRulesViewModel() -> RulesViewModel {
+        RulesViewModel {
+            try LocalStatusStore.openApplicationSupportStore().rules()
+        } saveRule: { rule in
+            try LocalStatusStore.openApplicationSupportStore().upsertRule(rule, updatedAt: Date())
+        }
     }
 
     private func loadAuditEntries() -> [AuditEntry] {
