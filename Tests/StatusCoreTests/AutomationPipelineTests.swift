@@ -22,7 +22,8 @@ import Testing
     )
     let now = Date(timeIntervalSince1970: 1_783_433_530)
     let runner = ActionRunner(now: { now })
-    let pipeline = AutomationPipeline(store: store, actionRunner: runner)
+    let dispatcher = RecordingActionEffectDispatcher()
+    let pipeline = AutomationPipeline(store: store, actionRunner: runner, effectDispatcher: dispatcher)
 
     let result = try pipeline.process(event: event, rules: [rule])
 
@@ -32,6 +33,11 @@ import Testing
     #expect(try store.actionRun(id: actionRun.id) == actionRun)
     #expect(try store.auditEntry(id: auditEntry.id) == auditEntry)
     #expect(runner.effects.notifications == [ActionRuntimeNotification(title: "Build failed", body: event.summary)])
+    #expect(dispatcher.dispatchedEffects == [
+        ActionRuntimeEffects(
+            notifications: [ActionRuntimeNotification(title: "Build failed", body: event.summary)]
+        )
+    ])
 }
 
 @Test func automationPipelineIgnoresRulesThatDoNotMatch() throws {

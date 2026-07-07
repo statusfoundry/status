@@ -67,7 +67,35 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
     public private(set) var openedURLs: [URL] = []
     public private(set) var auditNotes: [String] = []
 
-    public init() {}
+    public init(
+        notifications: [ActionRuntimeNotification] = [],
+        inboxEventIDs: [String] = [],
+        openedURLs: [URL] = [],
+        auditNotes: [String] = []
+    ) {
+        self.notifications = notifications
+        self.inboxEventIDs = inboxEventIDs
+        self.openedURLs = openedURLs
+        self.auditNotes = auditNotes
+    }
+
+    public func cursor() -> ActionRuntimeEffectCursor {
+        ActionRuntimeEffectCursor(
+            notificationCount: notifications.count,
+            inboxEventIDCount: inboxEventIDs.count,
+            openedURLCount: openedURLs.count,
+            auditNoteCount: auditNotes.count
+        )
+    }
+
+    public func effects(since cursor: ActionRuntimeEffectCursor) -> ActionRuntimeEffects {
+        var effects = ActionRuntimeEffects()
+        effects.notifications = Array(notifications.dropFirst(cursor.notificationCount))
+        effects.inboxEventIDs = Array(inboxEventIDs.dropFirst(cursor.inboxEventIDCount))
+        effects.openedURLs = Array(openedURLs.dropFirst(cursor.openedURLCount))
+        effects.auditNotes = Array(auditNotes.dropFirst(cursor.auditNoteCount))
+        return effects
+    }
 
     fileprivate mutating func recordNotification(title: String, body: String) {
         notifications.append(ActionRuntimeNotification(title: title, body: body))
@@ -83,6 +111,20 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
 
     fileprivate mutating func recordAuditNote(_ note: String) {
         auditNotes.append(note)
+    }
+}
+
+public struct ActionRuntimeEffectCursor: Equatable, Sendable {
+    public var notificationCount: Int
+    public var inboxEventIDCount: Int
+    public var openedURLCount: Int
+    public var auditNoteCount: Int
+
+    public init(notificationCount: Int, inboxEventIDCount: Int, openedURLCount: Int, auditNoteCount: Int) {
+        self.notificationCount = notificationCount
+        self.inboxEventIDCount = inboxEventIDCount
+        self.openedURLCount = openedURLCount
+        self.auditNoteCount = auditNoteCount
     }
 }
 

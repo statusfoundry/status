@@ -76,12 +76,29 @@ import Testing
             installedAt: now
         )
     )
+    try store.upsertRule(
+        Rule(
+            id: "rul_notify_website_down",
+            name: "Notify website down",
+            enabled: true,
+            provider: manifest.id,
+            eventType: "website.down",
+            conditions: [],
+            actions: [
+                RuleActionDefinition(action: "notification.show", parameters: ["title": "Website needs attention"])
+            ]
+        ),
+        updatedAt: now
+    )
     let url = try #require(URL(string: "https://status-registry.hakobs.com"))
+    let dispatcher = RecordingActionEffectDispatcher()
     let service = PluginRuntimeService(
         store: store,
         transport: RuntimeFakeTransport(responses: [
             url: PluginHTTPResponse(data: Data("Unavailable".utf8), statusCode: 503, url: url)
-        ])
+        ]),
+        actionRunner: ActionRunner(now: { now }),
+        effectDispatcher: dispatcher
     )
 
     let result = try await service.runInstalledPluginRequest(
@@ -103,6 +120,10 @@ import Testing
     #expect(try store.resource(id: "acct_status_registry:status-registry.hakobs.com")?.name == "status-registry.hakobs.com")
     #expect(try store.statusItemCount() == 1)
     #expect(try store.auditEntry(id: "aud_\(jobID)_success")?.status == "success")
+    #expect(try store.actionRun(id: "run_rul_notify_website_down_\(result.mappingOutput.events[0].id)_0")?.status == .success)
+    #expect(dispatcher.dispatchedEffects.flatMap(\.notifications) == [
+        ActionRuntimeNotification(title: "Website needs attention", body: "status-registry.hakobs.com is not responding normally.")
+    ])
 }
 
 @Test func pluginRuntimeServiceRunsNextQueuedConfiguredWebsiteJob() async throws {

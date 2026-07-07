@@ -57,10 +57,19 @@ public enum PluginRuntimeServiceError: Error, Equatable, LocalizedError, Sendabl
 public final class PluginRuntimeService: @unchecked Sendable {
     private let store: StatusPersistenceStore
     private let transport: PluginRequestHTTPTransport
+    private let actionRunner: ActionRunner
+    private let effectDispatcher: ActionEffectDispatcher
 
-    public init(store: StatusPersistenceStore, transport: PluginRequestHTTPTransport = URLSessionPluginRequestTransport()) {
+    public init(
+        store: StatusPersistenceStore,
+        transport: PluginRequestHTTPTransport = URLSessionPluginRequestTransport(),
+        actionRunner: ActionRunner = ActionRunner(),
+        effectDispatcher: ActionEffectDispatcher = NoopActionEffectDispatcher()
+    ) {
         self.store = store
         self.transport = transport
+        self.actionRunner = actionRunner
+        self.effectDispatcher = effectDispatcher
     }
 
     public func saveAccountConfiguration(_ configuration: PluginAccountConfiguration, now: Date = Date()) throws {
@@ -259,6 +268,7 @@ public final class PluginRuntimeService: @unchecked Sendable {
             if let job = try store.job(id: jobID) {
                 try store.insertJobAuditEntry(for: job, timestamp: request.now)
             }
+            try processAutomation(for: result)
             return result
         } catch {
             try store.upsertJob(
@@ -297,6 +307,26 @@ public final class PluginRuntimeService: @unchecked Sendable {
         )
         if let failedJob = try store.job(id: job.id) {
             try store.insertJobAuditEntry(for: failedJob, timestamp: date)
+        }
+    }
+
+    private func processAutomation(for result: PluginRequestJobResult) throws {
+        let insertedEventIDs = result.commitResult.eventResults.compactMap { ingestionResult -> String? in
+            guard case .inserted(let eventID, _) = ingestionResult else {
+                return nil
+            }
+            return eventID
+        }
+        guard insertedEventIDs.isEmpty == false else {
+            return
+        }
+        let pipeline = AutomationPipeline(
+            store: store,
+            actionRunner: actionRunner,
+            effectDispatcher: effectDispatcher
+        )
+        for event in result.mappingOutput.events where insertedEventIDs.contains(event.id) {
+            _ = try pipeline.processStoredRules(for: event)
         }
     }
 

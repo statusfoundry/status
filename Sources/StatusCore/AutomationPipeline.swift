@@ -14,16 +14,23 @@ public struct AutomationPipelineResult: Equatable, Sendable {
 
 public final class AutomationPipeline {
     private let store: StatusPersistenceStore
+    private let effectDispatcher: ActionEffectDispatcher
     public let actionRunner: ActionRunner
 
-    public init(store: StatusPersistenceStore, actionRunner: ActionRunner = ActionRunner()) {
+    public init(
+        store: StatusPersistenceStore,
+        actionRunner: ActionRunner = ActionRunner(),
+        effectDispatcher: ActionEffectDispatcher = NoopActionEffectDispatcher()
+    ) {
         self.store = store
         self.actionRunner = actionRunner
+        self.effectDispatcher = effectDispatcher
     }
 
     public func process(event: Event, rules: [Rule]) throws -> AutomationPipelineResult {
         let matches = RuleEngine.matchingRules(for: event, rules: rules)
         var actionResults: [ActionExecutionResult] = []
+        let cursor = actionRunner.effects.cursor()
 
         for match in matches {
             for result in actionRunner.run(match) {
@@ -32,6 +39,7 @@ public final class AutomationPipeline {
                 actionResults.append(result)
             }
         }
+        try effectDispatcher.dispatch(actionRunner.effects.effects(since: cursor))
 
         return AutomationPipelineResult(
             eventID: event.id,

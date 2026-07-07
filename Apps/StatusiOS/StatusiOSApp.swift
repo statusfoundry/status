@@ -1,6 +1,8 @@
 import StatusCore
 import StatusUI
 import SwiftUI
+import UIKit
+import UserNotifications
 
 @main
 struct StatusiOSApp: App {
@@ -133,7 +135,7 @@ private struct IOSRootView: View {
 
     private func runRegistryCheck(pluginID: String) async throws -> String {
         let store = try LocalStatusStore.openApplicationSupportStore()
-        let service = PluginRuntimeService(store: store)
+        let service = PluginRuntimeService(store: store, effectDispatcher: IOSActionEffectDispatcher())
         let result = try await service.runInstalledPluginRequest(
             PluginRuntimeRequest(
                 pluginID: pluginID,
@@ -149,7 +151,7 @@ private struct IOSRootView: View {
     private func runConfiguredWebsiteCheck(pluginID: String) async throws -> String {
         let store = try LocalStatusStore.openApplicationSupportStore()
         let configuration = try WebsitePluginSetup.configuredAccount(pluginID: pluginID, store: store)
-        let service = PluginRuntimeService(store: store)
+        let service = PluginRuntimeService(store: store, effectDispatcher: IOSActionEffectDispatcher())
         let job = try service.enqueueManualConfiguredPluginRun(
             pluginID: pluginID,
             accountID: configuration.id
@@ -174,5 +176,35 @@ private struct IOSRootView: View {
         let directory = databaseURL.deletingLastPathComponent().appendingPathComponent("Plugins", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+}
+
+private struct IOSActionEffectDispatcher: ActionEffectDispatcher {
+    func dispatch(_ effects: ActionRuntimeEffects) throws {
+        for notification in effects.notifications {
+            deliver(notification)
+        }
+        for url in effects.openedURLs {
+            Task { @MainActor in
+                UIApplication.shared.open(url)
+            }
+        }
+    }
+
+    private func deliver(_ notification: ActionRuntimeNotification) {
+        let content = UNMutableNotificationContent()
+        content.title = notification.title
+        content.body = notification.body
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "status-\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            center.add(request)
+        }
     }
 }

@@ -1,6 +1,8 @@
+import AppKit
 import StatusCore
 import StatusUI
 import SwiftUI
+import UserNotifications
 
 @main
 struct StatusMacApp: App {
@@ -132,7 +134,7 @@ private struct MacRootView: View {
 
     private func runRegistryCheck(pluginID: String) async throws -> String {
         let store = try LocalStatusStore.openApplicationSupportStore()
-        let service = PluginRuntimeService(store: store)
+        let service = PluginRuntimeService(store: store, effectDispatcher: MacActionEffectDispatcher())
         let result = try await service.runInstalledPluginRequest(
             PluginRuntimeRequest(
                 pluginID: pluginID,
@@ -148,7 +150,7 @@ private struct MacRootView: View {
     private func runConfiguredWebsiteCheck(pluginID: String) async throws -> String {
         let store = try LocalStatusStore.openApplicationSupportStore()
         let configuration = try WebsitePluginSetup.configuredAccount(pluginID: pluginID, store: store)
-        let service = PluginRuntimeService(store: store)
+        let service = PluginRuntimeService(store: store, effectDispatcher: MacActionEffectDispatcher())
         let job = try service.enqueueManualConfiguredPluginRun(
             pluginID: pluginID,
             accountID: configuration.id
@@ -182,4 +184,34 @@ private enum MacSection: Hashable {
     case rules
     case audit
     case settings
+}
+
+private struct MacActionEffectDispatcher: ActionEffectDispatcher {
+    func dispatch(_ effects: ActionRuntimeEffects) throws {
+        for notification in effects.notifications {
+            deliver(notification)
+        }
+        for url in effects.openedURLs {
+            Task { @MainActor in
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+
+    private func deliver(_ notification: ActionRuntimeNotification) {
+        let content = UNMutableNotificationContent()
+        content.title = notification.title
+        content.body = notification.body
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "status-\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            center.add(request)
+        }
+    }
 }
