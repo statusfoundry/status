@@ -35,8 +35,9 @@ The same pipeline is used for:
 - Failure backoff and success reset logic are implemented in core.
 - `InMemoryJobQueue` tracks queued/running/success/failed job lifecycle for tests and app scaffolding.
 - `StatusPersistenceStore` can round-trip trigger definitions and job records through SQLite.
+- Audit entries can now attach job, event, and action-run provenance; persisted event ingestion and job lifecycle audit rows use those references.
 
-Background timers, retry execution, timeouts, and job audit wiring remain planned work.
+Background timers, retry execution, timeouts, and full action-run audit wiring remain planned work.
 
 ## Triggers
 
@@ -421,6 +422,7 @@ Audit fields:
 
 ```txt
 id
+job_id
 rule_id
 event_id
 action_id

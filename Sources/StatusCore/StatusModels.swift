@@ -190,13 +190,28 @@ public struct AuditEntry: Identifiable, Codable, Equatable, Sendable {
     public var detail: String
     public var timestamp: Date
     public var status: String
+    public var jobID: String?
+    public var eventID: String?
+    public var actionRunID: String?
 
-    public init(id: String, title: String, detail: String, timestamp: Date, status: String) {
+    public init(
+        id: String,
+        title: String,
+        detail: String,
+        timestamp: Date,
+        status: String,
+        jobID: String? = nil,
+        eventID: String? = nil,
+        actionRunID: String? = nil
+    ) {
         self.id = id
         self.title = title
         self.detail = detail
         self.timestamp = timestamp
         self.status = status
+        self.jobID = jobID
+        self.eventID = eventID
+        self.actionRunID = actionRunID
     }
 }
 

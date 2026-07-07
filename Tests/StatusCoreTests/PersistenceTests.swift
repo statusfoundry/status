@@ -85,7 +85,9 @@ import Testing
         title: "Notification queued",
         detail: "Rule matched github.workflow.failed and queued a local notification.",
         timestamp: now,
-        status: "success"
+        status: "success",
+        eventID: event.id,
+        actionRunID: "run_01notification"
     )
 
     try store.insertEvent(event)
@@ -96,6 +98,37 @@ import Testing
     #expect(try store.statusItem(id: statusItem.id)?.title == statusItem.title)
     #expect(try store.statusItem(id: statusItem.id)?.actionLink?.url == url)
     #expect(try store.auditEntry(id: auditEntry.id) == auditEntry)
+}
+
+@Test func jobAuditEntryIncludesJobProvenance() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let job = JobRecord(
+        id: "job_poll_01",
+        pluginID: "com.status.github",
+        triggerID: "trg_github",
+        status: .success,
+        queuedAt: now.addingTimeInterval(-5),
+        startedAt: now.addingTimeInterval(-3),
+        finishedAt: now,
+        emittedEventIDs: ["evt_workflow_failed"]
+    )
+
+    try store.insertJobAuditEntry(for: job, timestamp: now)
+
+    #expect(
+        try store.auditEntry(id: "aud_job_poll_01_success") == AuditEntry(
+            id: "aud_job_poll_01_success",
+            title: "Job completed",
+            detail: "com.status.github job job_poll_01 from trigger trg_github is success. Emitted events: evt_workflow_failed.",
+            timestamp: now,
+            status: "success",
+            jobID: job.id,
+            eventID: "evt_workflow_failed"
+        )
+    )
 }
 
 @Test func resourceStateSnapshotRoundTripsThroughSQLite() throws {

@@ -136,16 +136,33 @@ public final class StatusPersistenceStore {
         try database.execute(
             """
             INSERT OR REPLACE INTO audit_entries
-            (id, title, detail, timestamp, status)
-            VALUES (?, ?, ?, ?, ?)
+            (id, title, detail, timestamp, status, job_id, event_id, action_run_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             bindings: [
                 .text(entry.id),
                 .text(entry.title),
                 .text(entry.detail),
                 .text(ISO8601.string(from: entry.timestamp)),
-                .text(entry.status)
+                .text(entry.status),
+                entry.jobID.map { .text($0) } ?? .null,
+                entry.eventID.map { .text($0) } ?? .null,
+                entry.actionRunID.map { .text($0) } ?? .null
             ]
+        )
+    }
+
+    public func insertJobAuditEntry(for job: JobRecord, timestamp: Date) throws {
+        try insertAuditEntry(
+            AuditEntry(
+                id: "aud_\(job.id)_\(job.status.rawValue)",
+                title: jobAuditTitle(for: job.status),
+                detail: jobAuditDetail(for: job),
+                timestamp: timestamp,
+                status: auditStatus(for: job.status),
+                jobID: job.id,
+                eventID: job.emittedEventIDs.count == 1 ? job.emittedEventIDs.first : nil
+            )
         )
     }
 
@@ -158,7 +175,10 @@ public final class StatusPersistenceStore {
             title: row.requiredText("title"),
             detail: row.requiredText("detail"),
             timestamp: ISO8601.date(from: row.requiredText("timestamp")),
-            status: row.requiredText("status")
+            status: row.requiredText("status"),
+            jobID: row.optionalText("job_id"),
+            eventID: row.optionalText("event_id"),
+            actionRunID: row.optionalText("action_run_id")
         )
     }
 
@@ -342,6 +362,49 @@ public final class StatusPersistenceStore {
     private func optionalJSON<T: Decodable>(_ type: T.Type, from string: String?) throws -> T? {
         guard let string else { return nil }
         return try jsonDecoder.decode(T.self, from: Data(string.utf8))
+    }
+
+    private func jobAuditTitle(for status: JobStatus) -> String {
+        switch status {
+        case .queued:
+            return "Job queued"
+        case .running:
+            return "Job started"
+        case .success:
+            return "Job completed"
+        case .failed:
+            return "Job failed"
+        case .cancelled:
+            return "Job cancelled"
+        case .skipped:
+            return "Job skipped"
+        }
+    }
+
+    private func jobAuditDetail(for job: JobRecord) -> String {
+        var detail = "\(job.pluginID) job \(job.id) from trigger \(job.triggerID) is \(job.status.rawValue)."
+        if let error = job.error, error.isEmpty == false {
+            detail += " Error: \(error)"
+        }
+        if job.emittedEventIDs.isEmpty == false {
+            detail += " Emitted events: \(job.emittedEventIDs.joined(separator: ", "))."
+        }
+        return detail
+    }
+
+    private func auditStatus(for status: JobStatus) -> String {
+        switch status {
+        case .success:
+            return "success"
+        case .failed:
+            return "failed"
+        case .cancelled:
+            return "cancelled"
+        case .skipped:
+            return "skipped"
+        case .queued, .running:
+            return "pending"
+        }
     }
 }
 

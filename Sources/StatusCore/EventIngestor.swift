@@ -21,7 +21,8 @@ public final class EventIngestor {
                     title: "Duplicate event suppressed",
                     detail: "\(event.type) matched existing fingerprint \(event.fingerprint).",
                     timestamp: event.timestamp,
-                    status: "suppressed"
+                    status: "suppressed",
+                    eventID: existing.id
                 )
             )
             return .duplicate(originalEventID: existing.id)
@@ -53,7 +54,8 @@ public final class EventIngestor {
                 title: "Event ingested",
                 detail: "\(event.type) entered the event pipeline.",
                 timestamp: event.timestamp,
-                status: "success"
+                status: "success",
+                eventID: event.id
             )
         )
 
