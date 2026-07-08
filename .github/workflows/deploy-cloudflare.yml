@@ -25,6 +25,14 @@ jobs:
       - name: Build website
         run: npm run web:build
 
+      - name: Build plugin artifacts
+        run: npm run plugins:build
+
+      - name: Upload plugin artifacts to R2
+        run: npm run plugins:upload-r2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
       - name: Deploy registry Worker
         run: npm run registry:deploy
         env:

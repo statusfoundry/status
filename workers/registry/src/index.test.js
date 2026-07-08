@@ -64,6 +64,30 @@ test("plugin package and manifest artifacts are downloadable and match registry 
   assert.equal(manifest.version, "0.1.0");
 });
 
+test("plugin artifacts prefer R2 bucket when available", async () => {
+  const response = await route(
+    new Request("https://status-registry.hakobs.com/plugins/com.status.github/0.1.0/manifest.json"),
+    {
+      PLUGIN_BUCKET: {
+        async get(key) {
+          assert.equal(key, "plugins/com.status.github/0.1.0/manifest.json");
+          return {
+            body: Buffer.from("{\"id\":\"from-r2\"}"),
+            httpMetadata: {
+              contentType: "application/json; charset=utf-8"
+            }
+          };
+        }
+      }
+    }
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "application/json; charset=utf-8");
+  assert.equal(body.id, "from-r2");
+});
+
 test("compatibility filters remove unsupported versions", async () => {
   const response = await get("/v1/plugins?platform=watchOS&coreVersion=0.1.0");
   const body = await response.json();

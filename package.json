@@ -10,6 +10,7 @@
     "typecheck": "vue-tsc --noEmit",
     "plugins:build": "node scripts/build-plugin-packages.mjs",
     "plugins:check": "node scripts/build-plugin-packages.mjs --check",
+    "plugins:upload-r2": "node scripts/upload-plugin-artifacts-to-r2.mjs",
     "web:build": "vite build web",
     "web:preview": "vite preview --host 0.0.0.0 --outDir web/dist",
     "registry:test": "node --test workers/registry/src/*.test.js",

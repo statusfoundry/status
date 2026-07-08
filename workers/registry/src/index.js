@@ -39,7 +39,21 @@ function methodNotAllowed() {
   );
 }
 
-function artifact(pathname, method) {
+async function artifact(pathname, method, env = {}) {
+  if (pathname.startsWith("/plugins/") && env.PLUGIN_BUCKET) {
+    const key = pathname.slice(1);
+    const object = await env.PLUGIN_BUCKET.get(key);
+    if (object) {
+      return new Response(method === "HEAD" ? null : object.body, {
+        headers: {
+          "content-type": object.httpMetadata?.contentType ?? contentTypeForPath(pathname),
+          "cache-control": "public, max-age=31536000, immutable",
+          ...corsHeaders
+        }
+      });
+    }
+  }
+
   const item = pluginArtifacts[pathname];
   if (!item) {
     return undefined;
@@ -53,6 +67,16 @@ function artifact(pathname, method) {
       ...corsHeaders
     }
   });
+}
+
+function contentTypeForPath(pathname) {
+  if (pathname.endsWith(".zip")) {
+    return "application/zip";
+  }
+  if (pathname.endsWith(".json")) {
+    return "application/json; charset=utf-8";
+  }
+  return "application/octet-stream";
 }
 
 function pluginByID(pluginID) {
@@ -114,7 +138,7 @@ function compareVersions(lhs, rhs) {
   return 0;
 }
 
-export function route(request) {
+export async function route(request, env = {}) {
   const url = new URL(request.url);
 
   if (request.method === "OPTIONS") {
@@ -124,7 +148,7 @@ export function route(request) {
     return methodNotAllowed();
   }
 
-  const artifactResponse = artifact(url.pathname, request.method);
+  const artifactResponse = await artifact(url.pathname, request.method, env);
   if (artifactResponse) {
     return artifactResponse;
   }
@@ -203,7 +227,7 @@ export function route(request) {
 }
 
 export default {
-  async fetch(request) {
-    return route(request);
+  async fetch(request, env) {
+    return route(request, env);
   }
 };
