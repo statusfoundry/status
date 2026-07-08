@@ -422,6 +422,60 @@ import Testing
     #expect(try store.pluginPermissions(pluginID: manifest.id).first(where: { $0.permission == .network })?.grantedAt == nil)
 }
 
+@Test func pluginRevocationMarksVersionDisablesPluginAndAudits() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let manifest = PluginManifest(
+        id: "com.status.github",
+        name: "GitHub",
+        version: "0.1.0",
+        author: "Status Foundry",
+        category: "developer",
+        description: "Read-only GitHub status events.",
+        minCoreVersion: "0.1.0",
+        platforms: [.macOS, .iOS],
+        permissions: [.network],
+        domains: ["api.github.com"]
+    )
+    let verification = PluginPackageVerificationResult(
+        pluginID: manifest.id,
+        version: manifest.version,
+        sha256: "dcd4260b527a28d62ad2a956b00c4f5616416b2fdc0506e6fe5f6b616f5df5aa",
+        signedBy: "status-foundry-dev"
+    )
+    try store.installPlugin(
+        PluginInstallRecord(
+            manifest: manifest,
+            trustLevel: .official,
+            installPath: "/Application Support/Status/Plugins/com.status.github",
+            packagePath: "/Application Support/Status/Packages/com.status.github-0.1.0.statusplugin.zip",
+            verification: verification,
+            signature: "signature",
+            installedAt: now
+        )
+    )
+
+    let result = try store.applyPluginRevocations(
+        RegistryRevocationsResponse(
+            schemaVersion: "1.0.0",
+            generatedAt: now,
+            revokedPlugins: [],
+            revokedVersions: [],
+            revokedHashes: [verification.sha256],
+            revokedSigningKeys: []
+        ),
+        checkedAt: now.addingTimeInterval(60)
+    )
+
+    #expect(result.disabledPluginIDs == [manifest.id])
+    #expect(result.revokedVersions.map(\.id) == ["plv_com_status_github_0_1_0"])
+    #expect(try store.installedPlugin(id: manifest.id)?.enabled == false)
+    #expect(try store.installedPluginVersions(pluginID: manifest.id).first?.revoked == true)
+    #expect(try store.auditEntry(id: "aud_plugin_com_status_github_revoked")?.status == "revoked")
+}
+
 @Test func pluginUninstallRemovesActivePluginDataAndKeepsHistory() throws {
     let database = try temporaryDatabase()
     try StatusDatabaseMigrator.migrate(database)

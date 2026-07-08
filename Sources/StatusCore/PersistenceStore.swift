@@ -1020,6 +1020,55 @@ public final class StatusPersistenceStore {
         ).map(installedPluginVersion(from:))
     }
 
+    public func applyPluginRevocations(
+        _ revocations: RegistryRevocationsResponse,
+        checkedAt: Date = Date()
+    ) throws -> PluginRevocationApplicationResult {
+        let installedVersions = try database.query(
+            "SELECT * FROM plugin_versions ORDER BY plugin_id ASC, version ASC"
+        ).map(installedPluginVersion(from:))
+        let matchingVersions = installedVersions.filter { version in
+            revocations.revokedPlugins.contains(version.pluginID)
+                || revocations.revokedVersions.contains { $0.pluginId == version.pluginID && $0.version == version.version }
+                || revocations.revokedHashes.contains(version.sha256)
+        }
+        let disabledPluginIDs = Array(Set(matchingVersions.map(\.pluginID))).sorted()
+        guard matchingVersions.isEmpty == false else {
+            return PluginRevocationApplicationResult(revokedVersions: [], disabledPluginIDs: [])
+        }
+
+        for version in matchingVersions {
+            try database.execute(
+                "UPDATE plugin_versions SET revoked = 1 WHERE id = ?",
+                bindings: [.text(version.id)]
+            )
+        }
+        for pluginID in disabledPluginIDs {
+            try database.execute(
+                "UPDATE plugins SET enabled = 0, updated_at = ? WHERE id = ?",
+                bindings: [.text(ISO8601.string(from: checkedAt)), .text(pluginID)]
+            )
+            try insertAuditEntry(
+                AuditEntry(
+                    id: "aud_plugin_\(pluginID.replacingOccurrences(of: ".", with: "_"))_revoked",
+                    title: "Plugin disabled by revocation",
+                    detail: "Status disabled \(pluginID) because the current revocation list matched its installed package.",
+                    timestamp: checkedAt,
+                    status: "revoked"
+                )
+            )
+        }
+
+        return PluginRevocationApplicationResult(
+            revokedVersions: matchingVersions.map { version in
+                var revokedVersion = version
+                revokedVersion.revoked = true
+                return revokedVersion
+            },
+            disabledPluginIDs: disabledPluginIDs
+        )
+    }
+
     public func pluginPermissions(pluginID: String) throws -> [InstalledPluginPermission] {
         try database.query(
             "SELECT * FROM plugin_permissions WHERE plugin_id = ? ORDER BY permission ASC",

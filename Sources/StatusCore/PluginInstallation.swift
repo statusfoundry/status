@@ -139,6 +139,16 @@ public struct PluginInstallRecord: Equatable, Sendable {
     }
 }
 
+public struct PluginRevocationApplicationResult: Equatable, Sendable {
+    public var revokedVersions: [InstalledPluginVersion]
+    public var disabledPluginIDs: [String]
+
+    public init(revokedVersions: [InstalledPluginVersion], disabledPluginIDs: [String]) {
+        self.revokedVersions = revokedVersions
+        self.disabledPluginIDs = disabledPluginIDs
+    }
+}
+
 public enum PluginInstallationError: Error, Equatable, LocalizedError, Sendable {
     case verificationPluginMismatch(expected: String, actual: String)
     case verificationVersionMismatch(expected: String, actual: String)

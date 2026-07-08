@@ -191,7 +191,7 @@ Check timing:
 - before every update;
 - periodically for installed plugins: on app launch and at least every 24 hours.
 
-If a periodic check matches an installed plugin, the app disables the plugin, keeps its Keychain secrets untouched, and tells the user why. If the revocation list is unreachable, installs of new packages should warn or fail closed; already-installed plugins keep running against the last successfully fetched list.
+If a periodic check matches an installed plugin, the app disables the plugin, keeps its Keychain secrets untouched, and tells the user why. Current implementation can apply installed plugin ID, plugin ID + version, and package-hash revocations locally by marking installed versions revoked, disabling affected plugins, and writing audit rows. Signing-key revocation for already-installed versions still needs the signing key id to be persisted with the install record. If the revocation list is unreachable, installs of new packages should warn or fail closed; already-installed plugins keep running against the last successfully fetched list.
 
 ### Unsigned and local-dev plugins
 
