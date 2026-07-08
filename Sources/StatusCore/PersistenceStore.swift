@@ -1062,6 +1062,13 @@ public final class StatusPersistenceStore {
         try database.query("SELECT * FROM plugins ORDER BY name ASC, id ASC").map(installedPlugin(from:))
     }
 
+    public func installedPluginDefinition(pluginID: String) throws -> PluginPackageDefinition? {
+        guard let plugin = try installedPlugin(id: pluginID) else {
+            return nil
+        }
+        return installedPluginDefinition(pluginID: pluginID, version: plugin.installedVersion)
+    }
+
     public func installedPluginVersions(pluginID: String) throws -> [InstalledPluginVersion] {
         try database.query(
             "SELECT * FROM plugin_versions WHERE plugin_id = ? ORDER BY installed_at DESC, version DESC",

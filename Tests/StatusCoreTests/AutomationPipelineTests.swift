@@ -168,6 +168,59 @@ import Testing
     #expect(audit.detail == "Runtime effect dispatch failed for webhook.post. Webhook endpoint returned 500.")
 }
 
+@Test func automationPipelineExecutesProviderBackedAction() async throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_530)
+    let event = workflowFailedEvent(provider: "com.status.jira")
+    let rule = Rule(
+        id: "rul_create_jira",
+        name: "Create Jira issue",
+        enabled: true,
+        provider: "com.status.jira",
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [
+            RuleActionDefinition(action: "jira.createIssue", parameters: ["summary": "{{event.title}}"])
+        ]
+    )
+    try installActionPlugin(
+        provider: "com.status.jira",
+        store: store,
+        at: now,
+        actions: [
+            PackagedPluginAction(id: "jira.createIssue", label: "Create issue", requiresWritePermission: true, request: "create_issue")
+        ],
+        requests: PackagedPluginRequests(requests: [
+            "create_issue": PackagedPluginRequest(method: "POST", url: "https://example.atlassian.net/rest/api/3/issue")
+        ])
+    )
+    try store.setPluginPermission(pluginID: "com.status.jira", permission: .writeActions, granted: true, grantedAt: now)
+    let executor = RecordingProviderActionExecutor(result: ["issue_key": "STATUS-1"])
+    let pipeline = AutomationPipeline(
+        store: store,
+        actionRunner: ActionRunner(now: { now }),
+        providerActionExecutor: executor
+    )
+
+    let result = try await pipeline.process(event: event, rules: [rule])
+
+    let actionRun = try #require(result.actionResults.first?.actionRun)
+    let storedActionRun = try #require(try store.actionRun(id: actionRun.id))
+    #expect(storedActionRun.status == .success)
+    #expect(storedActionRun.result == ["issue_key": "STATUS-1"])
+    #expect(executor.actions == [
+        ActionRuntimeProviderAction(
+            actionRunID: actionRun.id,
+            action: "jira.createIssue",
+            provider: event.provider,
+            parameters: ["summary": "Workflow failed"],
+            event: event
+        )
+    ])
+}
+
 @Test func actionWebhookRequestBuilderCreatesJSONPostRequest() throws {
     let url = try #require(URL(string: "https://example.com/hooks/status"))
     let request = try ActionWebhookRequestBuilder().request(
@@ -199,6 +252,20 @@ private struct FailingActionEffectDispatcher: ActionEffectDispatcher {
             return
         }
         throw ActionEffectDispatchFailure(actionRunID: actionRunID, message: message)
+    }
+}
+
+private final class RecordingProviderActionExecutor: ProviderActionExecutor, @unchecked Sendable {
+    var actions: [ActionRuntimeProviderAction] = []
+    var result: [String: String]
+
+    init(result: [String: String]) {
+        self.result = result
+    }
+
+    func execute(_ action: ActionRuntimeProviderAction) async throws -> [String: String] {
+        actions.append(action)
+        return result
     }
 }
 
@@ -267,7 +334,13 @@ private func iso8601String(from date: Date) -> String {
     return formatter.string(from: date)
 }
 
-private func installActionPlugin(provider: String, store: StatusPersistenceStore, at date: Date) throws {
+private func installActionPlugin(
+    provider: String,
+    store: StatusPersistenceStore,
+    at date: Date,
+    actions: [PackagedPluginAction] = [],
+    requests: PackagedPluginRequests = PackagedPluginRequests()
+) throws {
     let manifest = PluginManifest(
         id: provider,
         name: provider,
@@ -291,6 +364,7 @@ private func installActionPlugin(provider: String, store: StatusPersistenceStore
                 sha256: "fixture",
                 signedBy: "status-foundry-dev"
             ),
+            packageDefinition: PluginPackageDefinition(requests: requests, actions: actions),
             installedAt: date
         )
     )

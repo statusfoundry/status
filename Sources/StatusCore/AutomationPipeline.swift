@@ -15,16 +15,19 @@ public struct AutomationPipelineResult: Equatable, Sendable {
 public final class AutomationPipeline {
     private let store: StatusPersistenceStore
     private let effectDispatcher: ActionEffectDispatcher
+    private let providerActionExecutor: ProviderActionExecutor?
     public let actionRunner: ActionRunner
 
     public init(
         store: StatusPersistenceStore,
         actionRunner: ActionRunner = ActionRunner(),
-        effectDispatcher: ActionEffectDispatcher = NoopActionEffectDispatcher()
+        effectDispatcher: ActionEffectDispatcher = NoopActionEffectDispatcher(),
+        providerActionExecutor: ProviderActionExecutor? = nil
     ) {
         self.store = store
         self.actionRunner = actionRunner
         self.effectDispatcher = effectDispatcher
+        self.providerActionExecutor = providerActionExecutor
     }
 
     public func process(event: Event, rules: [Rule]) async throws -> AutomationPipelineResult {
@@ -42,6 +45,7 @@ public final class AutomationPipeline {
         let effects = actionRunner.effects.effects(since: cursor)
         try persistNotifications(effects.notifications)
         do {
+            try await executeProviderActions(effects.providerActions)
             try await effectDispatcher.dispatch(effects)
             try markNotificationsDelivered(effects.notifications)
         } catch let failure as ActionEffectDispatchFailure {
@@ -105,6 +109,36 @@ public final class AutomationPipeline {
         }
     }
 
+    private func executeProviderActions(_ actions: [ActionRuntimeProviderAction]) async throws {
+        for action in actions {
+            guard let providerActionExecutor else {
+                throw ActionEffectDispatchFailure(
+                    actionRunID: action.actionRunID,
+                    message: "\(action.action) is not wired to a provider executor yet."
+                )
+            }
+            do {
+                let result = try await providerActionExecutor.execute(action)
+                try recordProviderActionSuccess(actionRunID: action.actionRunID, result: result)
+            } catch let failure as ActionEffectDispatchFailure {
+                throw failure
+            } catch {
+                throw ActionEffectDispatchFailure(actionRunID: action.actionRunID, message: error.localizedDescription)
+            }
+        }
+    }
+
+    private func recordProviderActionSuccess(actionRunID: String, result: [String: String]) throws {
+        guard var actionRun = try store.actionRun(id: actionRunID) else {
+            return
+        }
+        actionRun.status = .success
+        actionRun.result = result
+        actionRun.error = nil
+        actionRun.finishedAt = Date()
+        try store.upsertActionRun(actionRun)
+    }
+
     private func notificationRecordID(for notification: ActionRuntimeNotification) -> String {
         if let actionRunID = notification.actionRunID {
             return "ntf_\(actionRunID)"
@@ -120,12 +154,32 @@ public final class AutomationPipeline {
     }
 
     private func reviewPermissionGranted(rule: Rule, action: RuleActionDefinition) -> Bool {
-        guard ActionRunner.safetyLevel(for: action.action) == .reviewRequired,
-              let provider = rule.provider else {
+        guard ActionRunner.safetyLevel(for: action.action) == .reviewRequired else {
             return false
         }
+        let provider: String?
+        if action.action == "webhook.post" {
+            provider = rule.provider
+        } else {
+            provider = providerDeclaringAction(action.action) ?? rule.provider
+        }
+        guard let provider else { return false }
         return ((try? store.pluginPermissions(pluginID: provider)) ?? []).contains { permission in
             permission.permission == .writeActions && permission.granted
         }
+    }
+
+    private func providerDeclaringAction(_ action: String) -> String? {
+        guard let plugins = try? store.installedPlugins() else {
+            return nil
+        }
+        for plugin in plugins where plugin.enabled {
+            guard let definition = try? store.installedPluginDefinition(pluginID: plugin.id),
+                  definition.actions.contains(where: { $0.id == action }) else {
+                continue
+            }
+            return plugin.id
+        }
+        return nil
     }
 }

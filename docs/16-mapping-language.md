@@ -218,7 +218,7 @@ trigger     the trigger that started the job (id, type)
 
 A path whose first segment is not a scope name is treated as `item.<path>`. So `{{id}}` in a mapping template means `{{item.id}}`. This keeps the short examples in `docs/04-plugin-system.md` valid.
 
-Which scopes are populated depends on where the template runs: mapping templates see `item`, `resource`, `account`, and `trigger`; rule and action templates (`docs/05-events-automation.md`) see `event`, `account`, and `trigger`. Referencing an unpopulated scope resolves to missing.
+Which scopes are populated depends on where the template runs: mapping templates see `item`, `resource`, `account`, and `trigger`; rule/action parameter templates (`docs/05-events-automation.md`) see `event`; provider action request templates see `item`, `account`, `action`, and `event`. Referencing an unpopulated scope resolves to missing.
 
 ### Missing values
 

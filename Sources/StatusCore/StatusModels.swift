@@ -202,6 +202,35 @@ public struct Event: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+extension Event {
+    var mappingValue: MappingJSONValue {
+        var fields: [String: MappingJSONValue] = [
+            "id": .string(id),
+            "provider": .string(provider),
+            "type": .string(type),
+            "resourceID": .string(resourceID),
+            "resourceId": .string(resourceID),
+            "resourceName": .string(resourceName),
+            "severity": .string(severity.rawValue),
+            "title": .string(title),
+            "summary": .string(summary),
+            "timestamp": .string(Self.iso8601String(from: timestamp)),
+            "fingerprint": .string(fingerprint)
+        ]
+        if let actionURL {
+            fields["actionURL"] = .string(actionURL.absoluteString)
+            fields["actionUrl"] = .string(actionURL.absoluteString)
+        }
+        return .object(fields)
+    }
+
+    private static func iso8601String(from date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.string(from: date)
+    }
+}
+
 public struct StatusItem: Identifiable, Codable, Equatable, Sendable {
     public var id: String
     public var resourceID: String

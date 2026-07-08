@@ -1212,6 +1212,143 @@ import Testing
     #expect(bundle.fields["apiToken"] == "jira-token")
 }
 
+@Test func pluginRuntimeServiceExecutesProviderBackedActionRequest() async throws {
+    let database = try temporaryRuntimeDatabase()
+    let store = StatusPersistenceStore(database: database)
+    let credentials = InMemoryCredentialStore()
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let packageURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("status-runtime-action-\(UUID().uuidString).statusplugin.zip")
+    let packageData = runtimeStoredZip(files: [
+        ("auth.json", Data("""
+        {
+          "type": "basic-auth",
+          "fields": [
+            { "key": "email", "label": "Email", "type": "text", "required": true },
+            { "key": "apiToken", "label": "API token", "type": "secret", "required": true }
+          ]
+        }
+        """.utf8)),
+        ("setup.schema.json", Data("""
+        {
+          "title": "Jira site",
+          "fields": [
+            { "key": "site", "label": "Site", "type": "hostname", "required": true }
+          ]
+        }
+        """.utf8)),
+        ("requests.json", Data("""
+        {
+          "requests": {
+            "create_issue": {
+              "method": "POST",
+              "url": "https://{{account.site}}/rest/api/3/issue",
+              "headers": {
+                "Accept": "application/json"
+              },
+              "body": {
+                "fields": {
+                  "project": { "key": "{{project}}" },
+                  "summary": "{{summary}}",
+                  "description": "{{event.summary}}"
+                }
+              }
+            }
+          }
+        }
+        """.utf8)),
+        ("actions.json", Data("""
+        {
+          "actions": [
+            {
+              "id": "jira.createIssue",
+              "label": "Create Jira issue",
+              "requiresWritePermission": true,
+              "request": "create_issue"
+            }
+          ]
+        }
+        """.utf8))
+    ])
+    try packageData.write(to: packageURL)
+    let manifest = PluginManifest(
+        id: "com.status.jira",
+        name: "Jira",
+        version: "0.1.0",
+        author: "Status Foundry",
+        category: "developer",
+        description: "Create issues from Status rules.",
+        minCoreVersion: "0.1.0",
+        platforms: [.macOS, .iOS],
+        permissions: [.network, .keychain, .writeActions],
+        domains: ["example.atlassian.net"]
+    )
+    try store.installPlugin(
+        PluginInstallRecord(
+            manifest: manifest,
+            trustLevel: .official,
+            installPath: packageURL.deletingLastPathComponent().path,
+            packagePath: packageURL.path,
+            verification: PluginPackageVerificationResult(
+                pluginID: manifest.id,
+                version: manifest.version,
+                sha256: PluginPackageVerifier.sha256Hex(packageData),
+                signedBy: "status-foundry-dev"
+            ),
+            signature: "dev-signature",
+            packageDefinition: try PluginPackageDefinition.decode(from: packageData),
+            installedAt: now
+        )
+    )
+    try grantRuntimePermissions(manifest.permissions, pluginID: manifest.id, store: store, at: now)
+    let plugin = try #require(try store.installedPlugin(id: manifest.id))
+    _ = try PluginSetupConfiguration.saveValues(
+        ["email": "me@example.com", "apiToken": "jira-token", "site": "example.atlassian.net"],
+        for: plugin,
+        service: PluginRuntimeService(store: store, credentialStore: credentials),
+        credentialStore: credentials,
+        now: now
+    )
+    let url = try #require(URL(string: "https://example.atlassian.net/rest/api/3/issue"))
+    let service = PluginRuntimeService(
+        store: store,
+        transport: RuntimeActionRequestCheckingTransport(
+            response: PluginHTTPResponse(data: Data(#"{"key":"STATUS-1"}"#.utf8), statusCode: 201, url: url),
+            expectedURL: url,
+            expectedAuthorization: "Basic \(Data("me@example.com:jira-token".utf8).base64EncodedString())"
+        ),
+        credentialStore: credentials
+    )
+    let event = Event(
+        id: "evt_01workflowfailed",
+        provider: "com.status.github",
+        type: "github.workflow.failed",
+        resourceID: "res_status_repo",
+        resourceName: "status",
+        severity: .critical,
+        title: "Workflow failed",
+        summary: "CI failed on main.",
+        timestamp: now,
+        fingerprint: "github:workflow.failed:res_status_repo:failure"
+    )
+
+    let result = try await service.execute(
+        ActionRuntimeProviderAction(
+            actionRunID: "run_01",
+            action: "jira.createIssue",
+            provider: event.provider,
+            parameters: ["project": "STATUS", "summary": "Workflow failed"],
+            event: event
+        )
+    )
+
+    #expect(result["plugin_id"] == "com.status.jira")
+    #expect(result["account_id"] == "acct_com_status_jira_example_atlassian_net")
+    #expect(result["request_id"] == "create_issue")
+    #expect(result["status_code"] == "201")
+    #expect(result["body"] == #"{"key":"STATUS-1"}"#)
+}
+
 @Test func pluginRuntimeServiceInjectsAPIKeyHeaderForConfiguredAccount() async throws {
     let database = try temporaryRuntimeDatabase()
     let store = StatusPersistenceStore(database: database)
@@ -1776,6 +1913,28 @@ private struct RuntimeAuthorizationCheckingTransport: PluginRequestHTTPTransport
 
     func response(for request: PluginHTTPRequest) async throws -> PluginHTTPResponse {
         try validate(request.headers["Authorization"])
+        return response
+    }
+}
+
+private struct RuntimeActionRequestCheckingTransport: PluginRequestHTTPTransport {
+    var response: PluginHTTPResponse
+    var expectedURL: URL
+    var expectedAuthorization: String
+
+    func response(for request: PluginHTTPRequest) async throws -> PluginHTTPResponse {
+        #expect(request.method == "POST")
+        #expect(request.url == expectedURL)
+        #expect(request.headers["Authorization"] == expectedAuthorization)
+        #expect(request.headers["Accept"] == "application/json")
+        #expect(request.headers["Content-Type"] == "application/json")
+        let body = try #require(request.body)
+        let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let fields = try #require(object["fields"] as? [String: Any])
+        let project = try #require(fields["project"] as? [String: Any])
+        #expect(project["key"] as? String == "STATUS")
+        #expect(fields["summary"] as? String == "Workflow failed")
+        #expect(fields["description"] as? String == "CI failed on main.")
         return response
     }
 }

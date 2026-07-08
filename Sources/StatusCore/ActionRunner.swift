@@ -67,19 +67,22 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
     public private(set) var openedURLs: [URL] = []
     public private(set) var auditNotes: [String] = []
     public private(set) var webhooks: [ActionRuntimeWebhook] = []
+    public private(set) var providerActions: [ActionRuntimeProviderAction] = []
 
     public init(
         notifications: [ActionRuntimeNotification] = [],
         inboxEventIDs: [String] = [],
         openedURLs: [URL] = [],
         auditNotes: [String] = [],
-        webhooks: [ActionRuntimeWebhook] = []
+        webhooks: [ActionRuntimeWebhook] = [],
+        providerActions: [ActionRuntimeProviderAction] = []
     ) {
         self.notifications = notifications
         self.inboxEventIDs = inboxEventIDs
         self.openedURLs = openedURLs
         self.auditNotes = auditNotes
         self.webhooks = webhooks
+        self.providerActions = providerActions
     }
 
     public func cursor() -> ActionRuntimeEffectCursor {
@@ -88,7 +91,8 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
             inboxEventIDCount: inboxEventIDs.count,
             openedURLCount: openedURLs.count,
             auditNoteCount: auditNotes.count,
-            webhookCount: webhooks.count
+            webhookCount: webhooks.count,
+            providerActionCount: providerActions.count
         )
     }
 
@@ -99,6 +103,7 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
         effects.openedURLs = Array(openedURLs.dropFirst(cursor.openedURLCount))
         effects.auditNotes = Array(auditNotes.dropFirst(cursor.auditNoteCount))
         effects.webhooks = Array(webhooks.dropFirst(cursor.webhookCount))
+        effects.providerActions = Array(providerActions.dropFirst(cursor.providerActionCount))
         return effects
     }
 
@@ -133,6 +138,22 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
     fileprivate mutating func recordWebhook(url: URL, payload: [String: String], actionRunID: String) {
         webhooks.append(ActionRuntimeWebhook(url: url, payload: payload, actionRunID: actionRunID))
     }
+
+    fileprivate mutating func recordProviderAction(
+        actionRunID: String,
+        action: String,
+        provider: String?,
+        parameters: [String: String],
+        event: Event
+    ) {
+        providerActions.append(ActionRuntimeProviderAction(
+            actionRunID: actionRunID,
+            action: action,
+            provider: provider,
+            parameters: parameters,
+            event: event
+        ))
+    }
 }
 
 public struct ActionRuntimeEffectCursor: Equatable, Sendable {
@@ -141,13 +162,22 @@ public struct ActionRuntimeEffectCursor: Equatable, Sendable {
     public var openedURLCount: Int
     public var auditNoteCount: Int
     public var webhookCount: Int
+    public var providerActionCount: Int
 
-    public init(notificationCount: Int, inboxEventIDCount: Int, openedURLCount: Int, auditNoteCount: Int, webhookCount: Int) {
+    public init(
+        notificationCount: Int,
+        inboxEventIDCount: Int,
+        openedURLCount: Int,
+        auditNoteCount: Int,
+        webhookCount: Int,
+        providerActionCount: Int = 0
+    ) {
         self.notificationCount = notificationCount
         self.inboxEventIDCount = inboxEventIDCount
         self.openedURLCount = openedURLCount
         self.auditNoteCount = auditNoteCount
         self.webhookCount = webhookCount
+        self.providerActionCount = providerActionCount
     }
 }
 
@@ -182,6 +212,28 @@ public struct ActionRuntimeWebhook: Equatable, Sendable {
         self.url = url
         self.payload = payload
         self.actionRunID = actionRunID
+    }
+}
+
+public struct ActionRuntimeProviderAction: Equatable, Sendable {
+    public var actionRunID: String
+    public var action: String
+    public var provider: String?
+    public var parameters: [String: String]
+    public var event: Event
+
+    public init(
+        actionRunID: String,
+        action: String,
+        provider: String? = nil,
+        parameters: [String: String],
+        event: Event
+    ) {
+        self.actionRunID = actionRunID
+        self.action = action
+        self.provider = provider
+        self.parameters = parameters
+        self.event = event
     }
 }
 
@@ -287,22 +339,25 @@ public final class ActionRunner {
     ) throws -> [String: String] {
         switch definition.action {
         case "notification.show":
-            let title = definition.parameters["title"] ?? event.title
-            let body = definition.parameters["body"] ?? event.summary
+            let parameters = renderedParameters(definition.parameters, event: event)
+            let title = parameters["title"] ?? event.title
+            let body = parameters["body"] ?? event.summary
             effects.recordNotification(title: title, body: body, eventID: event.id, actionRunID: actionRunID)
             return ["title": title, "body": body]
         case "status.inbox.add":
             effects.recordInbox(eventID: event.id)
             return ["event_id": event.id]
         case "status.open_url":
-            let urlString = definition.parameters["url"] ?? event.actionURL?.absoluteString
+            let parameters = renderedParameters(definition.parameters, event: event)
+            let urlString = parameters["url"] ?? event.actionURL?.absoluteString
             guard let urlString, let url = URL(string: urlString) else {
                 throw ActionRunnerError.missingURL
             }
             effects.recordOpenedURL(url)
             return ["url": url.absoluteString]
         case "audit.note":
-            let note = definition.parameters["note"] ?? event.summary
+            let parameters = renderedParameters(definition.parameters, event: event)
+            let note = parameters["note"] ?? event.summary
             effects.recordAuditNote(note)
             return ["note": note]
         default:
@@ -317,20 +372,29 @@ public final class ActionRunner {
     ) throws -> [String: String] {
         switch definition.action {
         case "webhook.post":
-            let urlString = definition.parameters["url"]
+            let parameters = renderedParameters(definition.parameters, event: event)
+            let urlString = parameters["url"]
             guard let urlString, let url = URL(string: urlString) else {
                 throw ActionRunnerError.missingURL
             }
-            let payload = webhookPayload(definition: definition, event: event)
+            let payload = webhookPayload(parameters: parameters, event: event)
             effects.recordWebhook(url: url, payload: payload, actionRunID: actionRunID)
             return ["url": url.absoluteString]
         default:
-            throw ActionRunnerError.unsupportedReviewRequiredAction(definition.action)
+            let parameters = renderedParameters(definition.parameters, event: event)
+            effects.recordProviderAction(
+                actionRunID: actionRunID,
+                action: definition.action,
+                provider: event.provider,
+                parameters: parameters,
+                event: event
+            )
+            return ["queued": "provider-action"]
         }
     }
 
-    private func webhookPayload(definition: RuleActionDefinition, event: Event) -> [String: String] {
-        var payload = definition.parameters
+    private func webhookPayload(parameters: [String: String], event: Event) -> [String: String] {
+        var payload = parameters
         payload["event_id"] = event.id
         payload["event_type"] = event.type
         payload["event_title"] = event.title
@@ -341,6 +405,11 @@ public final class ActionRunner {
         payload["timestamp"] = iso8601String(from: event.timestamp)
         payload["url"] = nil
         return payload
+    }
+
+    private func renderedParameters(_ parameters: [String: String], event: Event) -> [String: String] {
+        let context = MappingTemplateContext(scopes: ["event": event.mappingValue])
+        return parameters.mapValues { MappingTemplateRenderer.render($0, context: context) }
     }
 
     private func iso8601String(from date: Date) -> String {

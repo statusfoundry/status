@@ -41,7 +41,7 @@ The same pipeline is used for:
 - Inserted events from a successful plugin run are immediately evaluated against the stored rule set, so manual app refreshes now continue through `Event → Rule → Action → Audit`.
 - Plugin mapping commits can persist resources, events, dashboard metrics, and metric points in one audited job output.
 - Audit entries can now attach job, event, and action-run provenance; persisted event ingestion and job lifecycle audit rows use those references.
-- The core action runner executes safe built-in local actions, records deterministic action-run rows, and supports `webhook.post` only after the rule provider has an explicit `write-actions` grant. Provider-backed review-required actions remain unsupported until provider executors exist.
+- The core action runner executes safe built-in local actions, records deterministic action-run rows, supports `webhook.post`, and queues provider-backed declarative actions only after the relevant plugin has an explicit `write-actions` grant.
 - `AutomationPipeline` evaluates inserted events against rules, runs matching actions, persists action-run records, audit entries, and notification records, and dispatches newly produced runtime effects through a platform-owned effect dispatcher.
 - Rules persist to SQLite with structured condition/action JSON, and the automation pipeline can evaluate the stored local rule set for an event.
 - macOS and iOS expose app-owned rule toggles so suggested plugin rules remain disabled by default but can be explicitly enabled by the user.
@@ -52,7 +52,7 @@ The same pipeline is used for:
 - Failed cron jobs update the persisted trigger failure count and next retry time with exponential backoff; successful cron jobs reset the failure count and restore the normal schedule.
 - Declarative plugin requests enforce each request's `timeoutSeconds` value in the shared request runner; when omitted, the runner uses a 30-second default.
 
-OS-level background execution, richer retry policy controls, richer notification preference controls, and provider-backed write actions remain planned work.
+OS-level background execution, richer retry policy controls, and richer notification preference controls remain planned work.
 
 ## Triggers
 
@@ -308,7 +308,7 @@ Current implementation status:
 
 - `notification.show`, `status.inbox.add`, `status.open_url`, and `audit.note` are safe local core actions.
 - `webhook.post` is review-required and dispatches a platform-owned webhook runtime effect only when the rule provider has a granted `write-actions` permission. macOS and iOS post that effect as JSON through the shared HTTP transport. Delivery failures are reported back to the core with the originating action-run id so the stored action run and audit row are marked failed.
-- `jira.createIssue`, `github.createIssue`, `github.comment`, and `email.createDraft` are review-required but remain unsupported until provider execution is wired.
+- `jira.createIssue`, `github.createIssue`, `github.comment`, and `email.createDraft` are review-required provider actions. They execute only when an installed declarative plugin declares the action in `actions.json`, binds it to a request in `requests.json`, has a configured account, and has granted `write-actions` plus any required network/keychain permissions.
 - Unknown actions are recorded as unsupported rather than executed.
 
 ## Action safety levels

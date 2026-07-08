@@ -186,6 +186,18 @@ public final class PluginRequestJobRunner {
         )
     }
 
+    public func request(
+        definition: PackagedPluginRequest,
+        input: PluginRequestJobInput,
+        context: MappingTemplateContext? = nil
+    ) throws -> PluginHTTPRequest {
+        try makeRequest(definition, input: input, context: context)
+    }
+
+    public func response(for request: PluginHTTPRequest, requestID: String) async throws -> PluginHTTPResponse {
+        try await fetchResponse(for: request, requestID: requestID)
+    }
+
     private struct PayloadFetchResult {
         var payload: MappingJSONValue
         var warnings: [PluginMappingWarning]
@@ -197,7 +209,7 @@ public final class PluginRequestJobRunner {
         requestID: String,
         variables: [String: String]
     ) async throws -> PayloadFetchResult {
-        let firstResponse = try await response(for: request, requestID: requestID)
+        let firstResponse = try await fetchResponse(for: request, requestID: requestID)
         var payload = decodePayload(response: firstResponse, variables: variables)
         guard let pagination = definition.pagination else {
             return PayloadFetchResult(payload: payload, warnings: [])
@@ -215,7 +227,7 @@ public final class PluginRequestJobRunner {
                 headers: request.headers,
                 timeoutSeconds: definition.timeoutSeconds
             )
-            let pageResponse = try await response(for: pageRequest, requestID: requestID)
+            let pageResponse = try await fetchResponse(for: pageRequest, requestID: requestID)
             let pagePayload = decodePayload(response: pageResponse, variables: variables)
             payload = payload.mergingTopLevelArrays(from: pagePayload)
             fetchedPages += 1
@@ -227,7 +239,7 @@ public final class PluginRequestJobRunner {
         return PayloadFetchResult(payload: payload, warnings: warnings)
     }
 
-    private func response(for request: PluginHTTPRequest, requestID: String) async throws -> PluginHTTPResponse {
+    private func fetchResponse(for request: PluginHTTPRequest, requestID: String) async throws -> PluginHTTPResponse {
         let timeoutSeconds = request.timeoutSeconds ?? 30
         guard timeoutSeconds > 0 else {
             throw PluginRequestJobRunnerError.timedOut(requestID: requestID, timeoutSeconds: timeoutSeconds)
@@ -249,9 +261,13 @@ public final class PluginRequestJobRunner {
         }
     }
 
-    private func makeRequest(_ definition: PackagedPluginRequest, input: PluginRequestJobInput) throws -> PluginHTTPRequest {
+    private func makeRequest(
+        _ definition: PackagedPluginRequest,
+        input: PluginRequestJobInput,
+        context providedContext: MappingTemplateContext? = nil
+    ) throws -> PluginHTTPRequest {
         let variables = MappingJSONValue.object(input.variables.mapValues(MappingJSONValue.string))
-        let context = MappingTemplateContext(scopes: ["item": variables, "account": variables])
+        let context = providedContext ?? MappingTemplateContext(scopes: ["item": variables, "account": variables])
         let renderedURL = MappingTemplateRenderer.render(definition.url, context: context)
         guard var components = URLComponents(string: renderedURL) else {
             throw PluginRequestJobRunnerError.invalidURL(renderedURL)

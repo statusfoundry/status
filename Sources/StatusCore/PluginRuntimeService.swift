@@ -36,6 +36,8 @@ public enum PluginRuntimeServiceError: Error, Equatable, LocalizedError, Sendabl
     case runnableTriggerUnavailable(String)
     case triggerRequestUnavailable(String)
     case missingPermission(pluginID: String, permission: PluginPermission)
+    case actionUnavailable(String)
+    case actionRequestFailed(action: String, statusCode: Int)
 
     public var errorDescription: String? {
         switch self {
@@ -53,11 +55,15 @@ public enum PluginRuntimeServiceError: Error, Equatable, LocalizedError, Sendabl
             "Trigger does not declare a plugin request: \(triggerID)"
         case .missingPermission(let pluginID, let permission):
             "Plugin \(pluginID) requires granted permission before it can run: \(permission.rawValue)"
+        case .actionUnavailable(let action):
+            "No installed plugin declares action: \(action)"
+        case .actionRequestFailed(let action, let statusCode):
+            "Provider action \(action) failed with HTTP \(statusCode)."
         }
     }
 }
 
-public final class PluginRuntimeService: @unchecked Sendable {
+public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Sendable {
     private let store: StatusPersistenceStore
     private let transport: PluginRequestHTTPTransport
     private let credentialStore: CredentialStore?
@@ -453,11 +459,133 @@ public final class PluginRuntimeService: @unchecked Sendable {
         let pipeline = AutomationPipeline(
             store: store,
             actionRunner: actionRunner,
-            effectDispatcher: effectDispatcher
+            effectDispatcher: effectDispatcher,
+            providerActionExecutor: self
         )
         for event in result.mappingOutput.events where insertedEventIDs.contains(event.id) {
             _ = try await pipeline.processStoredRules(for: event)
         }
+    }
+
+    public func execute(_ action: ActionRuntimeProviderAction) async throws -> [String: String] {
+        let target = try providerActionTarget(for: action)
+        try requireGrantedPermissionIfDeclared(pluginID: target.plugin.id, manifest: target.manifest, permission: .writeActions)
+        try requireGrantedPermissionIfDeclared(pluginID: target.plugin.id, manifest: target.manifest, permission: .network)
+        let account = try providerActionAccount(for: action, pluginID: target.plugin.id)
+        let headers = try resolvedHeaders(
+            base: [:],
+            pluginID: target.plugin.id,
+            configuration: account,
+            now: Date()
+        )
+        let requestInput = PluginRequestJobInput(
+            pluginID: target.plugin.id,
+            accountID: account.id,
+            provider: target.plugin.id,
+            requestID: target.action.request,
+            variables: account.variables.merging(action.parameters) { _, actionValue in actionValue },
+            headers: headers,
+            capturedAt: Date()
+        )
+        let runner = PluginRequestJobRunner(
+            transport: transport,
+            committer: PluginMappingOutputCommitter(store: store)
+        )
+        let request = try runner.request(
+            definition: target.request,
+            input: requestInput,
+            context: providerActionTemplateContext(action: action, account: account)
+        )
+        let response = try await runner.response(for: request, requestID: target.action.request)
+        guard (200..<300).contains(response.statusCode) else {
+            throw PluginRuntimeServiceError.actionRequestFailed(action: action.action, statusCode: response.statusCode)
+        }
+        var result = [
+            "plugin_id": target.plugin.id,
+            "account_id": account.id,
+            "request_id": target.action.request,
+            "status_code": String(response.statusCode),
+            "url": response.url.absoluteString
+        ]
+        if let body = String(data: response.data, encoding: .utf8), body.isEmpty == false {
+            result["body"] = body
+        }
+        return result
+    }
+
+    private struct ProviderActionTarget {
+        var plugin: InstalledPlugin
+        var manifest: PluginManifest
+        var definition: PluginPackageDefinition
+        var action: PackagedPluginAction
+        var request: PackagedPluginRequest
+    }
+
+    private func providerActionTarget(for action: ActionRuntimeProviderAction) throws -> ProviderActionTarget {
+        var matches: [ProviderActionTarget] = []
+        for plugin in try store.installedPlugins() where plugin.enabled {
+            guard let definition = try store.installedPluginDefinition(pluginID: plugin.id),
+                  let declaredAction = definition.actions.first(where: { $0.id == action.action }),
+                  let request = definition.requests.requests[declaredAction.request],
+                  let manifest = try store.installedPluginVersions(pluginID: plugin.id)
+                    .sorted(by: { $0.installedAt > $1.installedAt })
+                    .first?
+                    .manifest else {
+                continue
+            }
+            matches.append(ProviderActionTarget(
+                plugin: plugin,
+                manifest: manifest,
+                definition: definition,
+                action: declaredAction,
+                request: request
+            ))
+        }
+        if let provider = action.provider,
+           let exact = matches.first(where: { $0.plugin.id == provider }) {
+            return exact
+        }
+        if let suffix = action.action.split(separator: ".").first.map(String.init),
+           let suffixMatch = matches.first(where: { $0.plugin.id.hasSuffix(".\(suffix)") }) {
+            return suffixMatch
+        }
+        guard let first = matches.first else {
+            throw PluginRuntimeServiceError.actionUnavailable(action.action)
+        }
+        return first
+    }
+
+    private func providerActionAccount(for action: ActionRuntimeProviderAction, pluginID: String) throws -> PluginAccountConfiguration {
+        if let accountID = action.parameters["account_id"] ?? action.parameters["accountID"],
+           let account = try store.accountConfiguration(accountID: accountID) {
+            return account
+        }
+        if let resource = try store.resource(id: action.event.resourceID),
+           resource.pluginID == pluginID,
+           let account = try store.accountConfiguration(accountID: resource.accountID) {
+            return account
+        }
+        guard let account = try store.accountConfigurations(pluginID: pluginID).first else {
+            throw PluginRuntimeServiceError.accountNotConfigured(pluginID)
+        }
+        return account
+    }
+
+    private func providerActionTemplateContext(
+        action: ActionRuntimeProviderAction,
+        account: PluginAccountConfiguration
+    ) -> MappingTemplateContext {
+        let accountValue = MappingJSONValue.object(account.variables.mapValues(MappingJSONValue.string))
+        let actionValue = MappingJSONValue.object(action.parameters.mapValues(MappingJSONValue.string))
+        let item = account.variables
+            .merging(action.parameters) { _, actionValue in actionValue }
+            .mapValues(MappingJSONValue.string)
+        return MappingTemplateContext(scopes: [
+            "item": .object(item),
+            "account": accountValue,
+            "action": actionValue,
+            "event": action.event.mappingValue
+        ])
     }
 
     private func isDueCronTrigger(_ trigger: TriggerDefinition, at date: Date) -> Bool {

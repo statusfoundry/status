@@ -231,7 +231,7 @@ public struct MappingTemplateContext: Equatable, Sendable {
         let parts = trimmed.split(separator: ".").map(String.init)
         guard parts.isEmpty == false else { return nil }
 
-        let knownScopes = Set(["item", "resource", "event", "account", "trigger"])
+        let knownScopes = Set(["item", "resource", "event", "account", "trigger", "action"])
         let scopeName: String
         let fieldParts: ArraySlice<String>
         if knownScopes.contains(parts[0]) {
