@@ -28,6 +28,13 @@ public enum PluginSetupConfiguration {
         try store.accountConfigurations(pluginID: pluginID).first?.variables ?? [:]
     }
 
+    public static func configuredAccount(pluginID: String, store: StatusPersistenceStore) throws -> PluginAccountConfiguration {
+        guard let configuration = try store.accountConfigurations(pluginID: pluginID).first else {
+            throw PluginRuntimeServiceError.accountNotConfigured(pluginID)
+        }
+        return configuration
+    }
+
     public static func saveValues(
         _ values: [String: String],
         for plugin: InstalledPlugin,

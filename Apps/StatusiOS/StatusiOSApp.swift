@@ -93,9 +93,9 @@ private struct IOSRootView: View {
                 trustLevel: plugin.trustLevel
             )
         } canRunPlugin: { plugin in
-            plugin.id == WebsitePluginSetup.pluginID
+            canRunConfiguredPlugin(pluginID: plugin.id)
         } runPlugin: { plugin in
-            try await runConfiguredWebsiteCheck(pluginID: plugin.id)
+            try await runConfiguredPluginCheck(pluginID: plugin.id)
         } canConfigurePlugin: { plugin in
             plugin.auth?.fields.isEmpty == false || plugin.setup?.fields.contains(where: \.type.isPlainConfigurationField) == true
         } loadConfigurationValues: { plugin in
@@ -155,16 +155,26 @@ private struct IOSRootView: View {
         return "\(result.mappingOutput.resources.count) resource stored, \(result.mappingOutput.events.count) events processed."
     }
 
-    private func runConfiguredWebsiteCheck(pluginID: String) async throws -> String {
+    private func runConfiguredPluginCheck(pluginID: String) async throws -> String {
         let store = try LocalStatusStore.openApplicationSupportStore()
-        let configuration = try WebsitePluginSetup.configuredAccount(pluginID: pluginID, store: store)
+        let configuration = try PluginSetupConfiguration.configuredAccount(pluginID: pluginID, store: store)
         let service = PluginRuntimeService(store: store, effectDispatcher: IOSActionEffectDispatcher())
         let job = try service.enqueueManualConfiguredPluginRun(
             pluginID: pluginID,
             accountID: configuration.id
         )
         let result = try await service.runQueuedPluginJob(jobID: job.id)
-        return "\(configuration.variables["host", default: configuration.accountName]): \(result.mappingOutput.resources.count) resource stored, \(result.mappingOutput.events.count) events processed."
+        return "\(configuration.accountName): \(result.mappingOutput.resources.count) resource stored, \(result.mappingOutput.events.count) events processed."
+    }
+
+    private func canRunConfiguredPlugin(pluginID: String) -> Bool {
+        guard let store = try? LocalStatusStore.openApplicationSupportStore(),
+              (try? store.accountConfigurations(pluginID: pluginID).isEmpty == false) == true else {
+            return false
+        }
+        return ((try? store.triggers()) ?? []).contains { trigger in
+            trigger.pluginID == pluginID && trigger.kind == .manual && trigger.enabled && trigger.requestID != nil
+        }
     }
 
     private func configuredPluginValues(pluginID: String) throws -> [String: String] {
