@@ -411,6 +411,15 @@ import Testing
     #expect(try store.installedPluginVersions(pluginID: manifest.id).first?.sha256 == verification.sha256)
     #expect(try store.pluginPermissions(pluginID: manifest.id).map(\.permission) == [.backgroundRefresh, .network])
     #expect(try store.pluginPermissions(pluginID: manifest.id).allSatisfy { $0.granted == false })
+
+    let grantedAt = now.addingTimeInterval(60)
+    try store.setPluginPermission(pluginID: manifest.id, permission: .network, granted: true, grantedAt: grantedAt)
+    #expect(try store.pluginPermissions(pluginID: manifest.id).first(where: { $0.permission == .network })?.granted == true)
+    #expect(try store.pluginPermissions(pluginID: manifest.id).first(where: { $0.permission == .network })?.grantedAt == grantedAt)
+
+    try store.setPluginPermission(pluginID: manifest.id, permission: .network, granted: false, grantedAt: nil)
+    #expect(try store.pluginPermissions(pluginID: manifest.id).first(where: { $0.permission == .network })?.granted == false)
+    #expect(try store.pluginPermissions(pluginID: manifest.id).first(where: { $0.permission == .network })?.grantedAt == nil)
 }
 
 @Test func pluginUninstallRemovesActivePluginDataAndKeepsHistory() throws {

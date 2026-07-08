@@ -24,11 +24,15 @@ public final class PluginStoreViewModel: ObservableObject {
     @Published public private(set) var savingSetupPluginID: String?
     @Published public private(set) var setupResults: [String: String]
     @Published public private(set) var setupErrors: [String: String]
+    @Published public private(set) var installedPermissions: [String: [InstalledPluginPermission]]
+    @Published public private(set) var savingPermissionID: String?
 
     private let loadInstalled: () throws -> [InstalledPlugin]
     private let loadAvailable: () async throws -> [RegistryPluginSummary]
     private let installPlugin: (RegistryPluginSummary) async throws -> Void
     private let removePlugin: (InstalledPlugin) async throws -> Void
+    private let loadPermissions: (InstalledPlugin) throws -> [InstalledPluginPermission]
+    private let setPermissionGrant: (InstalledPlugin, PluginPermission, Bool) async throws -> Void
     private let canRunPlugin: (InstalledPlugin) -> Bool
     private let runPlugin: (InstalledPlugin) async throws -> String
     private let canConfigurePlugin: (InstalledPlugin) -> Bool
@@ -41,6 +45,8 @@ public final class PluginStoreViewModel: ObservableObject {
         loadAvailable: @escaping () async throws -> [RegistryPluginSummary],
         installPlugin: @escaping (RegistryPluginSummary) async throws -> Void,
         removePlugin: @escaping (InstalledPlugin) async throws -> Void = { _ in },
+        loadPermissions: @escaping (InstalledPlugin) throws -> [InstalledPluginPermission] = { _ in [] },
+        setPermissionGrant: @escaping (InstalledPlugin, PluginPermission, Bool) async throws -> Void = { _, _, _ in },
         canRunPlugin: @escaping (InstalledPlugin) -> Bool = { _ in false },
         runPlugin: @escaping (InstalledPlugin) async throws -> String = { _ in "" },
         canConfigurePlugin: @escaping (InstalledPlugin) -> Bool = { _ in false },
@@ -53,10 +59,13 @@ public final class PluginStoreViewModel: ObservableObject {
         self.setupValues = [:]
         self.setupResults = [:]
         self.setupErrors = [:]
+        self.installedPermissions = [:]
         self.loadInstalled = loadInstalled
         self.loadAvailable = loadAvailable
         self.installPlugin = installPlugin
         self.removePlugin = removePlugin
+        self.loadPermissions = loadPermissions
+        self.setPermissionGrant = setPermissionGrant
         self.canRunPlugin = canRunPlugin
         self.runPlugin = runPlugin
         self.canConfigurePlugin = canConfigurePlugin
@@ -70,11 +79,13 @@ public final class PluginStoreViewModel: ObservableObject {
             let available = try await loadAvailable()
             catalog = PluginStoreCatalog(installed: installed, available: available)
             refreshSetupValues(for: installed)
+            refreshPermissions(for: installed)
             loadError = nil
         } catch {
             let installed = (try? loadInstalled()) ?? []
             catalog = PluginStoreCatalog(installed: installed, available: [])
             refreshSetupValues(for: installed)
+            refreshPermissions(for: installed)
             loadError = error.localizedDescription
         }
     }
@@ -109,6 +120,20 @@ public final class PluginStoreViewModel: ObservableObject {
         do {
             try await removePlugin(plugin)
             setupValues[plugin.id] = nil
+            installedPermissions[plugin.id] = nil
+            await reload()
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    public func setPermission(_ permission: PluginPermission, granted: Bool, for plugin: InstalledPlugin) async {
+        guard savingPermissionID == nil else { return }
+        savingPermissionID = permissionChangeID(plugin: plugin, permission: permission)
+        defer { savingPermissionID = nil }
+
+        do {
+            try await setPermissionGrant(plugin, permission, granted)
             await reload()
         } catch {
             loadError = error.localizedDescription
@@ -169,10 +194,20 @@ public final class PluginStoreViewModel: ObservableObject {
         }
     }
 
+    private func refreshPermissions(for plugins: [InstalledPlugin]) {
+        installedPermissions = Dictionary(uniqueKeysWithValues: plugins.map { plugin in
+            (plugin.id, (try? loadPermissions(plugin)) ?? [])
+        })
+    }
+
     private func defaultSetupValues(for plugin: InstalledPlugin) -> [String: String] {
         Dictionary(uniqueKeysWithValues: plugin.configurationFields.map { field in
             (field.id, field.defaultValue ?? "")
         })
+    }
+
+    private func permissionChangeID(plugin: InstalledPlugin, permission: PluginPermission) -> String {
+        "\(plugin.id):\(permission.rawValue)"
     }
 }
 
@@ -195,6 +230,8 @@ public struct PluginStoreContainerView: View {
             savingSetupPluginID: viewModel.savingSetupPluginID,
             setupResults: viewModel.setupResults,
             setupErrors: viewModel.setupErrors,
+            installedPermissions: viewModel.installedPermissions,
+            savingPermissionID: viewModel.savingPermissionID,
             canConfigure: { plugin in
                 viewModel.canConfigure(plugin)
             },
@@ -222,6 +259,11 @@ public struct PluginStoreContainerView: View {
             remove: { plugin in
                 Task {
                     await viewModel.remove(plugin)
+                }
+            },
+            setPermissionGrant: { plugin, permission, granted in
+                Task {
+                    await viewModel.setPermission(permission, granted: granted, for: plugin)
                 }
             }
         )
@@ -256,6 +298,8 @@ public struct PluginStoreView: View {
     private let savingSetupPluginID: String?
     private let setupResults: [String: String]
     private let setupErrors: [String: String]
+    private let installedPermissions: [String: [InstalledPluginPermission]]
+    private let savingPermissionID: String?
     private let canConfigure: (InstalledPlugin) -> Bool
     private let updateSetupValue: (InstalledPlugin, String, String) -> Void
     private let saveSetup: (InstalledPlugin) -> Void
@@ -263,6 +307,7 @@ public struct PluginStoreView: View {
     private let run: (InstalledPlugin) -> Void
     private let install: (RegistryPluginSummary) -> Void
     private let remove: (InstalledPlugin) -> Void
+    private let setPermissionGrant: (InstalledPlugin, PluginPermission, Bool) -> Void
     @State private var pluginPendingRemoval: InstalledPlugin?
 
     public init(
@@ -276,13 +321,16 @@ public struct PluginStoreView: View {
         savingSetupPluginID: String? = nil,
         setupResults: [String: String] = [:],
         setupErrors: [String: String] = [:],
+        installedPermissions: [String: [InstalledPluginPermission]] = [:],
+        savingPermissionID: String? = nil,
         canConfigure: @escaping (InstalledPlugin) -> Bool = { _ in false },
         updateSetupValue: @escaping (InstalledPlugin, String, String) -> Void = { _, _, _ in },
         saveSetup: @escaping (InstalledPlugin) -> Void = { _ in },
         canRun: @escaping (InstalledPlugin) -> Bool = { _ in false },
         run: @escaping (InstalledPlugin) -> Void = { _ in },
         install: @escaping (RegistryPluginSummary) -> Void = { _ in },
-        remove: @escaping (InstalledPlugin) -> Void = { _ in }
+        remove: @escaping (InstalledPlugin) -> Void = { _ in },
+        setPermissionGrant: @escaping (InstalledPlugin, PluginPermission, Bool) -> Void = { _, _, _ in }
     ) {
         self.catalog = catalog
         self.installingPluginID = installingPluginID
@@ -294,6 +342,8 @@ public struct PluginStoreView: View {
         self.savingSetupPluginID = savingSetupPluginID
         self.setupResults = setupResults
         self.setupErrors = setupErrors
+        self.installedPermissions = installedPermissions
+        self.savingPermissionID = savingPermissionID
         self.canConfigure = canConfigure
         self.updateSetupValue = updateSetupValue
         self.saveSetup = saveSetup
@@ -301,6 +351,7 @@ public struct PluginStoreView: View {
         self.run = run
         self.install = install
         self.remove = remove
+        self.setPermissionGrant = setPermissionGrant
     }
 
     public var body: some View {
@@ -316,11 +367,14 @@ public struct PluginStoreView: View {
                     savingSetupPluginID: savingSetupPluginID,
                     setupResults: setupResults,
                     setupErrors: setupErrors,
+                    permissions: installedPermissions,
+                    savingPermissionID: savingPermissionID,
                     canConfigure: canConfigure,
                     updateSetupValue: updateSetupValue,
                     saveSetup: saveSetup,
                     canRun: canRun,
                     run: run,
+                    setPermissionGrant: setPermissionGrant,
                     removingPluginID: removingPluginID,
                     requestRemoval: { pluginPendingRemoval = $0 }
                 )
@@ -385,11 +439,14 @@ private struct InstalledPluginSection: View {
     let savingSetupPluginID: String?
     let setupResults: [String: String]
     let setupErrors: [String: String]
+    let permissions: [String: [InstalledPluginPermission]]
+    let savingPermissionID: String?
     let canConfigure: (InstalledPlugin) -> Bool
     let updateSetupValue: (InstalledPlugin, String, String) -> Void
     let saveSetup: (InstalledPlugin) -> Void
     let canRun: (InstalledPlugin) -> Bool
     let run: (InstalledPlugin) -> Void
+    let setPermissionGrant: (InstalledPlugin, PluginPermission, Bool) -> Void
     let removingPluginID: String?
     let requestRemoval: (InstalledPlugin) -> Void
 
@@ -410,6 +467,8 @@ private struct InstalledPluginSection: View {
                             isSavingSetup: savingSetupPluginID == plugin.id,
                             setupResult: setupResults[plugin.id],
                             setupError: setupErrors[plugin.id],
+                            permissions: permissions[plugin.id, default: []],
+                            savingPermissionID: savingPermissionID,
                             updateSetupValue: updateSetupValue,
                             saveSetup: saveSetup,
                             canRun: canRun(plugin),
@@ -417,6 +476,7 @@ private struct InstalledPluginSection: View {
                             runResult: runResults[plugin.id],
                             runError: runErrors[plugin.id],
                             run: run,
+                            setPermissionGrant: setPermissionGrant,
                             isRemoving: removingPluginID == plugin.id,
                             requestRemoval: requestRemoval
                         )
@@ -463,6 +523,8 @@ private struct InstalledPluginRow: View {
     let isSavingSetup: Bool
     let setupResult: String?
     let setupError: String?
+    let permissions: [InstalledPluginPermission]
+    let savingPermissionID: String?
     let updateSetupValue: (InstalledPlugin, String, String) -> Void
     let saveSetup: (InstalledPlugin) -> Void
     let canRun: Bool
@@ -470,6 +532,7 @@ private struct InstalledPluginRow: View {
     let runResult: String?
     let runError: String?
     let run: (InstalledPlugin) -> Void
+    let setPermissionGrant: (InstalledPlugin, PluginPermission, Bool) -> Void
     let isRemoving: Bool
     let requestRemoval: (InstalledPlugin) -> Void
 
@@ -521,6 +584,24 @@ private struct InstalledPluginRow: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(isRunning)
+                    }
+                }
+            }
+            if permissions.isEmpty == false {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Permissions")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    VStack(spacing: 8) {
+                        ForEach(permissions) { permission in
+                            PluginPermissionToggle(
+                                permission: permission,
+                                isSaving: savingPermissionID == permissionChangeID(permission),
+                                update: { granted in
+                                    setPermissionGrant(plugin, permission.permission, granted)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -597,6 +678,35 @@ private struct InstalledPluginRow: View {
         setupFields.contains { field in
             field.required && setupValues[field.id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
+    }
+
+    private func permissionChangeID(_ permission: InstalledPluginPermission) -> String {
+        "\(plugin.id):\(permission.permission.rawValue)"
+    }
+}
+
+private struct PluginPermissionToggle: View {
+    let permission: InstalledPluginPermission
+    let isSaving: Bool
+    let update: (Bool) -> Void
+
+    var body: some View {
+        Toggle(
+            isOn: Binding(
+                get: { permission.granted },
+                set: { update($0) }
+            )
+        ) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(permission.permission.label)
+                    .font(.caption)
+                Text(permission.permission.detail)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .disabled(isSaving)
     }
 }
 
@@ -683,6 +793,58 @@ private extension PackagedPluginSetupFieldType {
 private extension InstalledPlugin {
     var configurationFields: [PackagedPluginSetupField] {
         ((auth?.fields ?? []) + (setup?.fields ?? [])).filter { $0.type.isLocallyPersistableSetupField }
+    }
+}
+
+private extension PluginPermission {
+    var label: String {
+        switch self {
+        case .network:
+            "Network"
+        case .keychain:
+            "Keychain"
+        case .oauth:
+            "OAuth"
+        case .apiKey:
+            "API key"
+        case .privateKey:
+            "Private key"
+        case .backgroundRefresh:
+            "Background refresh"
+        case .pushWebhook:
+            "Push webhook"
+        case .userConfiguredDomains:
+            "User-configured domains"
+        case .writeActions:
+            "Write actions"
+        case .localNotificationSuggestion:
+            "Notification suggestions"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .network:
+            "Allows the plugin to call its declared domains."
+        case .keychain:
+            "Allows Status to store credential references for this plugin."
+        case .oauth:
+            "Allows OAuth-based account connection when supported."
+        case .apiKey:
+            "Allows API-key based account connection."
+        case .privateKey:
+            "Allows private-key based account connection."
+        case .backgroundRefresh:
+            "Allows scheduled checks while the app is active."
+        case .pushWebhook:
+            "Allows incoming webhook-triggered events."
+        case .userConfiguredDomains:
+            "Allows requests to domains entered during setup."
+        case .writeActions:
+            "Allows explicitly approved write actions."
+        case .localNotificationSuggestion:
+            "Allows suggested notification rules."
+        }
     }
 }
 

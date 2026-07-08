@@ -1012,6 +1012,26 @@ public final class StatusPersistenceStore {
         ).map(installedPluginPermission(from:))
     }
 
+    public func setPluginPermission(pluginID: String, permission: PluginPermission, granted: Bool, grantedAt: Date?) throws {
+        try database.execute(
+            """
+            INSERT INTO plugin_permissions
+            (id, plugin_id, permission, granted, granted_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(plugin_id, permission) DO UPDATE SET
+              granted = excluded.granted,
+              granted_at = excluded.granted_at
+            """,
+            bindings: [
+                .text(pluginPermissionID(pluginID: pluginID, permission: permission)),
+                .text(pluginID),
+                .text(permission.rawValue),
+                .integer(granted ? 1 : 0),
+                grantedAt.map { .text(ISO8601.string(from: $0)) } ?? .null
+            ]
+        )
+    }
+
     public func statusItemCount() throws -> Int {
         try count("status_items")
     }

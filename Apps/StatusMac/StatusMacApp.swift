@@ -102,6 +102,15 @@ private struct MacRootView: View {
             )
         } removePlugin: { plugin in
             try LocalStatusStore.openApplicationSupportStore().uninstallPlugin(id: plugin.id)
+        } loadPermissions: { plugin in
+            try LocalStatusStore.openApplicationSupportStore().pluginPermissions(pluginID: plugin.id)
+        } setPermissionGrant: { plugin, permission, granted in
+            try LocalStatusStore.openApplicationSupportStore().setPluginPermission(
+                pluginID: plugin.id,
+                permission: permission,
+                granted: granted,
+                grantedAt: granted ? Date() : nil
+            )
         } canRunPlugin: { plugin in
             canRunConfiguredPlugin(pluginID: plugin.id)
         } runPlugin: { plugin in
