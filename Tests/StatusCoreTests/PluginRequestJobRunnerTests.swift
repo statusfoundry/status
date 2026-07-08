@@ -329,11 +329,47 @@ import Testing
     #expect(body["labels"] as? [String] == ["status"])
 }
 
+@Test func pluginRequestJobRunnerTimesOutStalledTransport() async throws {
+    let database = try temporaryRequestRunnerDatabase()
+    try insertRequestRunnerPluginFixture(database, pluginID: "com.status.website", accountID: "acct_web", jobID: "job_timeout")
+    let store = StatusPersistenceStore(database: database)
+    let runner = PluginRequestJobRunner(
+        transport: SlowPluginRequestTransport(),
+        committer: PluginMappingOutputCommitter(store: store)
+    )
+
+    do {
+        _ = try await runner.run(
+            definition: websiteDefinition(timeoutSeconds: 0.01),
+            input: PluginRequestJobInput(
+                pluginID: "com.status.website",
+                accountID: "acct_web",
+                provider: "com.status.website",
+                requestID: "check_site",
+                variables: ["host": "status.hakobs.com"],
+                jobID: "job_timeout",
+                capturedAt: Date(timeIntervalSince1970: 1_783_433_520)
+            )
+        )
+        Issue.record("Expected stalled plugin request to time out.")
+    } catch let error as PluginRequestJobRunnerError {
+        #expect(error == .timedOut(requestID: "check_site", timeoutSeconds: 0.01))
+        #expect(error.localizedDescription == "Plugin request check_site timed out after 0.01 seconds.")
+    }
+}
+
 private struct FakePluginRequestTransport: PluginRequestHTTPTransport {
     var responses: [URL: PluginHTTPResponse]
 
     func response(for request: PluginHTTPRequest) async throws -> PluginHTTPResponse {
         try #require(responses[request.url])
+    }
+}
+
+private struct SlowPluginRequestTransport: PluginRequestHTTPTransport {
+    func response(for request: PluginHTTPRequest) async throws -> PluginHTTPResponse {
+        try await Task.sleep(nanoseconds: 5_000_000_000)
+        return PluginHTTPResponse(data: Data("{}".utf8), statusCode: 200, url: request.url)
     }
 }
 
@@ -462,10 +498,10 @@ private func githubIssueDefinition() -> PluginPackageDefinition {
     )
 }
 
-private func websiteDefinition() -> PluginPackageDefinition {
+private func websiteDefinition(timeoutSeconds: TimeInterval = 15) -> PluginPackageDefinition {
     PluginPackageDefinition(
         requests: PackagedPluginRequests(requests: [
-            "check_site": PackagedPluginRequest(url: "https://{{host}}", timeoutSeconds: 15)
+            "check_site": PackagedPluginRequest(url: "https://{{host}}", timeoutSeconds: timeoutSeconds)
         ]),
         mappings: PackagedPluginMappings(
             resources: [

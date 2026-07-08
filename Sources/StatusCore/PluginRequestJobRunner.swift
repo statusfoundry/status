@@ -112,6 +112,7 @@ public enum PluginRequestJobRunnerError: Error, Equatable, LocalizedError, Senda
     case invalidURL(String)
     case invalidPaginationURL(String)
     case invalidBody
+    case timedOut(requestID: String, timeoutSeconds: TimeInterval)
 
     public var errorDescription: String? {
         switch self {
@@ -123,6 +124,8 @@ public enum PluginRequestJobRunnerError: Error, Equatable, LocalizedError, Senda
             "Plugin pagination URL is invalid: \(url)"
         case .invalidBody:
             "Plugin request body could not be rendered."
+        case .timedOut(let requestID, let timeoutSeconds):
+            "Plugin request \(requestID) timed out after \(formatTimeout(timeoutSeconds)) seconds."
         }
     }
 }
@@ -194,7 +197,7 @@ public final class PluginRequestJobRunner {
         requestID: String,
         variables: [String: String]
     ) async throws -> PayloadFetchResult {
-        let firstResponse = try await transport.response(for: request)
+        let firstResponse = try await response(for: request, requestID: requestID)
         var payload = decodePayload(response: firstResponse, variables: variables)
         guard let pagination = definition.pagination else {
             return PayloadFetchResult(payload: payload, warnings: [])
@@ -212,7 +215,7 @@ public final class PluginRequestJobRunner {
                 headers: request.headers,
                 timeoutSeconds: definition.timeoutSeconds
             )
-            let pageResponse = try await transport.response(for: pageRequest)
+            let pageResponse = try await response(for: pageRequest, requestID: requestID)
             let pagePayload = decodePayload(response: pageResponse, variables: variables)
             payload = payload.mergingTopLevelArrays(from: pagePayload)
             fetchedPages += 1
@@ -222,6 +225,28 @@ public final class PluginRequestJobRunner {
             warnings.append(PluginMappingWarning(message: "Request \(requestID) reached pagination maxPages limit of \(maxPages)."))
         }
         return PayloadFetchResult(payload: payload, warnings: warnings)
+    }
+
+    private func response(for request: PluginHTTPRequest, requestID: String) async throws -> PluginHTTPResponse {
+        let timeoutSeconds = request.timeoutSeconds ?? 30
+        guard timeoutSeconds > 0 else {
+            throw PluginRequestJobRunnerError.timedOut(requestID: requestID, timeoutSeconds: timeoutSeconds)
+        }
+        let transport = transport
+        return try await withThrowingTaskGroup(of: PluginHTTPResponse.self) { group in
+            group.addTask {
+                try await transport.response(for: request)
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: timeoutNanoseconds(timeoutSeconds))
+                throw PluginRequestJobRunnerError.timedOut(requestID: requestID, timeoutSeconds: timeoutSeconds)
+            }
+            guard let result = try await group.next() else {
+                throw PluginRequestJobRunnerError.timedOut(requestID: requestID, timeoutSeconds: timeoutSeconds)
+            }
+            group.cancelAll()
+            return result
+        }
     }
 
     private func makeRequest(_ definition: PackagedPluginRequest, input: PluginRequestJobInput) throws -> PluginHTTPRequest {
@@ -368,6 +393,18 @@ private extension URL {
         }
         return url
     }
+}
+
+private func timeoutNanoseconds(_ seconds: TimeInterval) -> UInt64 {
+    let boundedSeconds = max(0, min(seconds, TimeInterval(UInt64.max) / 1_000_000_000))
+    return UInt64((boundedSeconds * 1_000_000_000).rounded(.up))
+}
+
+private func formatTimeout(_ seconds: TimeInterval) -> String {
+    let formatter = NumberFormatter()
+    formatter.minimumFractionDigits = 0
+    formatter.maximumFractionDigits = 3
+    return formatter.string(from: NSNumber(value: seconds)) ?? String(seconds)
 }
 
 private extension URLComponents {
