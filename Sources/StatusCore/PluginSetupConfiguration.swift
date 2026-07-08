@@ -28,6 +28,10 @@ public enum PluginSetupConfiguration {
         try store.accountConfigurations(pluginID: pluginID).first?.variables ?? [:]
     }
 
+    public static func configuredValues(pluginID: String, accountID: String, store: StatusPersistenceStore) throws -> [String: String] {
+        try store.accountConfiguration(accountID: accountID)?.variables ?? [:]
+    }
+
     public static func configuredAccount(pluginID: String, store: StatusPersistenceStore) throws -> PluginAccountConfiguration {
         guard let configuration = try store.accountConfigurations(pluginID: pluginID).first else {
             throw PluginRuntimeServiceError.accountNotConfigured(pluginID)
@@ -40,6 +44,7 @@ public enum PluginSetupConfiguration {
         for plugin: InstalledPlugin,
         service: PluginRuntimeService,
         credentialStore: CredentialStore? = nil,
+        accountID: String? = nil,
         now: Date = Date()
     ) throws -> String {
         guard plugin.setup != nil || plugin.auth != nil else {
@@ -83,7 +88,7 @@ public enum PluginSetupConfiguration {
         let displayName = displayName(for: plugin, values: normalized)
         try service.saveAccountConfiguration(
             PluginAccountConfiguration(
-                id: accountID(pluginID: plugin.id, displayName: displayName),
+                id: accountID ?? self.accountID(pluginID: plugin.id, displayName: displayName),
                 pluginID: plugin.id,
                 accountName: displayName,
                 variables: normalized,

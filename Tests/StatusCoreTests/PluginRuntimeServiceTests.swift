@@ -873,6 +873,81 @@ import Testing
     #expect(try credentials.read(reference: credentialRef) == Data("github_pat_example".utf8))
 }
 
+@Test func genericPluginSetupUpdatesSpecificConfiguredAccount() throws {
+    let database = try temporaryRuntimeDatabase()
+    try insertRuntimePluginFixture(database, pluginID: "com.status.github")
+    let store = StatusPersistenceStore(database: database)
+    let service = PluginRuntimeService(store: store, credentialStore: nil)
+    let credentials = InMemoryCredentialStore()
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let plugin = InstalledPlugin(
+        id: "com.status.github",
+        name: "GitHub",
+        author: "Status Foundry",
+        description: "Read-only repository checks.",
+        category: "developer",
+        trustLevel: .official,
+        installedVersion: "0.1.0",
+        installPath: "/tmp/plugin",
+        auth: PackagedPluginAuth(
+            type: .bearerToken,
+            fields: [
+                PackagedPluginSetupField(
+                    id: "token",
+                    label: "Personal access token",
+                    type: .secret,
+                    required: true
+                )
+            ]
+        ),
+        setup: PackagedPluginSetup(
+            title: "Repository",
+            fields: [
+                PackagedPluginSetupField(id: "owner", label: "Owner", type: .text, required: true),
+                PackagedPluginSetupField(id: "repo", label: "Repository", type: .text, required: true)
+            ]
+        ),
+        installedAt: now,
+        updatedAt: now
+    )
+    _ = try PluginSetupConfiguration.saveValues(
+        ["token": "token-one", "owner": "statusfoundry", "repo": "status"],
+        for: plugin,
+        service: service,
+        credentialStore: credentials,
+        now: now
+    )
+    _ = try PluginSetupConfiguration.saveValues(
+        ["token": "token-two", "owner": "statusfoundry", "repo": "registry"],
+        for: plugin,
+        service: service,
+        credentialStore: credentials,
+        now: now
+    )
+    let statusAccountID = try #require(store.accountConfigurations(pluginID: "com.status.github")
+        .first { $0.accountName == "statusfoundry/status" }?.id)
+
+    let message = try PluginSetupConfiguration.saveValues(
+        ["token": "token-one-updated", "owner": "statusfoundry", "repo": "status-app"],
+        for: plugin,
+        service: service,
+        credentialStore: credentials,
+        accountID: statusAccountID,
+        now: now.addingTimeInterval(60)
+    )
+
+    let accounts = try store.accountConfigurations(pluginID: "com.status.github")
+    let updated = try #require(try store.accountConfiguration(accountID: statusAccountID))
+    #expect(message == "Saved statusfoundry/status-app.")
+    #expect(accounts.map(\.id).sorted().count == 2)
+    #expect(updated.accountName == "statusfoundry/status-app")
+    #expect(updated.variables == ["owner": "statusfoundry", "repo": "status-app"])
+    #expect(try PluginSetupConfiguration.configuredValues(pluginID: "com.status.github", accountID: statusAccountID, store: store) == [
+        "owner": "statusfoundry",
+        "repo": "status-app"
+    ])
+}
+
 @Test func genericPluginSetupStoresAPIKeyCredentialBundleInCredentialStore() throws {
     let database = try temporaryRuntimeDatabase()
     try insertRuntimePluginFixture(database, pluginID: "com.status.weather")

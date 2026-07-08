@@ -123,14 +123,16 @@ private struct MacRootView: View {
             )
         } canRunPlugin: { plugin in
             canRunConfiguredPlugin(pluginID: plugin.id)
-        } runPlugin: { plugin in
-            try await runConfiguredPluginCheck(pluginID: plugin.id)
+        } runPlugin: { plugin, account in
+            try await runConfiguredPluginCheck(pluginID: plugin.id, accountID: account.id, accountName: account.accountName)
         } canConfigurePlugin: { plugin in
             plugin.auth?.fields.isEmpty == false || plugin.setup?.fields.contains(where: \.type.isPlainConfigurationField) == true
-        } loadConfigurationValues: { plugin in
-            try configuredPluginValues(pluginID: plugin.id)
-        } saveConfigurationValues: { plugin, values in
-            try savePluginSetup(plugin: plugin, values: values)
+        } loadAccounts: { plugin in
+            try LocalStatusStore.openApplicationSupportStore().accountConfigurations(pluginID: plugin.id)
+        } loadConfigurationValues: { plugin, accountID in
+            try configuredPluginValues(pluginID: plugin.id, accountID: accountID)
+        } saveConfigurationValues: { plugin, accountID, values in
+            try savePluginSetup(plugin: plugin, accountID: accountID, values: values)
         }
     }
 
@@ -206,16 +208,15 @@ private struct MacRootView: View {
         return "\(result.mappingOutput.resources.count) resource stored, \(result.mappingOutput.events.count) events processed."
     }
 
-    private func runConfiguredPluginCheck(pluginID: String) async throws -> String {
+    private func runConfiguredPluginCheck(pluginID: String, accountID: String, accountName: String) async throws -> String {
         let store = try LocalStatusStore.openApplicationSupportStore()
-        let configuration = try PluginSetupConfiguration.configuredAccount(pluginID: pluginID, store: store)
         let service = PluginRuntimeService(store: store, effectDispatcher: MacActionEffectDispatcher())
         let job = try service.enqueueManualConfiguredPluginRun(
             pluginID: pluginID,
-            accountID: configuration.id
+            accountID: accountID
         )
         let result = try await service.runQueuedPluginJob(jobID: job.id)
-        return "\(configuration.accountName): \(result.mappingOutput.resources.count) resource stored, \(result.mappingOutput.events.count) events processed."
+        return "\(accountName): \(result.mappingOutput.resources.count) resource stored, \(result.mappingOutput.events.count) events processed."
     }
 
     private func canRunConfiguredPlugin(pluginID: String) -> Bool {
@@ -228,19 +229,23 @@ private struct MacRootView: View {
         }
     }
 
-    private func configuredPluginValues(pluginID: String) throws -> [String: String] {
+    private func configuredPluginValues(pluginID: String, accountID: String?) throws -> [String: String] {
         let store = try LocalStatusStore.openApplicationSupportStore()
+        if let accountID {
+            return try PluginSetupConfiguration.configuredValues(pluginID: pluginID, accountID: accountID, store: store)
+        }
         return try PluginSetupConfiguration.configuredValues(pluginID: pluginID, store: store)
     }
 
-    private func savePluginSetup(plugin: InstalledPlugin, values: [String: String]) throws -> String {
+    private func savePluginSetup(plugin: InstalledPlugin, accountID: String?, values: [String: String]) throws -> String {
         let store = try LocalStatusStore.openApplicationSupportStore()
         let service = PluginRuntimeService(store: store)
         return try PluginSetupConfiguration.saveValues(
             values,
             for: plugin,
             service: service,
-            credentialStore: KeychainCredentialStore()
+            credentialStore: KeychainCredentialStore(),
+            accountID: accountID
         )
     }
 

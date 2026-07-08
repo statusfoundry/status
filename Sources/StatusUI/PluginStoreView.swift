@@ -21,6 +21,8 @@ public final class PluginStoreViewModel: ObservableObject {
     @Published public private(set) var runResults: [String: String]
     @Published public private(set) var runErrors: [String: String]
     @Published public private(set) var setupValues: [String: [String: String]]
+    @Published public private(set) var configuredAccounts: [String: [PluginAccountConfiguration]]
+    @Published public private(set) var selectedAccountIDs: [String: String]
     @Published public private(set) var savingSetupPluginID: String?
     @Published public private(set) var setupResults: [String: String]
     @Published public private(set) var setupErrors: [String: String]
@@ -38,10 +40,11 @@ public final class PluginStoreViewModel: ObservableObject {
     private let loadTriggers: (InstalledPlugin) throws -> [TriggerDefinition]
     private let setTriggerEnabled: (InstalledPlugin, TriggerDefinition, Bool) async throws -> Void
     private let canRunPlugin: (InstalledPlugin) -> Bool
-    private let runPlugin: (InstalledPlugin) async throws -> String
+    private let runPlugin: (InstalledPlugin, PluginAccountConfiguration) async throws -> String
     private let canConfigurePlugin: (InstalledPlugin) -> Bool
-    private let loadConfigurationValues: (InstalledPlugin) throws -> [String: String]
-    private let saveConfigurationValues: (InstalledPlugin, [String: String]) async throws -> String
+    private let loadAccounts: (InstalledPlugin) throws -> [PluginAccountConfiguration]
+    private let loadConfigurationValues: (InstalledPlugin, String?) throws -> [String: String]
+    private let saveConfigurationValues: (InstalledPlugin, String?, [String: String]) async throws -> String
 
     public init(
         initialCatalog: PluginStoreCatalog = PluginStoreCatalog(),
@@ -54,15 +57,18 @@ public final class PluginStoreViewModel: ObservableObject {
         loadTriggers: @escaping (InstalledPlugin) throws -> [TriggerDefinition] = { _ in [] },
         setTriggerEnabled: @escaping (InstalledPlugin, TriggerDefinition, Bool) async throws -> Void = { _, _, _ in },
         canRunPlugin: @escaping (InstalledPlugin) -> Bool = { _ in false },
-        runPlugin: @escaping (InstalledPlugin) async throws -> String = { _ in "" },
+        runPlugin: @escaping (InstalledPlugin, PluginAccountConfiguration) async throws -> String = { _, _ in "" },
         canConfigurePlugin: @escaping (InstalledPlugin) -> Bool = { _ in false },
-        loadConfigurationValues: @escaping (InstalledPlugin) throws -> [String: String] = { _ in [:] },
-        saveConfigurationValues: @escaping (InstalledPlugin, [String: String]) async throws -> String = { _, _ in "" }
+        loadAccounts: @escaping (InstalledPlugin) throws -> [PluginAccountConfiguration] = { _ in [] },
+        loadConfigurationValues: @escaping (InstalledPlugin, String?) throws -> [String: String] = { _, _ in [:] },
+        saveConfigurationValues: @escaping (InstalledPlugin, String?, [String: String]) async throws -> String = { _, _, _ in "" }
     ) {
         self.catalog = initialCatalog
         self.runResults = [:]
         self.runErrors = [:]
         self.setupValues = [:]
+        self.configuredAccounts = [:]
+        self.selectedAccountIDs = [:]
         self.setupResults = [:]
         self.setupErrors = [:]
         self.installedPermissions = [:]
@@ -78,6 +84,7 @@ public final class PluginStoreViewModel: ObservableObject {
         self.canRunPlugin = canRunPlugin
         self.runPlugin = runPlugin
         self.canConfigurePlugin = canConfigurePlugin
+        self.loadAccounts = loadAccounts
         self.loadConfigurationValues = loadConfigurationValues
         self.saveConfigurationValues = saveConfigurationValues
     }
@@ -87,6 +94,7 @@ public final class PluginStoreViewModel: ObservableObject {
             let installed = try loadInstalled()
             let available = try await loadAvailable()
             catalog = PluginStoreCatalog(installed: installed, available: available)
+            refreshAccounts(for: installed)
             refreshSetupValues(for: installed)
             refreshPermissions(for: installed)
             refreshTriggers(for: installed)
@@ -94,6 +102,7 @@ public final class PluginStoreViewModel: ObservableObject {
         } catch {
             let installed = (try? loadInstalled()) ?? []
             catalog = PluginStoreCatalog(installed: installed, available: [])
+            refreshAccounts(for: installed)
             refreshSetupValues(for: installed)
             refreshPermissions(for: installed)
             refreshTriggers(for: installed)
@@ -130,10 +139,12 @@ public final class PluginStoreViewModel: ObservableObject {
 
         do {
             try await removePlugin(plugin)
-            setupValues[plugin.id] = nil
-            installedPermissions[plugin.id] = nil
-            installedTriggers[plugin.id] = nil
-            await reload()
+        setupValues[plugin.id] = nil
+        configuredAccounts[plugin.id] = nil
+        selectedAccountIDs[plugin.id] = nil
+        installedPermissions[plugin.id] = nil
+        installedTriggers[plugin.id] = nil
+        await reload()
         } catch {
             loadError = error.localizedDescription
         }
@@ -174,48 +185,92 @@ public final class PluginStoreViewModel: ObservableObject {
     }
 
     public func updateSetupValue(_ plugin: InstalledPlugin, fieldID: String, value: String) {
-        var values = setupValues[plugin.id, default: defaultSetupValues(for: plugin)]
+        let key = setupKey(for: plugin)
+        var values = setupValues[key, default: defaultSetupValues(for: plugin)]
         values[fieldID] = value
-        setupValues[plugin.id] = values
-        setupResults[plugin.id] = nil
-        setupErrors[plugin.id] = nil
+        setupValues[key] = values
+        setupResults[key] = nil
+        setupErrors[key] = nil
+    }
+
+    public func selectAccount(_ accountID: String, for plugin: InstalledPlugin) {
+        selectedAccountIDs[plugin.id] = accountID
+        let key = setupKey(pluginID: plugin.id, accountID: accountID)
+        let values = (try? loadConfigurationValues(plugin, persistedAccountID(from: accountID))) ?? [:]
+        setupValues[key] = defaultSetupValues(for: plugin).merging(values) { _, loaded in loaded }
+        setupResults[key] = nil
+        setupErrors[key] = nil
+        runResults[key] = nil
+        runErrors[key] = nil
+    }
+
+    public func addAccount(for plugin: InstalledPlugin) {
+        let accountID = newAccountID(for: plugin)
+        selectedAccountIDs[plugin.id] = accountID
+        setupValues[setupKey(pluginID: plugin.id, accountID: accountID)] = defaultSetupValues(for: plugin)
     }
 
     public func saveSetup(_ plugin: InstalledPlugin) async {
         guard savingSetupPluginID == nil else { return }
-        let values = setupValues[plugin.id, default: defaultSetupValues(for: plugin)]
+        let selectedAccountID = selectedAccountIDs[plugin.id]
+        let key = setupKey(pluginID: plugin.id, accountID: selectedAccountID)
+        let values = setupValues[key, default: defaultSetupValues(for: plugin)]
         savingSetupPluginID = plugin.id
-        setupResults[plugin.id] = nil
-        setupErrors[plugin.id] = nil
+        setupResults[key] = nil
+        setupErrors[key] = nil
         defer { savingSetupPluginID = nil }
 
         do {
-            setupResults[plugin.id] = try await saveConfigurationValues(plugin, values)
+            setupResults[key] = try await saveConfigurationValues(plugin, persistedAccountID(from: selectedAccountID), values)
             await reload()
         } catch {
-            setupErrors[plugin.id] = error.localizedDescription
+            setupErrors[key] = error.localizedDescription
         }
     }
 
     public func run(_ plugin: InstalledPlugin) async {
         guard runningPluginID == nil else { return }
+        guard let account = selectedAccount(for: plugin) else {
+            runErrors[setupKey(for: plugin)] = "Save an account before running this plugin."
+            return
+        }
+        let key = setupKey(pluginID: plugin.id, accountID: account.id)
         runningPluginID = plugin.id
-        runResults[plugin.id] = nil
-        runErrors[plugin.id] = nil
+        runResults[key] = nil
+        runErrors[key] = nil
         defer { runningPluginID = nil }
 
         do {
-            runResults[plugin.id] = try await runPlugin(plugin)
+            runResults[key] = try await runPlugin(plugin, account)
             await reload()
         } catch {
-            runErrors[plugin.id] = error.localizedDescription
+            runErrors[key] = error.localizedDescription
+        }
+    }
+
+    private func refreshAccounts(for plugins: [InstalledPlugin]) {
+        configuredAccounts = Dictionary(uniqueKeysWithValues: plugins.map { plugin in
+            let accounts = (try? loadAccounts(plugin)) ?? []
+            return (plugin.id, accounts)
+        })
+        for plugin in plugins {
+            let accounts = configuredAccounts[plugin.id, default: []]
+            let currentSelection = selectedAccountIDs[plugin.id]
+            if let currentSelection, currentSelection.hasPrefix(Self.newAccountPrefix) {
+                continue
+            }
+            if let currentSelection, accounts.contains(where: { $0.id == currentSelection }) {
+                continue
+            }
+            selectedAccountIDs[plugin.id] = accounts.first?.id ?? newAccountID(for: plugin)
         }
     }
 
     private func refreshSetupValues(for plugins: [InstalledPlugin]) {
         for plugin in plugins where canConfigurePlugin(plugin) {
-            let loaded = (try? loadConfigurationValues(plugin)) ?? [:]
-            setupValues[plugin.id] = defaultSetupValues(for: plugin).merging(loaded) { _, loaded in loaded }
+            let accountID = selectedAccountIDs[plugin.id]
+            let loaded = (try? loadConfigurationValues(plugin, persistedAccountID(from: accountID))) ?? [:]
+            setupValues[setupKey(pluginID: plugin.id, accountID: accountID)] = defaultSetupValues(for: plugin).merging(loaded) { _, loaded in loaded }
         }
     }
 
@@ -240,6 +295,35 @@ public final class PluginStoreViewModel: ObservableObject {
     private func permissionChangeID(plugin: InstalledPlugin, permission: PluginPermission) -> String {
         "\(plugin.id):\(permission.rawValue)"
     }
+
+    private func selectedAccount(for plugin: InstalledPlugin) -> PluginAccountConfiguration? {
+        guard let accountID = selectedAccountIDs[plugin.id],
+              accountID.hasPrefix(Self.newAccountPrefix) == false else {
+            return nil
+        }
+        return configuredAccounts[plugin.id, default: []].first { $0.id == accountID }
+    }
+
+    private func setupKey(for plugin: InstalledPlugin) -> String {
+        setupKey(pluginID: plugin.id, accountID: selectedAccountIDs[plugin.id])
+    }
+
+    private func setupKey(pluginID: String, accountID: String?) -> String {
+        "\(pluginID):\(accountID ?? Self.newAccountPrefix)"
+    }
+
+    private func persistedAccountID(from accountID: String?) -> String? {
+        guard let accountID, accountID.hasPrefix(Self.newAccountPrefix) == false else {
+            return nil
+        }
+        return accountID
+    }
+
+    private func newAccountID(for plugin: InstalledPlugin) -> String {
+        "\(Self.newAccountPrefix)\(plugin.id)"
+    }
+
+    private static let newAccountPrefix = "__new__:"
 }
 
 public struct PluginStoreContainerView: View {
@@ -258,6 +342,8 @@ public struct PluginStoreContainerView: View {
             runResults: viewModel.runResults,
             runErrors: viewModel.runErrors,
             setupValues: viewModel.setupValues,
+            configuredAccounts: viewModel.configuredAccounts,
+            selectedAccountIDs: viewModel.selectedAccountIDs,
             savingSetupPluginID: viewModel.savingSetupPluginID,
             setupResults: viewModel.setupResults,
             setupErrors: viewModel.setupErrors,
@@ -270,6 +356,12 @@ public struct PluginStoreContainerView: View {
             },
             updateSetupValue: { plugin, fieldID, value in
                 viewModel.updateSetupValue(plugin, fieldID: fieldID, value: value)
+            },
+            selectAccount: { plugin, accountID in
+                viewModel.selectAccount(accountID, for: plugin)
+            },
+            addAccount: { plugin in
+                viewModel.addAccount(for: plugin)
             },
             saveSetup: { plugin in
                 Task {
@@ -333,6 +425,8 @@ public struct PluginStoreView: View {
     private let runResults: [String: String]
     private let runErrors: [String: String]
     private let setupValues: [String: [String: String]]
+    private let configuredAccounts: [String: [PluginAccountConfiguration]]
+    private let selectedAccountIDs: [String: String]
     private let savingSetupPluginID: String?
     private let setupResults: [String: String]
     private let setupErrors: [String: String]
@@ -342,6 +436,8 @@ public struct PluginStoreView: View {
     private let savingTriggerID: String?
     private let canConfigure: (InstalledPlugin) -> Bool
     private let updateSetupValue: (InstalledPlugin, String, String) -> Void
+    private let selectAccount: (InstalledPlugin, String) -> Void
+    private let addAccount: (InstalledPlugin) -> Void
     private let saveSetup: (InstalledPlugin) -> Void
     private let canRun: (InstalledPlugin) -> Bool
     private let run: (InstalledPlugin) -> Void
@@ -359,6 +455,8 @@ public struct PluginStoreView: View {
         runResults: [String: String] = [:],
         runErrors: [String: String] = [:],
         setupValues: [String: [String: String]] = [:],
+        configuredAccounts: [String: [PluginAccountConfiguration]] = [:],
+        selectedAccountIDs: [String: String] = [:],
         savingSetupPluginID: String? = nil,
         setupResults: [String: String] = [:],
         setupErrors: [String: String] = [:],
@@ -368,6 +466,8 @@ public struct PluginStoreView: View {
         savingTriggerID: String? = nil,
         canConfigure: @escaping (InstalledPlugin) -> Bool = { _ in false },
         updateSetupValue: @escaping (InstalledPlugin, String, String) -> Void = { _, _, _ in },
+        selectAccount: @escaping (InstalledPlugin, String) -> Void = { _, _ in },
+        addAccount: @escaping (InstalledPlugin) -> Void = { _ in },
         saveSetup: @escaping (InstalledPlugin) -> Void = { _ in },
         canRun: @escaping (InstalledPlugin) -> Bool = { _ in false },
         run: @escaping (InstalledPlugin) -> Void = { _ in },
@@ -383,6 +483,8 @@ public struct PluginStoreView: View {
         self.runResults = runResults
         self.runErrors = runErrors
         self.setupValues = setupValues
+        self.configuredAccounts = configuredAccounts
+        self.selectedAccountIDs = selectedAccountIDs
         self.savingSetupPluginID = savingSetupPluginID
         self.setupResults = setupResults
         self.setupErrors = setupErrors
@@ -392,6 +494,8 @@ public struct PluginStoreView: View {
         self.savingTriggerID = savingTriggerID
         self.canConfigure = canConfigure
         self.updateSetupValue = updateSetupValue
+        self.selectAccount = selectAccount
+        self.addAccount = addAccount
         self.saveSetup = saveSetup
         self.canRun = canRun
         self.run = run
@@ -411,6 +515,8 @@ public struct PluginStoreView: View {
                     runResults: runResults,
                     runErrors: runErrors,
                     setupValues: setupValues,
+                    configuredAccounts: configuredAccounts,
+                    selectedAccountIDs: selectedAccountIDs,
                     savingSetupPluginID: savingSetupPluginID,
                     setupResults: setupResults,
                     setupErrors: setupErrors,
@@ -420,6 +526,8 @@ public struct PluginStoreView: View {
                     savingTriggerID: savingTriggerID,
                     canConfigure: canConfigure,
                     updateSetupValue: updateSetupValue,
+                    selectAccount: selectAccount,
+                    addAccount: addAccount,
                     saveSetup: saveSetup,
                     canRun: canRun,
                     run: run,
@@ -486,6 +594,8 @@ private struct InstalledPluginSection: View {
     let runResults: [String: String]
     let runErrors: [String: String]
     let setupValues: [String: [String: String]]
+    let configuredAccounts: [String: [PluginAccountConfiguration]]
+    let selectedAccountIDs: [String: String]
     let savingSetupPluginID: String?
     let setupResults: [String: String]
     let setupErrors: [String: String]
@@ -495,6 +605,8 @@ private struct InstalledPluginSection: View {
     let savingTriggerID: String?
     let canConfigure: (InstalledPlugin) -> Bool
     let updateSetupValue: (InstalledPlugin, String, String) -> Void
+    let selectAccount: (InstalledPlugin, String) -> Void
+    let addAccount: (InstalledPlugin) -> Void
     let saveSetup: (InstalledPlugin) -> Void
     let canRun: (InstalledPlugin) -> Bool
     let run: (InstalledPlugin) -> Void
@@ -516,20 +628,24 @@ private struct InstalledPluginSection: View {
                         InstalledPluginRow(
                             plugin: plugin,
                             canConfigure: canConfigure(plugin),
-                            setupValues: setupValues[plugin.id, default: [:]],
+                            accounts: configuredAccounts[plugin.id, default: []],
+                            selectedAccountID: selectedAccountIDs[plugin.id],
+                            setupValues: setupValues[setupKey(pluginID: plugin.id, accountID: selectedAccountIDs[plugin.id]), default: [:]],
                             isSavingSetup: savingSetupPluginID == plugin.id,
-                            setupResult: setupResults[plugin.id],
-                            setupError: setupErrors[plugin.id],
+                            setupResult: setupResults[setupKey(pluginID: plugin.id, accountID: selectedAccountIDs[plugin.id])],
+                            setupError: setupErrors[setupKey(pluginID: plugin.id, accountID: selectedAccountIDs[plugin.id])],
                             permissions: permissions[plugin.id, default: []],
                             savingPermissionID: savingPermissionID,
                             triggers: triggers[plugin.id, default: []],
                             savingTriggerID: savingTriggerID,
                             updateSetupValue: updateSetupValue,
+                            selectAccount: selectAccount,
+                            addAccount: addAccount,
                             saveSetup: saveSetup,
                             canRun: canRun(plugin),
                             isRunning: runningPluginID == plugin.id,
-                            runResult: runResults[plugin.id],
-                            runError: runErrors[plugin.id],
+                            runResult: runResults[setupKey(pluginID: plugin.id, accountID: selectedAccountIDs[plugin.id])],
+                            runError: runErrors[setupKey(pluginID: plugin.id, accountID: selectedAccountIDs[plugin.id])],
                             run: run,
                             setPermissionGrant: setPermissionGrant,
                             setTriggerEnabled: setTriggerEnabled,
@@ -540,6 +656,10 @@ private struct InstalledPluginSection: View {
                 }
             }
         }
+    }
+
+    private func setupKey(pluginID: String, accountID: String?) -> String {
+        "\(pluginID):\(accountID ?? "__new__:")"
     }
 }
 
@@ -575,6 +695,8 @@ private struct AvailablePluginSection: View {
 private struct InstalledPluginRow: View {
     let plugin: InstalledPlugin
     let canConfigure: Bool
+    let accounts: [PluginAccountConfiguration]
+    let selectedAccountID: String?
     let setupValues: [String: String]
     let isSavingSetup: Bool
     let setupResult: String?
@@ -584,6 +706,8 @@ private struct InstalledPluginRow: View {
     let triggers: [TriggerDefinition]
     let savingTriggerID: String?
     let updateSetupValue: (InstalledPlugin, String, String) -> Void
+    let selectAccount: (InstalledPlugin, String) -> Void
+    let addAccount: (InstalledPlugin) -> Void
     let saveSetup: (InstalledPlugin) -> Void
     let canRun: Bool
     let isRunning: Bool
@@ -695,6 +819,12 @@ private struct InstalledPluginRow: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    PluginAccountPicker(
+                        accounts: accounts,
+                        selectedAccountID: selectedAccountID,
+                        select: { selectAccount(plugin, $0) },
+                        addAccount: { addAccount(plugin) }
+                    )
                     VStack(spacing: 10) {
                         ForEach(setupFields, id: \.id) { field in
                             PluginSetupFieldRow(
@@ -784,6 +914,45 @@ private struct PluginTriggerToggle: View {
             }
         }
         .disabled(isSaving)
+    }
+}
+
+private struct PluginAccountPicker: View {
+    let accounts: [PluginAccountConfiguration]
+    let selectedAccountID: String?
+    let select: (String) -> Void
+    let addAccount: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if accounts.isEmpty {
+                Text("New account")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Picker(
+                    "Account",
+                    selection: Binding(
+                        get: { selectedAccountID ?? accounts.first?.id ?? "" },
+                        set: { select($0) }
+                    )
+                ) {
+                    ForEach(accounts) { account in
+                        Text(account.accountName).tag(account.id)
+                    }
+                    if let selectedAccountID, selectedAccountID.hasPrefix("__new__:") {
+                        Text("New account").tag(selectedAccountID)
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+            Button {
+                addAccount()
+            } label: {
+                Label("Add account", systemImage: "plus")
+            }
+            .buttonStyle(.bordered)
+        }
     }
 }
 
