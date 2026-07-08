@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginsRoot = path.join(root, "plugins", "bundled");
+const examplePluginsRoot = path.join(root, "plugins", "examples");
 const registryDataPath = path.join(root, "workers", "registry", "src", "registry-data.js");
 const artifactsPath = path.join(root, "workers", "registry", "src", "plugin-artifacts.js");
 const webRegistryPath = path.join(root, "web", "src", "generated", "registry.json");
@@ -135,6 +136,20 @@ async function readOptionalJSON(filePath) {
   } catch (error) {
     if (error?.code === "ENOENT") {
       return undefined;
+    }
+    throw error;
+  }
+}
+
+async function directoryNames(directoryPath) {
+  try {
+    return (await readdir(directoryPath, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return [];
     }
     throw error;
   }
@@ -346,10 +361,8 @@ function jsModule(name, value) {
 }
 
 async function build() {
-  const pluginDirectoryNames = (await readdir(pluginsRoot, { withFileTypes: true }))
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
+  const pluginDirectoryNames = await directoryNames(pluginsRoot);
+  const exampleDirectoryNames = await directoryNames(examplePluginsRoot);
 
   const plugins = [];
   const bundledPlugins = [];
@@ -435,6 +448,13 @@ async function build() {
     }
   }
 
+  for (const directoryName of exampleDirectoryNames) {
+    const pluginDirectory = path.join(examplePluginsRoot, directoryName);
+    const manifest = await readJSON(path.join(pluginDirectory, "manifest.json"));
+    validateManifest(manifest, `examples/${directoryName}`);
+    await validatePluginPackage(pluginDirectory, manifest, `examples/${directoryName}`);
+  }
+
   const registryModule = `${jsModule("registry", { schemaVersion: "1.0.0", plugins })}
 \n${jsModule("revocations", {
     schemaVersion: "1.0.0",
@@ -489,7 +509,8 @@ async function build() {
     await writeFile(path.join(swiftBundledPluginsRoot, "index.json"), bundledPluginIndexJSON);
   }
 
-  console.log(`${checkOnly ? "Checked" : "Built"} ${plugins.length} plugin package(s).`);
+  const exampleSummary = exampleDirectoryNames.length === 0 ? "" : ` and validated ${exampleDirectoryNames.length} example plugin(s)`;
+  console.log(`${checkOnly ? "Checked" : "Built"} ${plugins.length} plugin package(s)${exampleSummary}.`);
 }
 
 await build();

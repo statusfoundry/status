@@ -1,0 +1,20 @@
+{
+  "views": [
+    {
+      "id": "overview",
+      "title": "Mock Operations",
+      "type": "list",
+      "resourceType": "service",
+      "fields": [
+        {
+          "label": "State",
+          "path": "state"
+        },
+        {
+          "label": "Region",
+          "path": "region"
+        }
+      ]
+    }
+  ]
+}

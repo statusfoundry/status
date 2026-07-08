@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "type": "mock.service.degraded",
+      "title": "Service degraded",
+      "severity": "warning"
+    },
+    {
+      "type": "mock.service.recovered",
+      "title": "Service recovered",
+      "severity": "ok"
+    },
+    {
+      "type": "mock.error_rate.high",
+      "title": "Error rate high",
+      "severity": "critical"
+    }
+  ]
+}

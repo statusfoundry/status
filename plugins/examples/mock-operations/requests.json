@@ -1,0 +1,15 @@
+{
+  "requests": {
+    "fetch_status": {
+      "method": "GET",
+      "url": "https://example.com/status.json",
+      "query": {
+        "service": "{{service_slug}}"
+      },
+      "headers": {
+        "Accept": "application/json"
+      },
+      "timeoutSeconds": 20
+    }
+  }
+}

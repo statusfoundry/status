@@ -1,0 +1,12 @@
+{
+  "id": "com.status.example.mockops",
+  "name": "Mock Operations",
+  "version": "0.1.0",
+  "author": "Status Foundry",
+  "category": "example",
+  "description": "Example declarative plugin package for operational status data.",
+  "minCoreVersion": "0.1.0",
+  "platforms": ["macOS", "iOS"],
+  "permissions": ["network", "background-refresh", "local-notification-suggestion", "write-actions"],
+  "domains": ["example.com"]
+}

@@ -1,0 +1,16 @@
+{
+  "actions": [
+    {
+      "id": "open_dashboard",
+      "label": "Open dashboard",
+      "type": "open_url",
+      "url": "{{resource.actionUrl}}"
+    },
+    {
+      "id": "post_webhook",
+      "label": "Post webhook",
+      "type": "webhook.post",
+      "requiresPermission": "write-actions"
+    }
+  ]
+}

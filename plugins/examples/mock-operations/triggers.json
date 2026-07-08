@@ -1,0 +1,17 @@
+{
+  "triggers": [
+    {
+      "id": "poll_status",
+      "type": "cron",
+      "label": "Poll mock operations status",
+      "defaultSchedule": "*/15 * * * *",
+      "request": "fetch_status"
+    },
+    {
+      "id": "refresh_now",
+      "type": "manual",
+      "label": "Refresh mock operations now",
+      "request": "fetch_status"
+    }
+  ]
+}

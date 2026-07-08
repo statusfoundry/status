@@ -1,0 +1,20 @@
+{
+  "title": "Mock Operations API",
+  "fields": [
+    {
+      "key": "service_slug",
+      "label": "Service slug",
+      "type": "text",
+      "placeholder": "status-api",
+      "default": "status-api",
+      "required": true
+    },
+    {
+      "key": "include_metrics",
+      "label": "Include metrics",
+      "type": "toggle",
+      "default": true,
+      "required": false
+    }
+  ]
+}

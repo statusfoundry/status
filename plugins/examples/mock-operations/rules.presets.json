@@ -1,0 +1,51 @@
+{
+  "presets": [
+    {
+      "name": "Notify on degraded mock service",
+      "when": {
+        "eventType": "mock.service.degraded",
+        "provider": "com.status.example.mockops"
+      },
+      "if": [
+        {
+          "field": "severity",
+          "operator": "matches_severity",
+          "value": "warning"
+        }
+      ],
+      "then": [
+        {
+          "action": "status.inbox.add"
+        },
+        {
+          "action": "notification.show",
+          "parameters": {
+            "title": "{{event.title}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Post critical mock errors to a webhook",
+      "when": {
+        "eventType": "mock.error_rate.high",
+        "provider": "com.status.example.mockops"
+      },
+      "if": [
+        {
+          "field": "severity",
+          "operator": "matches_severity",
+          "value": "critical"
+        }
+      ],
+      "then": [
+        {
+          "action": "webhook.post",
+          "parameters": {
+            "url": "https://example.com/hooks/status"
+          }
+        }
+      ]
+    }
+  ]
+}
