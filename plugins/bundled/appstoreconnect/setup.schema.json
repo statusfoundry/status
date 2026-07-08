@@ -1,0 +1,13 @@
+{
+  "title": "App",
+  "description": "Choose the App Store Connect app to monitor for review and release state.",
+  "fields": [
+    {
+      "key": "appId",
+      "label": "App ID",
+      "type": "text",
+      "required": true,
+      "placeholder": "App Store Connect app ID"
+    }
+  ]
+}

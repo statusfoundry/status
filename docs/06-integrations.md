@@ -109,6 +109,8 @@ app.version.ready_for_sale
 app.build.processing_failed
 ```
 
+Current implementation note: the bundled App Store Connect package uses `jwt-api-key` auth (`issuerId`, `keyId`, `.p8` private key) and asks for one `appId` during native setup. Manual refresh can list apps with JSON:API pagination; the scheduled review-state check uses the configured `appId` directly until the runtime supports chained per-resource requests.
+
 Views:
 
 - overview cards;
