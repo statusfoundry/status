@@ -115,6 +115,67 @@ public final class StatusPersistenceStore {
         )
     }
 
+    public func upsertEventBackedStatusItem(for event: Event) throws -> StatusItem {
+        if let existing = try openEventBackedStatusItem(resourceID: event.resourceID, eventType: event.type) {
+            let sourceEventIDs = existing.sourceEventIDs + [event.id]
+            let updatedAt = ISO8601.string(from: event.timestamp)
+            try database.execute(
+                """
+                UPDATE status_items
+                SET source_event_ids = ?,
+                    severity = ?,
+                    title = ?,
+                    summary = ?,
+                    action_url = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                bindings: [
+                    .text(try jsonString(sourceEventIDs)),
+                    .text(event.severity.rawValue),
+                    .text(event.title),
+                    .text(event.summary),
+                    event.actionURL.map { .text($0.absoluteString) } ?? .null,
+                    .text(updatedAt),
+                    .text(existing.item.id)
+                ]
+            )
+            return try statusItem(id: existing.item.id) ?? existing.item
+        }
+
+        let item = StatusItem(
+            id: statusItemID(for: event),
+            resourceID: event.resourceID,
+            severity: event.severity,
+            title: event.title,
+            summary: event.summary,
+            state: .open,
+            updatedAt: event.timestamp,
+            actionLink: event.actionURL.map { ActionLink(id: "act_\(event.id)", label: "Open", url: $0) }
+        )
+        let updatedAt = ISO8601.string(from: item.updatedAt)
+        try database.execute(
+            """
+            INSERT OR REPLACE INTO status_items
+            (id, resource_id, kind, source_event_ids, severity, title, summary, action_url, state, created_at, updated_at)
+            VALUES (?, ?, 'event', ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            bindings: [
+                .text(item.id),
+                .text(item.resourceID),
+                .text(try jsonString([event.id])),
+                .text(item.severity.rawValue),
+                .text(item.title),
+                .text(item.summary),
+                item.actionLink.map { .text($0.url.absoluteString) } ?? .null,
+                .text(item.state.rawValue),
+                .text(updatedAt),
+                .text(updatedAt)
+            ]
+        )
+        return item
+    }
+
     public func statusItem(id: String) throws -> StatusItem? {
         guard let row = try database.query("SELECT * FROM status_items WHERE id = ?", bindings: [.text(id)]).first else {
             return nil
@@ -132,6 +193,36 @@ public final class StatusPersistenceStore {
             """,
             bindings: [.integer(Int64(limit))]
         ).map(statusItem(from:))
+    }
+
+    private func openEventBackedStatusItem(resourceID: String, eventType: String) throws -> (item: StatusItem, sourceEventIDs: [String])? {
+        let rows = try database.query(
+            """
+            SELECT * FROM status_items
+            WHERE resource_id = ?
+              AND kind = 'event'
+              AND state IN ('open', 'snoozed')
+            ORDER BY updated_at DESC, id ASC
+            """,
+            bindings: [.text(resourceID)]
+        )
+        for row in rows {
+            let sourceEventIDs = try optionalJSON([String].self, from: row.optionalText("source_event_ids")) ?? []
+            guard let sourceEventID = sourceEventIDs.first,
+                  let sourceEvent = try event(id: sourceEventID),
+                  sourceEvent.type == eventType else {
+                continue
+            }
+            return try (statusItem(from: row), sourceEventIDs)
+        }
+        return nil
+    }
+
+    private func statusItemID(for event: Event) -> String {
+        if event.id.hasPrefix("evt_") {
+            return "sti_" + event.id.dropFirst(4)
+        }
+        return "sti_" + event.id
     }
 
     public func insertAuditEntry(_ entry: AuditEntry) throws {

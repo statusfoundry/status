@@ -13,12 +13,13 @@ The current `StatusCore` implementation contains the first ingestion slice:
 - `EventIngestor` accepts normalized events after mapping and before rules.
 - Existing fingerprints are suppressed as duplicates, increment `dedup_count`, update `last_seen_at`, and write an audit entry.
 - New warning and critical events create event-backed `StatusItem` rows.
+- Later warning and critical events for the same resource and event type update the existing open or snoozed event-backed `StatusItem` instead of multiplying inbox rows.
 - New notice events are stored and audited, but do not create inbox items by default.
 - `StateChangeDetector` records resource state snapshots and classifies observations as first sighting, unchanged, or changed.
 - `MappingConditionEvaluator` evaluates `changed`, `changed_to`, and `changed_from` against current and previous resource state.
 - `StateEventPipeline` connects snapshot detection, mapping conditions, normalized event creation, and ingestion for the first polling-based path.
 
-The remaining semantics in this document are still planned work: full JSON mapping-engine integration, first-observation notification policy, date-bucketed fingerprints, incident open/close handling, status item attachment/update, auto-resolution, notification decisions, and rule evaluation integration.
+The remaining semantics in this document are still planned work: full incident open/close handling, auto-resolution, notification decisions, and richer first-observation notification policy controls.
 
 ## Three emission models
 

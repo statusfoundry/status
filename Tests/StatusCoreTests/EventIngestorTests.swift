@@ -31,6 +31,28 @@ import Testing
     #expect(try store.auditEntryCount() == 2)
 }
 
+@Test func eventIngestorUpdatesExistingStatusItemForSameResourceAndEventType() throws {
+    let store = try temporaryStore()
+    let ingestor = EventIngestor(store: store)
+    let first = workflowFailedEvent()
+    var second = workflowFailedEvent()
+    second.id = "evt_02workflowfailed"
+    second.summary = "CI failed on release."
+    second.timestamp = first.timestamp.addingTimeInterval(300)
+    second.fingerprint = "github:workflow.failed:res_status_repo:failure-release"
+
+    #expect(try ingestor.ingest(first) == .inserted(eventID: first.id, statusItemID: "sti_01workflowfailed"))
+    #expect(try ingestor.ingest(second) == .inserted(eventID: second.id, statusItemID: "sti_01workflowfailed"))
+
+    let item = try #require(try store.statusItem(id: "sti_01workflowfailed"))
+    #expect(item.summary == "CI failed on release.")
+    #expect(item.updatedAt == second.timestamp)
+    #expect(try store.event(id: first.id) == first)
+    #expect(try store.event(id: second.id) == second)
+    #expect(try store.statusItemCount() == 1)
+    #expect(try store.auditEntryCount() == 2)
+}
+
 @Test func noticeEventDoesNotCreateStatusItemByDefault() throws {
     let store = try temporaryStore()
     let ingestor = EventIngestor(store: store)

@@ -32,17 +32,7 @@ public final class EventIngestor {
 
         let statusItemID: String?
         if event.severity >= .warning {
-            let item = StatusItem(
-                id: makeStatusItemID(for: event),
-                resourceID: event.resourceID,
-                severity: event.severity,
-                title: event.title,
-                summary: event.summary,
-                state: .open,
-                updatedAt: event.timestamp,
-                actionLink: event.actionURL.map { ActionLink(id: "act_\(event.id)", label: "Open", url: $0) }
-            )
-            try store.insertStatusItem(item)
+            let item = try store.upsertEventBackedStatusItem(for: event)
             statusItemID = item.id
         } else {
             statusItemID = nil
@@ -60,13 +50,6 @@ public final class EventIngestor {
         )
 
         return .inserted(eventID: event.id, statusItemID: statusItemID)
-    }
-
-    private func makeStatusItemID(for event: Event) -> String {
-        if event.id.hasPrefix("evt_") {
-            return "sti_" + event.id.dropFirst(4)
-        }
-        return "sti_" + event.id
     }
 
     private func auditID(for event: Event, suffix: String) -> String {
