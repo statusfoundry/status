@@ -23,6 +23,9 @@ private struct MacRootView: View {
                 NavigationLink(value: MacSection.overview) {
                     Label("Overview", systemImage: "rectangle.grid.2x2")
                 }
+                NavigationLink(value: MacSection.alerts) {
+                    Label("Alerts", systemImage: "bell")
+                }
                 NavigationLink(value: MacSection.integrations) {
                     Label("Integrations", systemImage: "puzzlepiece.extension")
                 }
@@ -42,6 +45,9 @@ private struct MacRootView: View {
             case .overview:
                 DashboardContainerView(viewModel: makeDashboardViewModel())
                     .navigationTitle("Overview")
+            case .alerts:
+                AlertsContainerView(viewModel: makeAlertsViewModel())
+                    .navigationTitle("Alerts")
             case .integrations:
                 PluginStoreContainerView(viewModel: makePluginStoreViewModel(platform: .macOS))
                     .navigationTitle("Integrations")
@@ -109,6 +115,25 @@ private struct MacRootView: View {
 
     private var registryBaseURL: URL {
         URL(string: "https://status-registry.hakobs.com")!
+    }
+
+    private func makeAlertsViewModel() -> AlertsViewModel {
+        AlertsViewModel {
+            try bootstrapBundledPlugins()
+            try reopenExpiredSnoozedItems()
+            return try LocalStatusStore.openApplicationSupportStore()
+                .statusItems(limit: 50)
+                .filter { $0.severity >= .warning }
+        } resolveItem: { item in
+            try LocalStatusStore.openApplicationSupportStore().resolveStatusItem(id: item.id, at: Date())
+        } snoozeItem: { item in
+            let now = Date()
+            try LocalStatusStore.openApplicationSupportStore()
+                .snoozeStatusItem(id: item.id, until: now.addingTimeInterval(3_600), at: now)
+        } dismissItem: { item in
+            try LocalStatusStore.openApplicationSupportStore()
+                .dismissStatusItem(id: item.id, reason: "Dismissed in Status", at: Date())
+        }
     }
 
     private func makeRulesViewModel() -> RulesViewModel {
@@ -233,10 +258,15 @@ private struct MacRootView: View {
         let installer = BundledPluginInstaller(store: store, installRoot: try pluginInstallRoot())
         try installer.installAll()
     }
+
+    private func reopenExpiredSnoozedItems() throws {
+        _ = try LocalStatusStore.openApplicationSupportStore().reopenExpiredSnoozedItems(at: Date())
+    }
 }
 
 private enum MacSection: Hashable {
     case overview
+    case alerts
     case integrations
     case rules
     case audit

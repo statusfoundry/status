@@ -114,9 +114,19 @@ private struct IOSRootView: View {
     private func makeAlertsViewModel() -> AlertsViewModel {
         AlertsViewModel {
             try bootstrapBundledPlugins()
+            try reopenExpiredSnoozedItems()
             return try LocalStatusStore.openApplicationSupportStore()
                 .statusItems(limit: 50)
                 .filter { $0.severity >= .warning }
+        } resolveItem: { item in
+            try LocalStatusStore.openApplicationSupportStore().resolveStatusItem(id: item.id, at: Date())
+        } snoozeItem: { item in
+            let now = Date()
+            try LocalStatusStore.openApplicationSupportStore()
+                .snoozeStatusItem(id: item.id, until: now.addingTimeInterval(3_600), at: now)
+        } dismissItem: { item in
+            try LocalStatusStore.openApplicationSupportStore()
+                .dismissStatusItem(id: item.id, reason: "Dismissed in Status", at: Date())
         }
     }
 
@@ -234,6 +244,10 @@ private struct IOSRootView: View {
         let store = try LocalStatusStore.openApplicationSupportStore()
         let installer = BundledPluginInstaller(store: store, installRoot: try pluginInstallRoot())
         try installer.installAll()
+    }
+
+    private func reopenExpiredSnoozedItems() throws {
+        _ = try LocalStatusStore.openApplicationSupportStore().reopenExpiredSnoozedItems(at: Date())
     }
 }
 

@@ -18,6 +18,7 @@ The current `StatusCore` implementation contains the first ingestion slice:
 - Closing events declared with `closedBy` resolve matching open or snoozed event-backed `StatusItem` rows for the same resource.
 - New notice events are stored and audited, but do not create inbox items by default.
 - `StatusPersistenceStore` persists status item lifecycle fields and exposes resolve, snooze, dismiss, and snooze-expiry reopen operations for the native inbox.
+- The shared Alerts UI and native shells expose resolve, one-hour snooze, and dismiss controls backed by those lifecycle operations.
 - `StateChangeDetector` records resource state snapshots and classifies observations as first sighting, unchanged, or changed.
 - `MappingConditionEvaluator` evaluates `changed`, `changed_to`, and `changed_from` against current and previous resource state.
 - `StateEventPipeline` connects snapshot detection, mapping conditions, normalized event creation, and ingestion for the first polling-based path.

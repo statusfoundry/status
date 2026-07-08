@@ -77,23 +77,36 @@ public struct RulesContainerView: View {
 
 public struct AlertsView: View {
     private let items: [StatusItem]
+    private let resolve: (StatusItem) -> Void
+    private let snooze: (StatusItem) -> Void
+    private let dismiss: (StatusItem) -> Void
 
-    public init(items: [StatusItem]) {
+    public init(
+        items: [StatusItem],
+        resolve: @escaping (StatusItem) -> Void = { _ in },
+        snooze: @escaping (StatusItem) -> Void = { _ in },
+        dismiss: @escaping (StatusItem) -> Void = { _ in }
+    ) {
         self.items = items
+        self.resolve = resolve
+        self.snooze = snooze
+        self.dismiss = dismiss
     }
 
     public var body: some View {
-        StatusListPage(title: "Alerts", subtitle: "\(items.count) open attention item\(items.count == 1 ? "" : "s").") {
+        StatusListPage(title: "Alerts", subtitle: "\(items.count) active attention item\(items.count == 1 ? "" : "s").") {
             if items.isEmpty {
                 EmptyState(title: "No alerts", detail: "Status has no open warning or critical items on this device.")
             } else {
                 VStack(spacing: 10) {
                     ForEach(items) { item in
                         StatusRow(severity: item.severity, title: item.title, detail: item.summary) {
-                            if let link = item.actionLink {
-                                Link(link.label, destination: link.url)
-                                    .font(.callout.weight(.semibold))
-                            }
+                            AlertRowActions(
+                                item: item,
+                                resolve: resolve,
+                                snooze: snooze,
+                                dismiss: dismiss
+                            )
                         }
                     }
                 }
@@ -108,10 +121,22 @@ public final class AlertsViewModel: ObservableObject {
     @Published public private(set) var loadError: String?
 
     private let loadItems: () throws -> [StatusItem]
+    private let resolveItem: (StatusItem) throws -> Void
+    private let snoozeItem: (StatusItem) throws -> Void
+    private let dismissItem: (StatusItem) throws -> Void
 
-    public init(initialItems: [StatusItem] = [], loadItems: @escaping () throws -> [StatusItem]) {
+    public init(
+        initialItems: [StatusItem] = [],
+        loadItems: @escaping () throws -> [StatusItem],
+        resolveItem: @escaping (StatusItem) throws -> Void = { _ in },
+        snoozeItem: @escaping (StatusItem) throws -> Void = { _ in },
+        dismissItem: @escaping (StatusItem) throws -> Void = { _ in }
+    ) {
         self.items = initialItems
         self.loadItems = loadItems
+        self.resolveItem = resolveItem
+        self.snoozeItem = snoozeItem
+        self.dismissItem = dismissItem
     }
 
     public func reload() {
@@ -120,6 +145,27 @@ public final class AlertsViewModel: ObservableObject {
             loadError = nil
         } catch {
             items = []
+            loadError = error.localizedDescription
+        }
+    }
+
+    public func resolve(_ item: StatusItem) {
+        mutate(item, action: resolveItem)
+    }
+
+    public func snooze(_ item: StatusItem) {
+        mutate(item, action: snoozeItem)
+    }
+
+    public func dismiss(_ item: StatusItem) {
+        mutate(item, action: dismissItem)
+    }
+
+    private func mutate(_ item: StatusItem, action: (StatusItem) throws -> Void) {
+        do {
+            try action(item)
+            reload()
+        } catch {
             loadError = error.localizedDescription
         }
     }
@@ -133,7 +179,12 @@ public struct AlertsContainerView: View {
     }
 
     public var body: some View {
-        AlertsView(items: viewModel.items)
+        AlertsView(
+            items: viewModel.items,
+            resolve: { item in viewModel.resolve(item) },
+            snooze: { item in viewModel.snooze(item) },
+            dismiss: { item in viewModel.dismiss(item) }
+        )
             .overlay(alignment: .bottom) {
                 if let loadError = viewModel.loadError {
                     Text(loadError)
@@ -151,6 +202,63 @@ public struct AlertsContainerView: View {
             .refreshable {
                 viewModel.reload()
             }
+    }
+}
+
+private struct AlertRowActions: View {
+    let item: StatusItem
+    let resolve: (StatusItem) -> Void
+    let snooze: (StatusItem) -> Void
+    let dismiss: (StatusItem) -> Void
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            if let link = item.actionLink {
+                Link(link.label, destination: link.url)
+                    .font(.callout.weight(.semibold))
+            }
+            if item.state == .snoozed, let snoozeUntil = item.snoozeUntil {
+                Text("Snoozed until \(snoozeUntil.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 8) {
+                IconActionButton(
+                    title: "Resolve",
+                    systemImage: "checkmark.circle",
+                    action: { resolve(item) }
+                )
+                IconActionButton(
+                    title: "Snooze one hour",
+                    systemImage: "clock",
+                    action: { snooze(item) }
+                )
+                IconActionButton(
+                    title: "Dismiss",
+                    systemImage: "xmark.circle",
+                    role: .destructive,
+                    action: { dismiss(item) }
+                )
+            }
+        }
+    }
+}
+
+private struct IconActionButton: View {
+    let title: String
+    let systemImage: String
+    var role: ButtonRole? = nil
+    let action: () -> Void
+
+    var body: some View {
+        Button(role: role, action: action) {
+            Image(systemName: systemImage)
+                .frame(width: 18, height: 18)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .help(title)
+        .accessibilityLabel(Text(title))
     }
 }
 
