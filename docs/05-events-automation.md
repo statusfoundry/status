@@ -38,6 +38,7 @@ The same pipeline is used for:
 - `StatusPersistenceStore` can round-trip trigger definitions and job records through SQLite.
 - `PluginRuntimeService` can enqueue configured manual and due cron plugin jobs and execute specific queued jobs, preserving `Trigger → Job → request/mapping → audit` provenance for app-initiated refreshes.
 - Inserted events from a successful plugin run are immediately evaluated against the stored rule set, so manual app refreshes now continue through `Event → Rule → Action → Audit`.
+- Plugin mapping commits can persist resources, events, dashboard metrics, and metric points in one audited job output.
 - Audit entries can now attach job, event, and action-run provenance; persisted event ingestion and job lifecycle audit rows use those references.
 - The core action runner executes safe built-in local actions, records deterministic action-run rows, and denies review-required or unsupported actions until explicit permission/provider support exists.
 - `AutomationPipeline` evaluates inserted events against rules, runs matching actions, persists both action-run records and audit entries, and dispatches newly produced runtime effects through a platform-owned effect dispatcher.

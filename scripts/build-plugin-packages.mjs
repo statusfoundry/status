@@ -290,6 +290,11 @@ function validateMappings(mappingsFile, requestIDs, eventTypes, sourceName) {
       fail(`${sourceName}: event mapping ${event.type} references missing request ${event.request}`);
     }
   }
+  for (const metric of mappingsFile.metrics ?? []) {
+    if (metric.request && requestIDs.has(metric.request) === false) {
+      fail(`${sourceName}: metric mapping ${metric.name ?? "(unnamed)"} references missing request ${metric.request}`);
+    }
+  }
 }
 
 function validateRulePresets(presetsFile, eventTypes, sourceName) {

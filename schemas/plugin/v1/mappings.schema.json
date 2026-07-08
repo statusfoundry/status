@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://plugins.status.app/schemas/plugin/v1/mappings.schema.json",
   "title": "Status plugin mappings (mappings.json)",
-  "description": "Converts service-specific payloads into Status common objects (resources and events). Selector, condition, and template strings are opaque here; their grammar is defined in docs/16-mapping-language.md.",
+  "description": "Converts service-specific payloads into Status common objects (resources, events, and metrics). Selector, condition, and template strings are opaque here; their grammar is defined in docs/16-mapping-language.md.",
   "type": "object",
   "additionalProperties": false,
   "minProperties": 1,
@@ -16,6 +16,11 @@
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/eventMapping" }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/metricMapping" }
     }
   },
   "$defs": {
@@ -33,7 +38,7 @@
           "type": "string",
           "description": "Optional name of the request in requests.json whose responses this mapping applies to. When omitted, the mapping applies to every payload the trigger routes to it."
         },
-        "items": {
+        "source": {
           "$ref": "#/$defs/selector",
           "description": "Optional selector for the array of items in the payload. Each item becomes one resource."
         },
@@ -65,7 +70,7 @@
           "type": "string",
           "description": "Optional name of the request in requests.json whose responses this mapping applies to."
         },
-        "items": {
+        "source": {
           "$ref": "#/$defs/selector",
           "description": "Optional selector for the array of items to evaluate."
         },
@@ -84,6 +89,36 @@
         "timestamp": {
           "$ref": "#/$defs/selector",
           "description": "Selector for the event timestamp. Defaults to the job time."
+        }
+      }
+    },
+    "metricMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "resourceId", "value"],
+      "properties": {
+        "request": {
+          "type": "string",
+          "description": "Optional name of the request in requests.json whose responses this mapping applies to."
+        },
+        "source": {
+          "$ref": "#/$defs/selector",
+          "description": "Optional selector for the array of metric source items."
+        },
+        "name": {
+          "type": "string",
+          "description": "Metric key/label.",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "resourceId": { "$ref": "#/$defs/selector" },
+        "value": { "$ref": "#/$defs/selector" },
+        "unit": {
+          "type": "string",
+          "description": "Optional display unit."
+        },
+        "timestamp": {
+          "$ref": "#/$defs/selector",
+          "description": "Selector for the metric point timestamp. Defaults to the job time."
         }
       }
     },

@@ -267,16 +267,23 @@ public struct PackagedPluginRequest: Decodable, Equatable, Sendable {
 public struct PackagedPluginMappings: Decodable, Equatable, Sendable {
     public var resources: [PackagedResourceMapping]
     public var events: [PackagedEventMapping]
+    public var metrics: [PackagedMetricMapping]
 
-    public init(resources: [PackagedResourceMapping] = [], events: [PackagedEventMapping] = []) {
+    public init(
+        resources: [PackagedResourceMapping] = [],
+        events: [PackagedEventMapping] = [],
+        metrics: [PackagedMetricMapping] = []
+    ) {
         self.resources = resources
         self.events = events
+        self.metrics = metrics
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicCodingKey.self)
         resources = try container.decodeIfPresent([PackagedResourceMapping].self, forKey: DynamicCodingKey("resources")) ?? []
         events = try container.decodeIfPresent([PackagedEventMapping].self, forKey: DynamicCodingKey("events")) ?? []
+        metrics = try container.decodeIfPresent([PackagedMetricMapping].self, forKey: DynamicCodingKey("metrics")) ?? []
     }
 }
 
@@ -393,6 +400,55 @@ public struct PackagedEventMapping: Decodable, Equatable, Sendable {
         summary = try container.decode(String.self, forKey: .summary)
         severity = try container.decode(PackagedEventSeverity.self, forKey: .severity)
         actionURL = try container.decodeIfPresent(String.self, forKey: .actionURL)
+        timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
+    }
+}
+
+public struct PackagedMetricMapping: Decodable, Equatable, Sendable {
+    public var request: String
+    public var source: String?
+    public var name: String
+    public var resourceID: String
+    public var value: String
+    public var unit: String?
+    public var timestamp: String?
+
+    enum CodingKeys: String, CodingKey {
+        case request
+        case source
+        case name
+        case resourceID = "resourceId"
+        case value
+        case unit
+        case timestamp
+    }
+
+    public init(
+        request: String = "",
+        source: String? = nil,
+        name: String,
+        resourceID: String,
+        value: String,
+        unit: String? = nil,
+        timestamp: String? = nil
+    ) {
+        self.request = request
+        self.source = source
+        self.name = name
+        self.resourceID = resourceID
+        self.value = value
+        self.unit = unit
+        self.timestamp = timestamp
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        request = try container.decodeIfPresent(String.self, forKey: .request) ?? ""
+        source = try container.decodeIfPresent(String.self, forKey: .source)
+        name = try container.decode(String.self, forKey: .name)
+        resourceID = try container.decode(String.self, forKey: .resourceID)
+        value = try container.decode(String.self, forKey: .value)
+        unit = try container.decodeIfPresent(String.self, forKey: .unit)
         timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
     }
 }

@@ -41,13 +41,27 @@ public struct MappedPluginResource: Equatable, Sendable {
     }
 }
 
+public struct MappedPluginMetric: Equatable, Sendable {
+    public var metric: Metric
+    public var pointValue: Double
+    public var pointTimestamp: Date
+
+    public init(metric: Metric, pointValue: Double, pointTimestamp: Date) {
+        self.metric = metric
+        self.pointValue = pointValue
+        self.pointTimestamp = pointTimestamp
+    }
+}
+
 public struct PluginMappingExecutionOutput: Equatable, Sendable {
     public var resources: [MappedPluginResource]
     public var events: [Event]
+    public var metrics: [MappedPluginMetric]
 
-    public init(resources: [MappedPluginResource], events: [Event]) {
+    public init(resources: [MappedPluginResource], events: [Event], metrics: [MappedPluginMetric] = []) {
         self.resources = resources
         self.events = events
+        self.metrics = metrics
     }
 }
 
@@ -75,7 +89,11 @@ public enum PluginMappingExecutor {
             .filter { $0.request == input.requestID }
             .flatMap { try executeEventMapping($0, input: input) }
 
-        return PluginMappingExecutionOutput(resources: resources, events: events)
+        let metrics = try mappings.metrics
+            .filter { $0.request.isEmpty || $0.request == input.requestID }
+            .flatMap { try executeMetricMapping($0, input: input) }
+
+        return PluginMappingExecutionOutput(resources: resources, events: events, metrics: metrics)
     }
 
     private static func executeResourceMapping(
@@ -179,6 +197,39 @@ public enum PluginMappingExecutor {
                 timestamp: timestamp,
                 actionURL: actionURLString.flatMap(URL.init(string:)),
                 fingerprint: fingerprint
+            )
+        }
+    }
+
+    private static func executeMetricMapping(
+        _ mapping: PackagedMetricMapping,
+        input: PluginMappingExecutionInput
+    ) throws -> [MappedPluginMetric] {
+        try items(for: mapping.source, payload: input.payload).compactMap { item in
+            let context = templateContext(item: item, input: input)
+            guard let rawResourceID = try expression(mapping.resourceID, item: item, context: context),
+                  rawResourceID.isEmpty == false,
+                  let valueString = try expression(mapping.value, item: item, context: context),
+                  let pointValue = Double(valueString.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+                return nil
+            }
+
+            let timestampString = try mapping.timestamp.flatMap { try expression($0, item: item, context: context) }
+            let pointTimestamp = timestampString.flatMap(parseDate) ?? input.capturedAt
+            let resourceID = normalizedResourceID(accountID: input.accountID, rawID: rawResourceID)
+            let metricID = normalizedMetricID(resourceID: resourceID, name: mapping.name)
+
+            return MappedPluginMetric(
+                metric: Metric(
+                    id: metricID,
+                    resourceID: resourceID,
+                    label: mapping.name,
+                    value: formatMetricValue(pointValue, unit: mapping.unit),
+                    delta: mapping.unit,
+                    severity: .ok
+                ),
+                pointValue: pointValue,
+                pointTimestamp: pointTimestamp
             )
         }
     }
@@ -315,6 +366,26 @@ public enum PluginMappingExecutor {
 
     private static func normalizedResourceID(accountID: String, rawID: String) -> String {
         "\(accountID):\(rawID)"
+    }
+
+    private static func normalizedMetricID(resourceID: String, name: String) -> String {
+        "\(resourceID):metric:\(name)"
+            .lowercased()
+            .replacingOccurrences(of: #"[^a-z0-9:_\-\.]+"#, with: "_", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+    }
+
+    private static func formatMetricValue(_ value: Double, unit: String?) -> String {
+        let formatted: String
+        if value.rounded() == value {
+            formatted = String(Int64(value))
+        } else {
+            formatted = String(value)
+        }
+        guard let unit, unit.isEmpty == false, unit != "count" else {
+            return formatted
+        }
+        return "\(formatted) \(unit)"
     }
 
     private static func parseDate(_ value: String) -> Date? {

@@ -553,6 +553,64 @@ public final class StatusPersistenceStore {
         try database.query("SELECT * FROM metrics ORDER BY label ASC").map(metric(from:))
     }
 
+    public func upsertMetric(_ metric: Metric, updatedAt: Date) throws {
+        try database.execute(
+            """
+            INSERT INTO metrics
+            (id, resource_id, label, value, delta, severity, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              resource_id = excluded.resource_id,
+              label = excluded.label,
+              value = excluded.value,
+              delta = excluded.delta,
+              severity = excluded.severity,
+              updated_at = excluded.updated_at
+            """,
+            bindings: [
+                .text(metric.id),
+                .text(metric.resourceID),
+                .text(metric.label),
+                .text(metric.value),
+                metric.delta.map { .text($0) } ?? .null,
+                .text(metric.severity.rawValue),
+                .text(ISO8601.string(from: updatedAt))
+            ]
+        )
+    }
+
+    public func insertMetricPoint(metricID: String, value: Double, timestamp: Date, metadata: [String: String] = [:]) throws {
+        try database.execute(
+            """
+            INSERT INTO metric_points
+            (metric_id, timestamp, value, metadata_json)
+            VALUES (?, ?, ?, ?)
+            """,
+            bindings: [
+                .text(metricID),
+                .text(ISO8601.string(from: timestamp)),
+                .double(value),
+                .text(try jsonString(metadata))
+            ]
+        )
+    }
+
+    public func metricPoints(metricID: String) throws -> [(timestamp: Date, value: Double)] {
+        try database.query(
+            """
+            SELECT timestamp, value FROM metric_points
+            WHERE metric_id = ?
+            ORDER BY timestamp ASC, id ASC
+            """,
+            bindings: [.text(metricID)]
+        ).map { row in
+            try (
+                timestamp: ISO8601.date(from: row.requiredText("timestamp")),
+                value: row.requiredDouble("value")
+            )
+        }
+    }
+
     public func integrationSummaries() throws -> [IntegrationSummary] {
         try database.query(
             """
@@ -1213,5 +1271,16 @@ private extension Dictionary where Key == String, Value == SQLiteValue {
             return 0
         }
         return value
+    }
+
+    func requiredDouble(_ column: String) throws -> Double {
+        switch self[column] {
+        case .double(let value):
+            return value
+        case .integer(let value):
+            return Double(value)
+        default:
+            throw PersistenceError.missingColumn(column)
+        }
     }
 }

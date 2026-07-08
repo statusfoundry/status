@@ -52,7 +52,21 @@ import Testing
                     ]
                 )
             ],
-            events: [event]
+            events: [event],
+            metrics: [
+                MappedPluginMetric(
+                    metric: Metric(
+                        id: "\(resource.id):metric:response_time",
+                        resourceID: resource.id,
+                        label: "response_time",
+                        value: "120 ms",
+                        delta: "ms",
+                        severity: .ok
+                    ),
+                    pointValue: 120,
+                    pointTimestamp: now
+                )
+            ]
         ),
         jobID: "job_website_check",
         capturedAt: now
@@ -60,9 +74,21 @@ import Testing
 
     #expect(result.resourceIDs == [resource.id])
     #expect(result.eventResults == [.inserted(eventID: event.id, statusItemID: "sti_\(event.id.dropFirst(4))")])
+    #expect(result.metricIDs == ["\(resource.id):metric:response_time"])
     #expect(try store.resource(id: resource.id) == resource)
     #expect(try store.resourceStateSnapshot(resourceID: resource.id)?.state["statusCode"] == "503")
     #expect(try store.event(id: event.id) == event)
+    #expect(try store.metrics() == [
+        Metric(
+            id: "\(resource.id):metric:response_time",
+            resourceID: resource.id,
+            label: "response_time",
+            value: "120 ms",
+            delta: "ms",
+            severity: .ok
+        )
+    ])
+    #expect(try store.metricPoints(metricID: "\(resource.id):metric:response_time").map(\.value) == [120])
     #expect(try store.statusItemCount() == 1)
     #expect(try store.auditEntry(id: "aud_job_website_check_mapping_commit") == result.auditEntry)
     #expect(try store.auditEntryCount() == 2)

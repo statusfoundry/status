@@ -154,6 +154,52 @@ import Testing
     #expect(output.events[0].timestamp == ISO8601DateFormatter().date(from: "2026-07-07T20:15:30Z"))
 }
 
+@Test func pluginMappingExecutorMapsNumericMetrics() throws {
+    let mappings = PackagedPluginMappings(metrics: [
+        PackagedMetricMapping(
+            request: "channel_stats",
+            source: "$.items[*]",
+            name: "views_28d",
+            resourceID: "$.id",
+            value: "$.statistics.viewCount",
+            unit: "count",
+            timestamp: "$.capturedAt"
+        )
+    ])
+    let output = try PluginMappingExecutor.execute(
+        mappings,
+        input: PluginMappingExecutionInput(
+            pluginID: "com.status.youtube",
+            accountID: "acct_yt",
+            provider: "com.status.youtube",
+            requestID: "channel_stats",
+            payload: decodeMappingJSON("""
+            {
+              "items": [
+                {
+                  "id": "channel-1",
+                  "capturedAt": "2026-07-07T20:15:30Z",
+                  "statistics": {
+                    "viewCount": "1234"
+                  }
+                }
+              ]
+            }
+            """),
+            capturedAt: Date(timeIntervalSince1970: 1_783_433_520)
+        )
+    )
+
+    #expect(output.metrics.count == 1)
+    #expect(output.metrics[0].metric.id == "acct_yt:channel-1:metric:views_28d")
+    #expect(output.metrics[0].metric.resourceID == "acct_yt:channel-1")
+    #expect(output.metrics[0].metric.label == "views_28d")
+    #expect(output.metrics[0].metric.value == "1234")
+    #expect(output.metrics[0].metric.delta == "count")
+    #expect(output.metrics[0].pointValue == 1234)
+    #expect(output.metrics[0].pointTimestamp == ISO8601DateFormatter().date(from: "2026-07-07T20:15:30Z"))
+}
+
 private func decodeMappingJSON(_ string: String) throws -> MappingJSONValue {
     try JSONDecoder().decode(MappingJSONValue.self, from: Data(string.utf8))
 }

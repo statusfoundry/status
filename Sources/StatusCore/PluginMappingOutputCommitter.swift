@@ -3,11 +3,18 @@ import Foundation
 public struct PluginMappingCommitResult: Equatable, Sendable {
     public var resourceIDs: [String]
     public var eventResults: [EventIngestionResult]
+    public var metricIDs: [String]
     public var auditEntry: AuditEntry
 
-    public init(resourceIDs: [String], eventResults: [EventIngestionResult], auditEntry: AuditEntry) {
+    public init(
+        resourceIDs: [String],
+        eventResults: [EventIngestionResult],
+        metricIDs: [String] = [],
+        auditEntry: AuditEntry
+    ) {
         self.resourceIDs = resourceIDs
         self.eventResults = eventResults
+        self.metricIDs = metricIDs
         self.auditEntry = auditEntry
     }
 }
@@ -47,10 +54,21 @@ public final class PluginMappingOutputCommitter {
         }
 
         let eventResults = try output.events.map { try ingestor.ingest($0) }
+        var metricIDs: [String] = []
+        for mappedMetric in output.metrics {
+            try store.upsertMetric(mappedMetric.metric, updatedAt: capturedAt)
+            try store.insertMetricPoint(
+                metricID: mappedMetric.metric.id,
+                value: mappedMetric.pointValue,
+                timestamp: mappedMetric.pointTimestamp,
+                metadata: jobID.map { ["jobID": $0] } ?? [:]
+            )
+            metricIDs.append(mappedMetric.metric.id)
+        }
         let auditEntry = AuditEntry(
             id: auditID(jobID: jobID, capturedAt: capturedAt),
             title: "Plugin mapping output committed",
-            detail: "\(resourceIDs.count) resources stored, \(eventResults.count) events processed.",
+            detail: "\(resourceIDs.count) resources stored, \(eventResults.count) events processed, \(metricIDs.count) metrics updated.",
             timestamp: capturedAt,
             status: "success",
             jobID: jobID,
@@ -61,6 +79,7 @@ public final class PluginMappingOutputCommitter {
         return PluginMappingCommitResult(
             resourceIDs: resourceIDs,
             eventResults: eventResults,
+            metricIDs: metricIDs,
             auditEntry: auditEntry
         )
     }
