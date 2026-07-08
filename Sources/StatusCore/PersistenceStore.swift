@@ -741,6 +741,21 @@ public final class StatusPersistenceStore {
         try database.query("SELECT * FROM triggers ORDER BY id").map(trigger(from:))
     }
 
+    public func setTriggerEnabled(id: String, enabled: Bool, updatedAt: Date) throws {
+        try database.execute(
+            """
+            UPDATE triggers
+            SET enabled = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            bindings: [
+                .integer(enabled ? 1 : 0),
+                .text(ISO8601.string(from: updatedAt)),
+                .text(id)
+            ]
+        )
+    }
+
     public func upsertJob(_ job: JobRecord) throws {
         let metadata = JobMetadata(queuedAt: ISO8601.string(from: job.queuedAt))
         try database.execute(

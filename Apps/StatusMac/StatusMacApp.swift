@@ -111,6 +111,16 @@ private struct MacRootView: View {
                 granted: granted,
                 grantedAt: granted ? Date() : nil
             )
+        } loadTriggers: { plugin in
+            try LocalStatusStore.openApplicationSupportStore()
+                .triggers()
+                .filter { $0.pluginID == plugin.id }
+        } setTriggerEnabled: { _, trigger, enabled in
+            try LocalStatusStore.openApplicationSupportStore().setTriggerEnabled(
+                id: trigger.id,
+                enabled: enabled,
+                updatedAt: Date()
+            )
         } canRunPlugin: { plugin in
             canRunConfiguredPlugin(pluginID: plugin.id)
         } runPlugin: { plugin in

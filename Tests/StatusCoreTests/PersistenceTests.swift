@@ -594,6 +594,9 @@ import Testing
 
     #expect(try store.trigger(id: trigger.id) == trigger)
     #expect(try store.triggers() == [trigger])
+
+    try store.setTriggerEnabled(id: trigger.id, enabled: false, updatedAt: now.addingTimeInterval(60))
+    #expect(try store.trigger(id: trigger.id)?.enabled == false)
 }
 
 @Test func jobRecordRoundTripsThroughSQLite() throws {
