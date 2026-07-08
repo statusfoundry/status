@@ -303,7 +303,7 @@ Actions must declare permissions.
 Current implementation status:
 
 - `notification.show`, `status.inbox.add`, `status.open_url`, and `audit.note` are safe local core actions.
-- `webhook.post` is review-required and dispatches a platform-owned webhook runtime effect only when the rule provider has a granted `write-actions` permission.
+- `webhook.post` is review-required and dispatches a platform-owned webhook runtime effect only when the rule provider has a granted `write-actions` permission. macOS and iOS currently post that effect as JSON through the shared HTTP transport; delivery failures are not yet persisted back into the action audit trail.
 - `jira.createIssue`, `github.createIssue`, `github.comment`, and `email.createDraft` are review-required but remain unsupported until provider execution is wired.
 - Unknown actions are recorded as unsupported rather than executed.
 

@@ -313,6 +313,16 @@ private struct MacActionEffectDispatcher: ActionEffectDispatcher {
                 NSWorkspace.shared.open(url)
             }
         }
+        for webhook in effects.webhooks {
+            Task {
+                try? await post(webhook)
+            }
+        }
+    }
+
+    private func post(_ webhook: ActionRuntimeWebhook) async throws {
+        let request = try ActionWebhookRequestBuilder().request(for: webhook)
+        _ = try await URLSessionPluginRequestTransport().response(for: request)
     }
 
     private func deliver(_ notification: ActionRuntimeNotification) {

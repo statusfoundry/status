@@ -126,6 +126,29 @@ import Testing
     ])
 }
 
+@Test func actionWebhookRequestBuilderCreatesJSONPostRequest() throws {
+    let url = try #require(URL(string: "https://example.com/hooks/status"))
+    let request = try ActionWebhookRequestBuilder().request(
+        for: ActionRuntimeWebhook(
+            url: url,
+            payload: [
+                "event_id": "evt_01",
+                "severity": "warning"
+            ]
+        )
+    )
+
+    let body = try #require(request.body)
+    let decoded = try JSONDecoder().decode([String: String].self, from: body)
+    #expect(request.method == "POST")
+    #expect(request.url == url)
+    #expect(request.headers["Content-Type"] == "application/json")
+    #expect(request.headers["Accept"] == "application/json")
+    #expect(request.headers["User-Agent"] == "Status/0.1")
+    #expect(request.timeoutSeconds == 30)
+    #expect(decoded == ["event_id": "evt_01", "severity": "warning"])
+}
+
 @Test func automationPipelineCanEvaluateStoredRules() throws {
     let database = try temporaryDatabase()
     try StatusDatabaseMigrator.migrate(database)
