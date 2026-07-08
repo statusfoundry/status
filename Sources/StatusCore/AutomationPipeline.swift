@@ -33,7 +33,7 @@ public final class AutomationPipeline {
         let cursor = actionRunner.effects.cursor()
 
         for match in matches {
-            for result in actionRunner.run(match) {
+            for result in actionRunner.run(match, reviewPermissionGranted: reviewPermissionGranted) {
                 try store.upsertActionRun(result.actionRun)
                 try store.insertAuditEntry(result.auditEntry)
                 actionResults.append(result)
@@ -50,5 +50,15 @@ public final class AutomationPipeline {
 
     public func processStoredRules(for event: Event) throws -> AutomationPipelineResult {
         try process(event: event, rules: store.rules(eventType: event.type))
+    }
+
+    private func reviewPermissionGranted(rule: Rule, action: RuleActionDefinition) -> Bool {
+        guard ActionRunner.safetyLevel(for: action.action) == .reviewRequired,
+              let provider = rule.provider else {
+            return false
+        }
+        return ((try? store.pluginPermissions(pluginID: provider)) ?? []).contains { permission in
+            permission.permission == .writeActions && permission.granted
+        }
     }
 }

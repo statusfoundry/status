@@ -41,7 +41,7 @@ The same pipeline is used for:
 - Inserted events from a successful plugin run are immediately evaluated against the stored rule set, so manual app refreshes now continue through `Event → Rule → Action → Audit`.
 - Plugin mapping commits can persist resources, events, dashboard metrics, and metric points in one audited job output.
 - Audit entries can now attach job, event, and action-run provenance; persisted event ingestion and job lifecycle audit rows use those references.
-- The core action runner executes safe built-in local actions, records deterministic action-run rows, and denies review-required or unsupported actions until explicit permission/provider support exists.
+- The core action runner executes safe built-in local actions, records deterministic action-run rows, and supports `webhook.post` only after the rule provider has an explicit `write-actions` grant. Provider-backed review-required actions remain unsupported until provider executors exist.
 - `AutomationPipeline` evaluates inserted events against rules, runs matching actions, persists both action-run records and audit entries, and dispatches newly produced runtime effects through a platform-owned effect dispatcher.
 - Rules persist to SQLite with structured condition/action JSON, and the automation pipeline can evaluate the stored local rule set for an event.
 - macOS and iOS expose app-owned rule toggles so suggested plugin rules remain disabled by default but can be explicitly enabled by the user.
@@ -303,7 +303,8 @@ Actions must declare permissions.
 Current implementation status:
 
 - `notification.show`, `status.inbox.add`, `status.open_url`, and `audit.note` are safe local core actions.
-- `webhook.post`, `jira.createIssue`, `github.createIssue`, `github.comment`, and `email.createDraft` are review-required and are denied by the core runner until explicit write permission and provider execution are wired.
+- `webhook.post` is review-required and dispatches a platform-owned webhook runtime effect only when the rule provider has a granted `write-actions` permission.
+- `jira.createIssue`, `github.createIssue`, `github.comment`, and `email.createDraft` are review-required but remain unsupported until provider execution is wired.
 - Unknown actions are recorded as unsupported rather than executed.
 
 ## Action safety levels

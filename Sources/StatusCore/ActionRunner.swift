@@ -66,17 +66,20 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
     public private(set) var inboxEventIDs: [String] = []
     public private(set) var openedURLs: [URL] = []
     public private(set) var auditNotes: [String] = []
+    public private(set) var webhooks: [ActionRuntimeWebhook] = []
 
     public init(
         notifications: [ActionRuntimeNotification] = [],
         inboxEventIDs: [String] = [],
         openedURLs: [URL] = [],
-        auditNotes: [String] = []
+        auditNotes: [String] = [],
+        webhooks: [ActionRuntimeWebhook] = []
     ) {
         self.notifications = notifications
         self.inboxEventIDs = inboxEventIDs
         self.openedURLs = openedURLs
         self.auditNotes = auditNotes
+        self.webhooks = webhooks
     }
 
     public func cursor() -> ActionRuntimeEffectCursor {
@@ -84,7 +87,8 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
             notificationCount: notifications.count,
             inboxEventIDCount: inboxEventIDs.count,
             openedURLCount: openedURLs.count,
-            auditNoteCount: auditNotes.count
+            auditNoteCount: auditNotes.count,
+            webhookCount: webhooks.count
         )
     }
 
@@ -94,6 +98,7 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
         effects.inboxEventIDs = Array(inboxEventIDs.dropFirst(cursor.inboxEventIDCount))
         effects.openedURLs = Array(openedURLs.dropFirst(cursor.openedURLCount))
         effects.auditNotes = Array(auditNotes.dropFirst(cursor.auditNoteCount))
+        effects.webhooks = Array(webhooks.dropFirst(cursor.webhookCount))
         return effects
     }
 
@@ -112,6 +117,10 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
     fileprivate mutating func recordAuditNote(_ note: String) {
         auditNotes.append(note)
     }
+
+    fileprivate mutating func recordWebhook(url: URL, payload: [String: String]) {
+        webhooks.append(ActionRuntimeWebhook(url: url, payload: payload))
+    }
 }
 
 public struct ActionRuntimeEffectCursor: Equatable, Sendable {
@@ -119,12 +128,14 @@ public struct ActionRuntimeEffectCursor: Equatable, Sendable {
     public var inboxEventIDCount: Int
     public var openedURLCount: Int
     public var auditNoteCount: Int
+    public var webhookCount: Int
 
-    public init(notificationCount: Int, inboxEventIDCount: Int, openedURLCount: Int, auditNoteCount: Int) {
+    public init(notificationCount: Int, inboxEventIDCount: Int, openedURLCount: Int, auditNoteCount: Int, webhookCount: Int) {
         self.notificationCount = notificationCount
         self.inboxEventIDCount = inboxEventIDCount
         self.openedURLCount = openedURLCount
         self.auditNoteCount = auditNoteCount
+        self.webhookCount = webhookCount
     }
 }
 
@@ -138,6 +149,16 @@ public struct ActionRuntimeNotification: Equatable, Sendable {
     }
 }
 
+public struct ActionRuntimeWebhook: Equatable, Sendable {
+    public var url: URL
+    public var payload: [String: String]
+
+    public init(url: URL, payload: [String: String]) {
+        self.url = url
+        self.payload = payload
+    }
+}
+
 public final class ActionRunner {
     public private(set) var effects: ActionRuntimeEffects
     private let now: () -> Date
@@ -147,9 +168,12 @@ public final class ActionRunner {
         self.now = now
     }
 
-    public func run(_ match: RuleMatch) -> [ActionExecutionResult] {
+    public func run(
+        _ match: RuleMatch,
+        reviewPermissionGranted: (Rule, RuleActionDefinition) -> Bool = { _, _ in false }
+    ) -> [ActionExecutionResult] {
         match.actions.enumerated().map { index, action in
-            run(action, at: index, rule: match.rule, event: match.event)
+            run(action, at: index, rule: match.rule, event: match.event, reviewPermissionGranted: reviewPermissionGranted)
         }
     }
 
@@ -164,7 +188,13 @@ public final class ActionRunner {
         }
     }
 
-    private func run(_ definition: RuleActionDefinition, at index: Int, rule: Rule, event: Event) -> ActionExecutionResult {
+    private func run(
+        _ definition: RuleActionDefinition,
+        at index: Int,
+        rule: Rule,
+        event: Event,
+        reviewPermissionGranted: (Rule, RuleActionDefinition) -> Bool
+    ) -> ActionExecutionResult {
         let startedAt = now()
         let runID = "run_\(rule.id)_\(event.id)_\(index)"
         var status: ActionRunStatus = .success
@@ -183,8 +213,20 @@ public final class ActionRunner {
                 error = String(describing: caughtError)
             }
         case .reviewRequired:
-            status = .denied
-            error = "\(definition.action) requires explicit write permission before it can run."
+            guard reviewPermissionGranted(rule, definition) else {
+                status = .denied
+                error = "\(definition.action) requires explicit write permission before it can run."
+                break
+            }
+            do {
+                result = try performReviewRequiredAction(definition, event: event)
+            } catch let actionError as ActionRunnerError {
+                status = .unsupported
+                error = actionError.errorDescription
+            } catch let caughtError {
+                status = .failed
+                error = String(describing: caughtError)
+            }
         case .dangerous:
             status = .denied
             error = "\(definition.action) is not allowed in v1."
@@ -238,6 +280,41 @@ public final class ActionRunner {
         }
     }
 
+    private func performReviewRequiredAction(_ definition: RuleActionDefinition, event: Event) throws -> [String: String] {
+        switch definition.action {
+        case "webhook.post":
+            let urlString = definition.parameters["url"]
+            guard let urlString, let url = URL(string: urlString) else {
+                throw ActionRunnerError.missingURL
+            }
+            let payload = webhookPayload(definition: definition, event: event)
+            effects.recordWebhook(url: url, payload: payload)
+            return ["url": url.absoluteString]
+        default:
+            throw ActionRunnerError.unsupportedReviewRequiredAction(definition.action)
+        }
+    }
+
+    private func webhookPayload(definition: RuleActionDefinition, event: Event) -> [String: String] {
+        var payload = definition.parameters
+        payload["event_id"] = event.id
+        payload["event_type"] = event.type
+        payload["event_title"] = event.title
+        payload["event_summary"] = event.summary
+        payload["resource_id"] = event.resourceID
+        payload["resource_name"] = event.resourceName
+        payload["severity"] = event.severity.rawValue
+        payload["timestamp"] = iso8601String(from: event.timestamp)
+        payload["url"] = nil
+        return payload
+    }
+
+    private func iso8601String(from date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.string(from: date)
+    }
+
     private func auditEntry(for actionRun: ActionRunRecord, rule: Rule, event: Event) -> AuditEntry {
         let title: String
         switch actionRun.status {
@@ -273,6 +350,7 @@ public final class ActionRunner {
 public enum ActionRunnerError: Error, Equatable, LocalizedError, Sendable {
     case missingURL
     case unsupportedSafeAction(String)
+    case unsupportedReviewRequiredAction(String)
 
     public var errorDescription: String? {
         switch self {
@@ -280,6 +358,8 @@ public enum ActionRunnerError: Error, Equatable, LocalizedError, Sendable {
             return "status.open_url requires a URL parameter or event action URL."
         case .unsupportedSafeAction(let action):
             return "\(action) is not a safe built-in action."
+        case .unsupportedReviewRequiredAction(let action):
+            return "\(action) is not wired to a provider executor yet."
         }
     }
 }
