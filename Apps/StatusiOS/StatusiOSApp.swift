@@ -49,6 +49,14 @@ private struct IOSRootView: View {
             }
 
             NavigationStack {
+                AuditLogContainerView(viewModel: makeAuditLogViewModel())
+                    .navigationTitle("Audit Log")
+            }
+            .tabItem {
+                Label("Audit", systemImage: "list.bullet.rectangle")
+            }
+
+            NavigationStack {
                 StatusSettingsView(
                     registryURL: registryBaseURL,
                     databasePath: applicationDatabasePath(),
@@ -157,6 +165,13 @@ private struct IOSRootView: View {
             return try LocalStatusStore.openApplicationSupportStore().rules()
         } saveRule: { rule in
             try LocalStatusStore.openApplicationSupportStore().upsertRule(rule, updatedAt: Date())
+        }
+    }
+
+    private func makeAuditLogViewModel() -> AuditLogViewModel {
+        AuditLogViewModel {
+            try bootstrapBundledPlugins()
+            return try LocalStatusStore.openApplicationSupportStore().auditEntries(limit: 50)
         }
     }
 
