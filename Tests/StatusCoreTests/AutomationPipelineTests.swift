@@ -32,12 +32,25 @@ import Testing
     #expect(result.matches.count == 1)
     #expect(try store.actionRun(id: actionRun.id) == actionRun)
     #expect(try store.auditEntry(id: auditEntry.id) == auditEntry)
-    #expect(runner.effects.notifications == [ActionRuntimeNotification(title: "Build failed", body: event.summary)])
+    let notification = ActionRuntimeNotification(
+        title: "Build failed",
+        body: event.summary,
+        eventID: event.id,
+        actionRunID: actionRun.id
+    )
+    #expect(runner.effects.notifications == [notification])
     #expect(dispatcher.dispatchedEffects == [
         ActionRuntimeEffects(
-            notifications: [ActionRuntimeNotification(title: "Build failed", body: event.summary)]
+            notifications: [notification]
         )
     ])
+    let notificationRecord = try #require(try store.notification(id: "ntf_\(actionRun.id)"))
+    #expect(notificationRecord.eventID == event.id)
+    #expect(notificationRecord.statusItemID == "sti_01workflowfailed")
+    #expect(notificationRecord.mode == .immediate)
+    #expect(notificationRecord.title == "Build failed")
+    #expect(notificationRecord.body == event.summary)
+    #expect(notificationRecord.deliveredAt != nil)
 }
 
 @Test func automationPipelineIgnoresRulesThatDoNotMatch() async throws {

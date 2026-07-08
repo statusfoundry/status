@@ -516,19 +516,16 @@ Column names follow the notification field list in `docs/05-events-automation.md
 ```sql
 CREATE TABLE notifications (
   id           TEXT PRIMARY KEY,                -- ntf_
-  event_id     TEXT REFERENCES events(id) ON DELETE SET NULL,
-  rule_id      TEXT REFERENCES rules(id) ON DELETE SET NULL,
+  event_id     TEXT,
+  status_item_id TEXT,
+  mode         TEXT NOT NULL,                   -- immediate | digest | dashboardOnly | silentAutomation | disabled
   title        TEXT NOT NULL,
-  body         TEXT,
-  mode         TEXT NOT NULL,                   -- immediate | digest | dashboard-only | silent-automation | disabled
-  delivered_at TEXT,                            -- NULL until delivered (digest queue)
-  dismissed_at TEXT,
-  action_url   TEXT,
+  body         TEXT NOT NULL,
+  delivered_at TEXT,                            -- NULL until delivered or queued for digest
   created_at   TEXT NOT NULL
 );
 
-CREATE INDEX idx_notifications_undelivered ON notifications (mode, delivered_at);
-CREATE INDEX idx_notifications_event ON notifications (event_id);
+Current implementation stores the columns above. `rule_id`, `dismissed_at`, and `action_url` remain planned extensions for richer notification preferences and notification-center history.
 ```
 
 ### audit_entries

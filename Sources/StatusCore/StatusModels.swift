@@ -35,6 +35,37 @@ public enum NotificationMode: String, Codable, CaseIterable, Sendable {
     case disabled
 }
 
+public struct NotificationRecord: Identifiable, Codable, Equatable, Sendable {
+    public var id: String
+    public var eventID: String?
+    public var statusItemID: String?
+    public var mode: NotificationMode
+    public var title: String
+    public var body: String
+    public var deliveredAt: Date?
+    public var createdAt: Date
+
+    public init(
+        id: String,
+        eventID: String? = nil,
+        statusItemID: String? = nil,
+        mode: NotificationMode,
+        title: String,
+        body: String,
+        deliveredAt: Date? = nil,
+        createdAt: Date
+    ) {
+        self.id = id
+        self.eventID = eventID
+        self.statusItemID = statusItemID
+        self.mode = mode
+        self.title = title
+        self.body = body
+        self.deliveredAt = deliveredAt
+        self.createdAt = createdAt
+    }
+}
+
 public struct Account: Identifiable, Codable, Equatable, Sendable {
     public var id: String
     public var pluginID: String

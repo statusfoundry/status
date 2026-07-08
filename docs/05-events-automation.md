@@ -42,10 +42,10 @@ The same pipeline is used for:
 - Plugin mapping commits can persist resources, events, dashboard metrics, and metric points in one audited job output.
 - Audit entries can now attach job, event, and action-run provenance; persisted event ingestion and job lifecycle audit rows use those references.
 - The core action runner executes safe built-in local actions, records deterministic action-run rows, and supports `webhook.post` only after the rule provider has an explicit `write-actions` grant. Provider-backed review-required actions remain unsupported until provider executors exist.
-- `AutomationPipeline` evaluates inserted events against rules, runs matching actions, persists both action-run records and audit entries, and dispatches newly produced runtime effects through a platform-owned effect dispatcher.
+- `AutomationPipeline` evaluates inserted events against rules, runs matching actions, persists action-run records, audit entries, and notification records, and dispatches newly produced runtime effects through a platform-owned effect dispatcher.
 - Rules persist to SQLite with structured condition/action JSON, and the automation pipeline can evaluate the stored local rule set for an event.
 - macOS and iOS expose app-owned rule toggles so suggested plugin rules remain disabled by default but can be explicitly enabled by the user.
-- macOS and iOS provide first platform adapters for safe runtime effects: local notifications and opening URLs. Notification permission is requested by the app shell, not by plugins.
+- macOS and iOS provide first platform adapters for safe runtime effects: local notifications and opening URLs. Notification permission is requested by the app shell, not by plugins. Immediate local notifications are stored before platform dispatch and marked delivered after successful effect dispatch.
 - The native shells start an app-alive background loop that asks the core to run due configured plugin jobs every five minutes. Due checks still respect each trigger's stored schedule.
 - Unscoped due cron triggers enqueue one job per configured plugin account; account-scoped cron triggers enqueue only for their declared account.
 - Due cron triggers that cannot enqueue because of missing `background-refresh` permission, missing request metadata, or missing account configuration write stable skipped audit rows instead of failing silently.

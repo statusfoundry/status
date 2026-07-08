@@ -39,8 +39,11 @@ public final class AutomationPipeline {
                 actionResults.append(result)
             }
         }
+        let effects = actionRunner.effects.effects(since: cursor)
+        try persistNotifications(effects.notifications)
         do {
-            try await effectDispatcher.dispatch(actionRunner.effects.effects(since: cursor))
+            try await effectDispatcher.dispatch(effects)
+            try markNotificationsDelivered(effects.notifications)
         } catch let failure as ActionEffectDispatchFailure {
             try recordDispatchFailure(failure)
             throw failure
@@ -77,6 +80,43 @@ public final class AutomationPipeline {
                 actionRunID: actionRun.id
             )
         )
+    }
+
+    private func persistNotifications(_ notifications: [ActionRuntimeNotification]) throws {
+        for notification in notifications {
+            try store.upsertNotification(
+                NotificationRecord(
+                    id: notificationRecordID(for: notification),
+                    eventID: notification.eventID,
+                    statusItemID: notification.eventID.map(statusItemID(for:)),
+                    mode: notification.mode,
+                    title: notification.title,
+                    body: notification.body,
+                    createdAt: Date()
+                )
+            )
+        }
+    }
+
+    private func markNotificationsDelivered(_ notifications: [ActionRuntimeNotification]) throws {
+        let deliveredAt = Date()
+        for notification in notifications where notification.mode == .immediate {
+            try store.markNotificationDelivered(id: notificationRecordID(for: notification), deliveredAt: deliveredAt)
+        }
+    }
+
+    private func notificationRecordID(for notification: ActionRuntimeNotification) -> String {
+        if let actionRunID = notification.actionRunID {
+            return "ntf_\(actionRunID)"
+        }
+        return "ntf_\(UUID().uuidString.lowercased())"
+    }
+
+    private func statusItemID(for eventID: String) -> String {
+        if eventID.hasPrefix("evt_") {
+            return "sti_" + eventID.dropFirst(4)
+        }
+        return "sti_\(eventID)"
     }
 
     private func reviewPermissionGranted(rule: Rule, action: RuleActionDefinition) -> Bool {

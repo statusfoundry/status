@@ -102,8 +102,20 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
         return effects
     }
 
-    fileprivate mutating func recordNotification(title: String, body: String) {
-        notifications.append(ActionRuntimeNotification(title: title, body: body))
+    fileprivate mutating func recordNotification(
+        title: String,
+        body: String,
+        eventID: String,
+        actionRunID: String,
+        mode: NotificationMode = .immediate
+    ) {
+        notifications.append(ActionRuntimeNotification(
+            title: title,
+            body: body,
+            eventID: eventID,
+            actionRunID: actionRunID,
+            mode: mode
+        ))
     }
 
     fileprivate mutating func recordInbox(eventID: String) {
@@ -142,10 +154,22 @@ public struct ActionRuntimeEffectCursor: Equatable, Sendable {
 public struct ActionRuntimeNotification: Equatable, Sendable {
     public var title: String
     public var body: String
+    public var eventID: String?
+    public var actionRunID: String?
+    public var mode: NotificationMode
 
-    public init(title: String, body: String) {
+    public init(
+        title: String,
+        body: String,
+        eventID: String? = nil,
+        actionRunID: String? = nil,
+        mode: NotificationMode = .immediate
+    ) {
         self.title = title
         self.body = body
+        self.eventID = eventID
+        self.actionRunID = actionRunID
+        self.mode = mode
     }
 }
 
@@ -206,7 +230,7 @@ public final class ActionRunner {
         switch Self.safetyLevel(for: definition.action) {
         case .safe:
             do {
-                result = try performSafeAction(definition, event: event)
+                result = try performSafeAction(definition, event: event, actionRunID: runID)
             } catch let actionError as ActionRunnerError {
                 status = .failed
                 error = actionError.errorDescription
@@ -256,12 +280,16 @@ public final class ActionRunner {
         )
     }
 
-    private func performSafeAction(_ definition: RuleActionDefinition, event: Event) throws -> [String: String] {
+    private func performSafeAction(
+        _ definition: RuleActionDefinition,
+        event: Event,
+        actionRunID: String
+    ) throws -> [String: String] {
         switch definition.action {
         case "notification.show":
             let title = definition.parameters["title"] ?? event.title
             let body = definition.parameters["body"] ?? event.summary
-            effects.recordNotification(title: title, body: body)
+            effects.recordNotification(title: title, body: body, eventID: event.id, actionRunID: actionRunID)
             return ["title": title, "body": body]
         case "status.inbox.add":
             effects.recordInbox(eventID: event.id)

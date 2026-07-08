@@ -122,10 +122,18 @@ import Testing
     #expect(try store.resource(id: "acct_status_registry:status-registry.hakobs.com")?.name == "status-registry.hakobs.com")
     #expect(try store.statusItemCount() == 1)
     #expect(try store.auditEntry(id: "aud_\(jobID)_success")?.status == "success")
-    #expect(try store.actionRun(id: "run_rul_notify_website_down_\(result.mappingOutput.events[0].id)_0")?.status == .success)
+    let eventID = result.mappingOutput.events[0].id
+    let actionRunID = "run_rul_notify_website_down_\(eventID)_0"
+    #expect(try store.actionRun(id: actionRunID)?.status == .success)
     #expect(dispatcher.dispatchedEffects.flatMap(\.notifications) == [
-        ActionRuntimeNotification(title: "Website needs attention", body: "status-registry.hakobs.com is not responding normally.")
+        ActionRuntimeNotification(
+            title: "Website needs attention",
+            body: "status-registry.hakobs.com is not responding normally.",
+            eventID: eventID,
+            actionRunID: actionRunID
+        )
     ])
+    #expect(try store.notification(id: "ntf_\(actionRunID)")?.deliveredAt != nil)
 }
 
 @Test func pluginRuntimeServiceRequiresGrantedNetworkPermission() async throws {

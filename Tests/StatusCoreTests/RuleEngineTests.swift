@@ -60,7 +60,14 @@ import Testing
     let results = runner.run(match)
 
     #expect(results.count == 1)
-    #expect(runner.effects.notifications == [ActionRuntimeNotification(title: "Build failed", body: event.summary)])
+    #expect(runner.effects.notifications == [
+        ActionRuntimeNotification(
+            title: "Build failed",
+            body: event.summary,
+            eventID: event.id,
+            actionRunID: "run_rul_notify_evt_01workflowfailed_0"
+        )
+    ])
     #expect(results[0].actionRun.status == .success)
     #expect(results[0].actionRun.action == "notification.show")
     #expect(results[0].auditEntry.actionRunID == results[0].actionRun.id)

@@ -247,6 +247,30 @@ import Testing
     #expect(try store.actionRun(id: actionRun.id) == actionRun)
 }
 
+@Test func notificationRoundTripsThroughSQLite() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let notification = NotificationRecord(
+        id: "ntf_run_01",
+        eventID: "evt_01",
+        statusItemID: "sti_01",
+        mode: .immediate,
+        title: "Build failed",
+        body: "CI failed on main.",
+        createdAt: now
+    )
+
+    try store.upsertNotification(notification)
+    try store.markNotificationDelivered(id: notification.id, deliveredAt: now.addingTimeInterval(1))
+
+    var expected = notification
+    expected.deliveredAt = now.addingTimeInterval(1)
+    #expect(try store.notification(id: notification.id) == expected)
+    #expect(try store.notifications(limit: 5) == [expected])
+}
+
 @Test func ruleRoundTripsThroughSQLite() throws {
     let database = try temporaryDatabase()
     try StatusDatabaseMigrator.migrate(database)

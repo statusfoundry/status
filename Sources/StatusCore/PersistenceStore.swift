@@ -418,6 +418,54 @@ public final class StatusPersistenceStore {
         return try actionRun(from: row)
     }
 
+    public func upsertNotification(_ notification: NotificationRecord) throws {
+        try database.execute(
+            """
+            INSERT OR REPLACE INTO notifications
+            (id, event_id, status_item_id, mode, title, body, delivered_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            bindings: [
+                .text(notification.id),
+                notification.eventID.map { .text($0) } ?? .null,
+                notification.statusItemID.map { .text($0) } ?? .null,
+                .text(notification.mode.rawValue),
+                .text(notification.title),
+                .text(notification.body),
+                notification.deliveredAt.map { .text(ISO8601.string(from: $0)) } ?? .null,
+                .text(ISO8601.string(from: notification.createdAt))
+            ]
+        )
+    }
+
+    public func markNotificationDelivered(id: String, deliveredAt: Date) throws {
+        try database.execute(
+            "UPDATE notifications SET delivered_at = ? WHERE id = ?",
+            bindings: [
+                .text(ISO8601.string(from: deliveredAt)),
+                .text(id)
+            ]
+        )
+    }
+
+    public func notification(id: String) throws -> NotificationRecord? {
+        guard let row = try database.query("SELECT * FROM notifications WHERE id = ?", bindings: [.text(id)]).first else {
+            return nil
+        }
+        return try notification(from: row)
+    }
+
+    public func notifications(limit: Int = 20) throws -> [NotificationRecord] {
+        try database.query(
+            """
+            SELECT * FROM notifications
+            ORDER BY created_at DESC, id ASC
+            LIMIT ?
+            """,
+            bindings: [.integer(Int64(limit))]
+        ).map(notification(from:))
+    }
+
     public func upsertRule(_ rule: Rule, updatedAt: Date) throws {
         try database.execute(
             """
@@ -1500,6 +1548,19 @@ public final class StatusPersistenceStore {
             error: row.optionalText("error"),
             startedAt: ISO8601.date(from: row.requiredText("started_at")),
             finishedAt: try row.optionalText("finished_at").map(ISO8601.date(from:))
+        )
+    }
+
+    private func notification(from row: [String: SQLiteValue]) throws -> NotificationRecord {
+        try NotificationRecord(
+            id: row.requiredText("id"),
+            eventID: row.optionalText("event_id"),
+            statusItemID: row.optionalText("status_item_id"),
+            mode: NotificationMode(rawValue: row.requiredText("mode")) ?? .immediate,
+            title: row.requiredText("title"),
+            body: row.requiredText("body"),
+            deliveredAt: try row.optionalText("delivered_at").map(ISO8601.date(from:)),
+            createdAt: ISO8601.date(from: row.requiredText("created_at"))
         )
     }
 
