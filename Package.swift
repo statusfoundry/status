@@ -13,7 +13,12 @@ let package = Package(
         .library(name: "StatusUI", targets: ["StatusUI"])
     ],
     targets: [
-        .target(name: "StatusCore"),
+        .target(
+            name: "StatusCore",
+            resources: [
+                .process("Resources")
+            ]
+        ),
         .target(name: "StatusUI", dependencies: ["StatusCore"]),
         .testTarget(name: "StatusCoreTests", dependencies: ["StatusCore"])
     ]

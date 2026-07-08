@@ -1,0 +1,22 @@
+{
+  "id": "com.status.appstoreconnect",
+  "name": "App Store Connect",
+  "version": "0.1.0",
+  "author": "Status Foundry",
+  "category": "developer",
+  "description": "Read-only App Store Connect status events for apps, review state, build processing, and release readiness.",
+  "minCoreVersion": "0.1.0",
+  "platforms": [
+    "macOS",
+    "iOS"
+  ],
+  "permissions": [
+    "network",
+    "keychain",
+    "private-key",
+    "background-refresh"
+  ],
+  "domains": [
+    "api.appstoreconnect.apple.com"
+  ]
+}

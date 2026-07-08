@@ -68,14 +68,16 @@ private struct IOSRootView: View {
 
     private func makeDashboardViewModel() -> DashboardViewModel {
         DashboardViewModel {
-            try LocalStatusStore.openApplicationSupportStore().dashboardSnapshot()
+            try bootstrapBundledPlugins()
+            return try LocalStatusStore.openApplicationSupportStore().dashboardSnapshot()
         }
     }
 
     private func makePluginStoreViewModel(platform: PluginPlatform) -> PluginStoreViewModel {
         let registry = PluginRegistryClient(baseURL: registryBaseURL)
         return PluginStoreViewModel {
-            try LocalStatusStore.openApplicationSupportStore().installedPlugins()
+            try bootstrapBundledPlugins()
+            return try LocalStatusStore.openApplicationSupportStore().installedPlugins()
         } loadAvailable: {
             try await registry.plugins(platform: platform, coreVersion: "0.1.0")
         } installPlugin: { plugin in
@@ -111,7 +113,8 @@ private struct IOSRootView: View {
 
     private func makeAlertsViewModel() -> AlertsViewModel {
         AlertsViewModel {
-            try LocalStatusStore.openApplicationSupportStore()
+            try bootstrapBundledPlugins()
+            return try LocalStatusStore.openApplicationSupportStore()
                 .statusItems(limit: 50)
                 .filter { $0.severity >= .warning }
         }
@@ -119,7 +122,8 @@ private struct IOSRootView: View {
 
     private func makeRulesViewModel() -> RulesViewModel {
         RulesViewModel {
-            try LocalStatusStore.openApplicationSupportStore().rules()
+            try bootstrapBundledPlugins()
+            return try LocalStatusStore.openApplicationSupportStore().rules()
         } saveRule: { rule in
             try LocalStatusStore.openApplicationSupportStore().upsertRule(rule, updatedAt: Date())
         }
@@ -197,6 +201,7 @@ private struct IOSRootView: View {
     }
 
     private func runBackgroundPluginLoop() async {
+        try? bootstrapBundledPlugins()
         await runDueConfiguredPluginJobs()
         while Task.isCancelled == false {
             do {
@@ -223,6 +228,12 @@ private struct IOSRootView: View {
         let directory = databaseURL.deletingLastPathComponent().appendingPathComponent("Plugins", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+
+    private func bootstrapBundledPlugins() throws {
+        let store = try LocalStatusStore.openApplicationSupportStore()
+        let installer = BundledPluginInstaller(store: store, installRoot: try pluginInstallRoot())
+        try installer.installAll()
     }
 }
 

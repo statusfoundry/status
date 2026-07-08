@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2026-07-07T12:00:00Z",
+  "plugins": [
+    {
+      "id": "com.status.appstoreconnect",
+      "version": "0.1.0",
+      "trustLevel": "official",
+      "minCoreVersion": "0.1.0",
+      "platforms": [
+        "macOS",
+        "iOS"
+      ],
+      "domains": [
+        "api.appstoreconnect.apple.com"
+      ],
+      "sha256": "bdb69dcccc1baaab3dbbb3f9a40b46360596815fabfccecc2270a4c59c08337a",
+      "signature": "dev-signature:bdb69dcccc1baaab3dbbb3f9a40b46360596815fabfccecc2270a4c59c08337a",
+      "signedBy": "status-foundry-dev",
+      "releasedAt": "2026-07-07T12:00:00Z",
+      "packageResourceName": "com.status.appstoreconnect-0.1.0.statusplugin.zip",
+      "manifestResourceName": "com.status.appstoreconnect-0.1.0-manifest.json"
+    },
+    {
+      "id": "com.status.github",
+      "version": "0.1.0",
+      "trustLevel": "official",
+      "minCoreVersion": "0.1.0",
+      "platforms": [
+        "macOS",
+        "iOS"
+      ],
+      "domains": [
+        "api.github.com"
+      ],
+      "sha256": "d863c60ee2bcefb8436b028c3b1c806e16b5f1fed049502d745cf151ee63a39b",
+      "signature": "dev-signature:d863c60ee2bcefb8436b028c3b1c806e16b5f1fed049502d745cf151ee63a39b",
+      "signedBy": "status-foundry-dev",
+      "releasedAt": "2026-07-07T12:00:00Z",
+      "packageResourceName": "com.status.github-0.1.0.statusplugin.zip",
+      "manifestResourceName": "com.status.github-0.1.0-manifest.json"
+    },
+    {
+      "id": "com.status.website",
+      "version": "0.1.0",
+      "trustLevel": "official",
+      "minCoreVersion": "0.1.0",
+      "platforms": [
+        "macOS",
+        "iOS"
+      ],
+      "domains": [],
+      "sha256": "1d973370cfa0e6413b713abc8396a8596d1947ac8172cd60e55f8607f12e1c20",
+      "signature": "dev-signature:1d973370cfa0e6413b713abc8396a8596d1947ac8172cd60e55f8607f12e1c20",
+      "signedBy": "status-foundry-dev",
+      "releasedAt": "2026-07-07T12:00:00Z",
+      "packageResourceName": "com.status.website-0.1.0.statusplugin.zip",
+      "manifestResourceName": "com.status.website-0.1.0-manifest.json"
+    }
+  ]
+}

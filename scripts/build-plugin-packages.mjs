@@ -9,6 +9,7 @@ const registryDataPath = path.join(root, "workers", "registry", "src", "registry
 const artifactsPath = path.join(root, "workers", "registry", "src", "plugin-artifacts.js");
 const webRegistryPath = path.join(root, "web", "src", "generated", "registry.json");
 const packageDistRoot = path.join(root, "workers", "registry", "dist", "plugins");
+const swiftBundledPluginsRoot = path.join(root, "Sources", "StatusCore", "Resources", "BundledPlugins");
 const registryBaseURL = "https://status-registry.hakobs.com";
 const checkOnly = process.argv.includes("--check");
 
@@ -348,6 +349,8 @@ async function build() {
     .sort();
 
   const plugins = [];
+  const bundledPlugins = [];
+  const bundledResourceFiles = {};
   const artifacts = {};
 
   for (const directoryName of pluginDirectoryNames) {
@@ -397,12 +400,35 @@ async function build() {
         }
       ]
     });
+    bundledPlugins.push({
+      id: manifest.id,
+      version: manifest.version,
+      trustLevel: metadata.trustLevel,
+      minCoreVersion: manifest.minCoreVersion,
+      platforms: manifest.platforms,
+      domains: manifest.domains,
+      sha256,
+      signature,
+      signedBy: metadata.signedBy,
+      releasedAt: metadata.releasedAt,
+      packageResourceName: `${manifest.id}-${manifest.version}.statusplugin.zip`,
+      manifestResourceName: `${manifest.id}-${manifest.version}-manifest.json`
+    });
+    bundledResourceFiles[`${manifest.id}-${manifest.version}.statusplugin.zip`] = packageData;
+    bundledResourceFiles[`${manifest.id}-${manifest.version}-manifest.json`] = Buffer.from(JSON.stringify(manifest, null, 2) + "\n");
 
     const distDirectory = path.join(packageDistRoot, manifest.id, manifest.version);
     if (!checkOnly) {
       await mkdir(distDirectory, { recursive: true });
       await writeFile(path.join(distDirectory, `${manifest.id}-${manifest.version}.statusplugin.zip`), packageData);
       await writeFile(path.join(distDirectory, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+
+      await mkdir(swiftBundledPluginsRoot, { recursive: true });
+      await writeFile(path.join(swiftBundledPluginsRoot, `${manifest.id}-${manifest.version}.statusplugin.zip`), packageData);
+      await writeFile(
+        path.join(swiftBundledPluginsRoot, `${manifest.id}-${manifest.version}-manifest.json`),
+        JSON.stringify(manifest, null, 2) + "\n"
+      );
     }
   }
 
@@ -416,12 +442,22 @@ async function build() {
   })}`;
   const artifactModule = jsModule("pluginArtifacts", artifacts);
   const webRegistryJSON = JSON.stringify({ schemaVersion: "1.0.0", plugins }, null, 2) + "\n";
+  const bundledPluginIndexJSON = JSON.stringify(
+    {
+      schemaVersion: "1.0.0",
+      generatedAt: "2026-07-07T12:00:00Z",
+      plugins: bundledPlugins
+    },
+    null,
+    2
+  ) + "\n";
 
   if (checkOnly) {
-    const [currentRegistry, currentArtifacts, currentWebRegistry] = await Promise.all([
+    const [currentRegistry, currentArtifacts, currentWebRegistry, currentBundledPluginIndex] = await Promise.all([
       readFile(registryDataPath, "utf8"),
       readFile(artifactsPath, "utf8"),
-      readFile(webRegistryPath, "utf8")
+      readFile(webRegistryPath, "utf8"),
+      readFile(path.join(swiftBundledPluginsRoot, "index.json"), "utf8")
     ]);
     if (currentRegistry !== registryModule) {
       fail("workers/registry/src/registry-data.js is out of date. Run npm run plugins:build.");
@@ -432,11 +468,22 @@ async function build() {
     if (currentWebRegistry !== webRegistryJSON) {
       fail("web/src/generated/registry.json is out of date. Run npm run plugins:build.");
     }
+    if (currentBundledPluginIndex !== bundledPluginIndexJSON) {
+      fail("Sources/StatusCore/Resources/BundledPlugins/index.json is out of date. Run npm run plugins:build.");
+    }
+    for (const [resourceName, expectedData] of Object.entries(bundledResourceFiles)) {
+      const currentData = await readFile(path.join(swiftBundledPluginsRoot, resourceName));
+      if (Buffer.compare(currentData, expectedData) !== 0) {
+        fail(`Sources/StatusCore/Resources/BundledPlugins/${resourceName} is out of date. Run npm run plugins:build.`);
+      }
+    }
   } else {
     await mkdir(path.dirname(webRegistryPath), { recursive: true });
+    await mkdir(swiftBundledPluginsRoot, { recursive: true });
     await writeFile(registryDataPath, registryModule);
     await writeFile(artifactsPath, artifactModule);
     await writeFile(webRegistryPath, webRegistryJSON);
+    await writeFile(path.join(swiftBundledPluginsRoot, "index.json"), bundledPluginIndexJSON);
   }
 
   console.log(`${checkOnly ? "Checked" : "Built"} ${plugins.length} plugin package(s).`);

@@ -196,6 +196,7 @@ Secrets are never stored in the database. Store only references to Keychain entr
 Current implementation status:
 
 - macOS and iOS open the local SQLite database from Application Support at launch.
+- `StatusCore` ships generated resources for the official bundled plugins. `BundledPluginInstaller` verifies those packages with the same hash/signature metadata used by the registry and installs them into Application Support, so a fresh app can show and configure official integrations before the Cloudflare registry is reachable.
 - The dashboard renders persisted status items, events, metrics, accounts, and audit entries through `StatusPersistenceStore.dashboardSnapshot`.
 - Shared SwiftUI now includes focused read-only operational surfaces for alerts, disabled/enabled rules, audit entries, and local runtime settings. macOS exposes Overview, Integrations, Rules, Audit Log, and Settings in the sidebar; iOS exposes Overview, Alerts, Integrations, Rules, and Settings as companion tabs.
 - The app shells can run installed declarative plugin requests through `PluginRuntimeService`: load the installed package, enqueue a configured manual job from the plugin trigger, execute the queued request/mapping pipeline, persist resources/events/status items, evaluate inserted events against stored rules, dispatch safe local action effects, and write job/action audit entries. Website Uptime also has the first native setup path for a user-configured host, persisted as non-secret account configuration.

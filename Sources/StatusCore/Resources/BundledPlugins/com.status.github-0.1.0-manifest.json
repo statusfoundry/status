@@ -1,0 +1,21 @@
+{
+  "id": "com.status.github",
+  "name": "GitHub",
+  "version": "0.1.0",
+  "author": "Status Foundry",
+  "category": "developer",
+  "description": "Read-only GitHub repository events for workflow failures, pull requests, and issue activity.",
+  "minCoreVersion": "0.1.0",
+  "platforms": [
+    "macOS",
+    "iOS"
+  ],
+  "permissions": [
+    "network",
+    "keychain",
+    "background-refresh"
+  ],
+  "domains": [
+    "api.github.com"
+  ]
+}

@@ -180,6 +180,7 @@ This repository now contains a working foundation:
 - plugin manifest, event, rule, fingerprint, automation, and audit primitives;
 - SQLite schema v0 migrator and persistence store;
 - registry client, package verifier, and plugin installer;
+- bundled official plugin packages that bootstrap locally before registry access;
 - native plugin store UI that browses and installs registry plugins;
 - Vue/TypeScript/Sass website using `@sil/ui` and `bemm`;
 - public docs, plugin, and developer website pages;

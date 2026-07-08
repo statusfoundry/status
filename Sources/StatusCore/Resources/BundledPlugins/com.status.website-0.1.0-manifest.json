@@ -1,0 +1,19 @@
+{
+  "id": "com.status.website",
+  "name": "Website Uptime",
+  "version": "0.1.0",
+  "author": "Status Foundry",
+  "category": "monitoring",
+  "description": "Declarative uptime checks for sites and endpoints the user chooses to track.",
+  "minCoreVersion": "0.1.0",
+  "platforms": [
+    "macOS",
+    "iOS"
+  ],
+  "permissions": [
+    "network",
+    "user-configured-domains",
+    "background-refresh"
+  ],
+  "domains": []
+}
