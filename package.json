@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 web",
+    "dev": "vite --host 0.0.0.0 --port 4000 web",
     "build": "npm run web:build",
     "check": "npm run plugins:check && npm run docs:check && npm run typecheck && npm run web:build && npm run registry:test && npm run registry:check",
     "typecheck": "vue-tsc --noEmit",
@@ -15,7 +15,7 @@
     "plugins:validate-local": "node scripts/build-plugin-packages.mjs --local-plugin",
     "plugins:upload-r2": "node scripts/upload-plugin-artifacts-to-r2.mjs",
     "web:build": "vite build web",
-    "web:preview": "vite preview --host 0.0.0.0 --outDir web/dist",
+    "web:preview": "vite preview --host 0.0.0.0 --port 4000 --outDir web/dist",
     "registry:test": "node --test workers/registry/src/*.test.js",
     "registry:check": "WRANGLER_WRITE_LOGS=false wrangler deploy --config workers/registry/wrangler.toml --dry-run",
     "registry:deploy": "WRANGLER_WRITE_LOGS=false wrangler deploy --config workers/registry/wrangler.toml",
@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251222.0",
+    "@types/node": "^26.1.1",
     "@vitejs/plugin-vue": "^6.0.3",
     "vue-tsc": "^3.1.8",
     "wrangler": "^4.107.0"
