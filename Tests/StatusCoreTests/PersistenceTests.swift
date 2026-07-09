@@ -597,6 +597,30 @@ import Testing
     #expect(try store.rules(eventType: "app.review.rejected", accountID: nil) == [pluginRule])
 }
 
+@Test func ruleCanBeDeletedFromSQLite() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let rule = Rule(
+        id: "rule_custom_work_notifications",
+        name: "Work notifications",
+        enabled: true,
+        scope: .app,
+        accountID: "acc_work",
+        provider: "com.status.github",
+        eventType: "github.workflow.failed",
+        conditions: [RuleCondition(field: "severity", operation: .matchesSeverity, value: .string("warning"))],
+        actions: [RuleActionDefinition(action: "notification.show")]
+    )
+
+    try store.upsertRule(rule, updatedAt: now)
+    try store.deleteRule(id: rule.id)
+
+    #expect(try store.rule(id: rule.id) == nil)
+    #expect(try store.rules().isEmpty)
+}
+
 @Test func accountConfigurationDeleteRemovesAppDataAndKeepsHistory() throws {
     let database = try temporaryDatabase()
     try StatusDatabaseMigrator.migrate(database)

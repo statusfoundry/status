@@ -629,6 +629,13 @@ public final class StatusPersistenceStore {
         return try rule(from: row)
     }
 
+    public func deleteRule(id: String) throws {
+        try database.execute(
+            "DELETE FROM rules WHERE id = ?",
+            bindings: [.text(id)]
+        )
+    }
+
     public func rules() throws -> [Rule] {
         try database.query("SELECT * FROM rules ORDER BY id").map(rule(from:))
     }

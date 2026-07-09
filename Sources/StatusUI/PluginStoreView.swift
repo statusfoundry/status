@@ -84,6 +84,7 @@ public final class PluginStoreViewModel: ObservableObject {
     private let loadPluginResources: (InstalledPlugin) throws -> [Resource]
     private let loadRules: (InstalledPlugin) throws -> [Rule]
     private let saveRule: (Rule) async throws -> Void
+    private let deleteRule: (Rule) async throws -> Void
     private let loadDashboardTileFields: (InstalledPlugin, String) throws -> [String]
     private let saveDashboardTileFields: (InstalledPlugin, String, [String]) async throws -> Void
     private let installPlugin: (RegistryPluginSummary) async throws -> Void
@@ -111,6 +112,7 @@ public final class PluginStoreViewModel: ObservableObject {
         loadPluginResources: @escaping (InstalledPlugin) throws -> [Resource] = { _ in [] },
         loadRules: @escaping (InstalledPlugin) throws -> [Rule] = { _ in [] },
         saveRule: @escaping (Rule) async throws -> Void = { _ in },
+        deleteRule: @escaping (Rule) async throws -> Void = { _ in },
         loadDashboardTileFields: @escaping (InstalledPlugin, String) throws -> [String] = { _, _ in [] },
         saveDashboardTileFields: @escaping (InstalledPlugin, String, [String]) async throws -> Void = { _, _, _ in },
         installPlugin: @escaping (RegistryPluginSummary) async throws -> Void,
@@ -163,6 +165,7 @@ public final class PluginStoreViewModel: ObservableObject {
         self.loadPluginResources = loadPluginResources
         self.loadRules = loadRules
         self.saveRule = saveRule
+        self.deleteRule = deleteRule
         self.loadDashboardTileFields = loadDashboardTileFields
         self.saveDashboardTileFields = saveDashboardTileFields
         self.installPlugin = installPlugin
@@ -304,6 +307,104 @@ public final class PluginStoreViewModel: ObservableObject {
             appRule.accountID = account.id
             appRule.provider = appRule.provider ?? plugin.id
             try await saveRule(appRule)
+            refreshRules(for: [plugin])
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    public func saveAppNotificationRule(
+        for plugin: InstalledPlugin,
+        ruleID: String? = nil,
+        name: String,
+        eventType: String,
+        minimumSeverity: Severity?,
+        notificationTitle: String
+    ) async {
+        guard savingRuleID == nil else { return }
+        guard let account = selectedAccount(for: plugin) else {
+            loadError = "Save an app before editing rules."
+            return
+        }
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedEventType = eventType.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedName.isEmpty == false else {
+            loadError = "Rule name is required."
+            return
+        }
+        guard trimmedEventType.isEmpty == false else {
+            loadError = "Event type is required."
+            return
+        }
+
+        let ruleID = ruleID ?? customAppRuleID(pluginID: plugin.id, accountID: account.id, name: trimmedName)
+        savingRuleID = ruleID
+        defer { savingRuleID = nil }
+
+        do {
+            let title = notificationTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            let conditions = minimumSeverity.map {
+                [RuleCondition(field: "severity", operation: .matchesSeverity, value: .string($0.rawValue))]
+            } ?? []
+            let actions = [
+                RuleActionDefinition(action: "status.inbox.add"),
+                RuleActionDefinition(
+                    action: "notification.show",
+                    parameters: title.isEmpty ? [:] : ["title": title]
+                )
+            ]
+            try await saveRule(
+                Rule(
+                    id: ruleID,
+                    name: trimmedName,
+                    enabled: true,
+                    scope: .app,
+                    accountID: account.id,
+                    provider: plugin.id,
+                    eventType: trimmedEventType,
+                    conditions: conditions,
+                    actions: actions
+                )
+            )
+            refreshRules(for: [plugin])
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    public func setAppRule(_ rule: Rule, enabled: Bool, for plugin: InstalledPlugin) async {
+        guard savingRuleID == nil else { return }
+        guard let account = selectedAccount(for: plugin), rule.accountID == account.id else {
+            loadError = "Select the app that owns this rule before editing it."
+            return
+        }
+        savingRuleID = rule.id
+        defer { savingRuleID = nil }
+
+        do {
+            var updated = rule
+            updated.enabled = enabled
+            updated.scope = .app
+            updated.accountID = account.id
+            updated.provider = plugin.id
+            try await saveRule(updated)
+            refreshRules(for: [plugin])
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    public func deleteAppRule(_ rule: Rule, for plugin: InstalledPlugin) async {
+        guard savingRuleID == nil else { return }
+        guard let account = selectedAccount(for: plugin), rule.accountID == account.id else {
+            loadError = "Select the app that owns this rule before deleting it."
+            return
+        }
+        savingRuleID = rule.id
+        defer { savingRuleID = nil }
+
+        do {
+            try await deleteRule(rule)
             refreshRules(for: [plugin])
         } catch {
             loadError = error.localizedDescription
@@ -643,6 +744,17 @@ public final class PluginStoreViewModel: ObservableObject {
             .joined()
     }
 
+    private func customAppRuleID(pluginID: String, accountID: String, name: String) -> String {
+        let rawID = "rule_custom_\(pluginID)_\(accountID)_\(name)"
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_"))
+        return rawID
+            .lowercased()
+            .map { character in
+                String(character).rangeOfCharacter(from: allowed) == nil ? "_" : String(character)
+            }
+            .joined()
+    }
+
     private func selectedAccount(for plugin: InstalledPlugin) -> PluginAccountConfiguration? {
         guard let accountID = selectedAccountIDs[plugin.id],
               accountID.hasPrefix(Self.newAccountPrefix) == false else {
@@ -816,6 +928,28 @@ public struct PluginStoreContainerView: View {
             setRulePresetEnabled: { plugin, preset, enabled in
                 Task {
                     await viewModel.setRulePreset(preset, enabled: enabled, for: plugin)
+                }
+            },
+            saveAppNotificationRule: { plugin, ruleID, name, eventType, minimumSeverity, notificationTitle in
+                Task {
+                    await viewModel.saveAppNotificationRule(
+                        for: plugin,
+                        ruleID: ruleID,
+                        name: name,
+                        eventType: eventType,
+                        minimumSeverity: minimumSeverity,
+                        notificationTitle: notificationTitle
+                    )
+                }
+            },
+            setAppRuleEnabled: { plugin, rule, enabled in
+                Task {
+                    await viewModel.setAppRule(rule, enabled: enabled, for: plugin)
+                }
+            },
+            deleteAppRule: { plugin, rule in
+                Task {
+                    await viewModel.deleteAppRule(rule, for: plugin)
                 }
             },
             setDashboardTileField: { plugin, field, enabled in
@@ -1067,6 +1201,24 @@ public struct PluginSettingsContainerView: View {
             setRulePresetEnabled: { plugin, preset, enabled in
                 Task { await viewModel.setRulePreset(preset, enabled: enabled, for: plugin) }
             },
+            saveAppNotificationRule: { plugin, ruleID, name, eventType, minimumSeverity, notificationTitle in
+                Task {
+                    await viewModel.saveAppNotificationRule(
+                        for: plugin,
+                        ruleID: ruleID,
+                        name: name,
+                        eventType: eventType,
+                        minimumSeverity: minimumSeverity,
+                        notificationTitle: notificationTitle
+                    )
+                }
+            },
+            setAppRuleEnabled: { plugin, rule, enabled in
+                Task { await viewModel.setAppRule(rule, enabled: enabled, for: plugin) }
+            },
+            deleteAppRule: { plugin, rule in
+                Task { await viewModel.deleteAppRule(rule, for: plugin) }
+            },
             setDashboardTileField: { plugin, field, enabled in
                 Task { await viewModel.setDashboardTileField(field, enabled: enabled, for: plugin) }
             }
@@ -1204,6 +1356,9 @@ public struct PluginStoreView: View {
     private let setPermissionGrant: (InstalledPlugin, PluginPermission, Bool) -> Void
     private let setTriggerEnabled: (InstalledPlugin, TriggerDefinition, Bool) -> Void
     private let setRulePresetEnabled: (InstalledPlugin, Rule, Bool) -> Void
+    private let saveAppNotificationRule: (InstalledPlugin, String?, String, String, Severity?, String) -> Void
+    private let setAppRuleEnabled: (InstalledPlugin, Rule, Bool) -> Void
+    private let deleteAppRule: (InstalledPlugin, Rule) -> Void
     private let setDashboardTileField: (InstalledPlugin, String, Bool) -> Void
     private let openSettings: ((InstalledPlugin) -> Void)?
     private let isInstallingLocalPlugin: Bool
@@ -1264,6 +1419,9 @@ public struct PluginStoreView: View {
         setPermissionGrant: @escaping (InstalledPlugin, PluginPermission, Bool) -> Void = { _, _, _ in },
         setTriggerEnabled: @escaping (InstalledPlugin, TriggerDefinition, Bool) -> Void = { _, _, _ in },
         setRulePresetEnabled: @escaping (InstalledPlugin, Rule, Bool) -> Void = { _, _, _ in },
+        saveAppNotificationRule: @escaping (InstalledPlugin, String?, String, String, Severity?, String) -> Void = { _, _, _, _, _, _ in },
+        setAppRuleEnabled: @escaping (InstalledPlugin, Rule, Bool) -> Void = { _, _, _ in },
+        deleteAppRule: @escaping (InstalledPlugin, Rule) -> Void = { _, _ in },
         setDashboardTileField: @escaping (InstalledPlugin, String, Bool) -> Void = { _, _, _ in },
         openSettings: ((InstalledPlugin) -> Void)? = nil,
         isInstallingLocalPlugin: Bool = false,
@@ -1321,6 +1479,9 @@ public struct PluginStoreView: View {
         self.setPermissionGrant = setPermissionGrant
         self.setTriggerEnabled = setTriggerEnabled
         self.setRulePresetEnabled = setRulePresetEnabled
+        self.saveAppNotificationRule = saveAppNotificationRule
+        self.setAppRuleEnabled = setAppRuleEnabled
+        self.deleteAppRule = deleteAppRule
         self.setDashboardTileField = setDashboardTileField
         self.openSettings = openSettings
         self.isInstallingLocalPlugin = isInstallingLocalPlugin
@@ -1454,6 +1615,9 @@ public struct PluginStoreView: View {
             setPermissionGrant: setPermissionGrant,
             setTriggerEnabled: setTriggerEnabled,
             setRulePresetEnabled: setRulePresetEnabled,
+            saveAppNotificationRule: saveAppNotificationRule,
+            setAppRuleEnabled: setAppRuleEnabled,
+            deleteAppRule: deleteAppRule,
             setDashboardTileField: setDashboardTileField
         )
     }
@@ -1716,6 +1880,9 @@ private struct PluginSettingsPanel: View {
     let setPermissionGrant: (InstalledPlugin, PluginPermission, Bool) -> Void
     let setTriggerEnabled: (InstalledPlugin, TriggerDefinition, Bool) -> Void
     let setRulePresetEnabled: (InstalledPlugin, Rule, Bool) -> Void
+    let saveAppNotificationRule: (InstalledPlugin, String?, String, String, Severity?, String) -> Void
+    let setAppRuleEnabled: (InstalledPlugin, Rule, Bool) -> Void
+    let deleteAppRule: (InstalledPlugin, Rule) -> Void
     let setDashboardTileField: (InstalledPlugin, String, Bool) -> Void
     @State private var confirmsAppRemoval = false
 
@@ -1878,6 +2045,22 @@ private struct PluginSettingsPanel: View {
                             setRulePresetEnabled(plugin, preset, enabled)
                         }
                     )
+                    CustomAppRulesPanel(
+                        plugin: plugin,
+                        selectedAccountID: selectedPersistedAccountID,
+                        presets: rulePresets,
+                        appRules: appRules,
+                        savingRuleID: savingRuleID,
+                        saveRule: { ruleID, name, eventType, severity, notificationTitle in
+                            saveAppNotificationRule(plugin, ruleID, name, eventType, severity, notificationTitle)
+                        },
+                        setRuleEnabled: { rule, enabled in
+                            setAppRuleEnabled(plugin, rule, enabled)
+                        },
+                        deleteRule: { rule in
+                            deleteAppRule(plugin, rule)
+                        }
+                    )
                     VStack(spacing: 10) {
                         ForEach(setupFields, id: \.id) { field in
                             PluginSetupFieldRow(
@@ -1974,7 +2157,7 @@ private struct PluginSettingsPanel: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Status will delete this app's local configuration, schedules, app-scoped rules, notification overrides, credentials reference, and active resources. Historical events and audit entries stay in place.")
+            Text("Status will delete this app's local configuration, schedules, app-scoped rules, notification overrides, credential reference, stored credential material, and active resources. Historical events and audit entries stay in place.")
         }
     }
 
@@ -2230,6 +2413,229 @@ private struct AppRulePresetToggle: View {
         let conditionCount = preset.conditions.count
         let actionCount = preset.actions.count
         return "\(preset.eventType) · \(conditionCount) condition\(conditionCount == 1 ? "" : "s") · \(actionCount) action\(actionCount == 1 ? "" : "s")"
+    }
+}
+
+private struct CustomAppRulesPanel: View {
+    let plugin: InstalledPlugin
+    let selectedAccountID: String?
+    let presets: [Rule]
+    let appRules: [Rule]
+    let savingRuleID: String?
+    let saveRule: (String?, String, String, Severity?, String) -> Void
+    let setRuleEnabled: (Rule, Bool) -> Void
+    let deleteRule: (Rule) -> Void
+    @State private var editingRuleID: String?
+    @State private var draftName = ""
+    @State private var draftEventType = ""
+    @State private var draftSeverity = Severity.warning.rawValue
+    @State private var draftNotificationTitle = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Custom rules")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            if selectedAccountID == nil {
+                Text("Save an app before creating app-specific rules.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(customRules) { rule in
+                        CustomAppRuleRow(
+                            rule: rule,
+                            isSaving: savingRuleID == rule.id,
+                            setEnabled: { setRuleEnabled(rule, $0) },
+                            edit: { load(rule) },
+                            delete: { deleteRule(rule) }
+                        )
+                    }
+                    if customRules.isEmpty {
+                        Text("No custom rules for this app yet.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(editingRuleID == nil ? "New notification rule" : "Edit notification rule")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("Rule name", text: $draftName)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Event type", text: $draftEventType)
+                        .textFieldStyle(.roundedBorder)
+                    if eventTypeSuggestions.isEmpty == false {
+                        Picker("Known event", selection: $draftEventType) {
+                            if eventTypeSuggestions.contains(draftEventType) == false {
+                                Text(draftEventType.isEmpty ? "Custom" : "Custom: \(draftEventType)").tag(draftEventType)
+                            }
+                            ForEach(eventTypeSuggestions, id: \.self) { eventType in
+                                Text(eventType).tag(eventType)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    Picker("Minimum severity", selection: $draftSeverity) {
+                        Text("Any").tag("")
+                        ForEach(Severity.allCases, id: \.rawValue) { severity in
+                            Text(severity.rawValue.capitalized).tag(severity.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    TextField("Notification title", text: $draftNotificationTitle)
+                        .textFieldStyle(.roundedBorder)
+                    HStack {
+                        if editingRuleID != nil {
+                            Button("Cancel") {
+                                resetDraft()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        Spacer()
+                        Button {
+                            saveRule(
+                                editingRuleID,
+                                draftName,
+                                draftEventType,
+                                Severity(rawValue: draftSeverity),
+                                draftNotificationTitle
+                            )
+                            resetDraft()
+                        } label: {
+                            if let editingRuleID, savingRuleID == editingRuleID {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Label(editingRuleID == nil ? "Add Rule" : "Update Rule", systemImage: "checkmark.circle")
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draftEventType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || savingRuleID != nil)
+                    }
+                }
+                .padding(10)
+                .background(Color.statusBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .onAppear {
+            if draftEventType.isEmpty {
+                draftEventType = eventTypeSuggestions.first ?? ""
+            }
+        }
+    }
+
+    private var customRules: [Rule] {
+        guard let selectedAccountID else { return [] }
+        let presetIDs = Set(presets.map { appScopedRuleID(accountID: selectedAccountID, presetID: $0.id) })
+        return appRules
+            .filter { $0.accountID == selectedAccountID && presetIDs.contains($0.id) == false }
+            .sorted { lhs, rhs in lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending }
+    }
+
+    private var eventTypeSuggestions: [String] {
+        Array(Set((presets + appRules).map(\.eventType))).sorted { lhs, rhs in
+            lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
+        }
+    }
+
+    private func load(_ rule: Rule) {
+        editingRuleID = rule.id
+        draftName = rule.name
+        draftEventType = rule.eventType
+        draftSeverity = minimumSeverity(in: rule)?.rawValue ?? ""
+        draftNotificationTitle = rule.actions.first { $0.action == "notification.show" }?.parameters["title"] ?? ""
+    }
+
+    private func resetDraft() {
+        editingRuleID = nil
+        draftName = ""
+        draftEventType = eventTypeSuggestions.first ?? ""
+        draftSeverity = Severity.warning.rawValue
+        draftNotificationTitle = ""
+    }
+
+    private func minimumSeverity(in rule: Rule) -> Severity? {
+        for condition in rule.conditions {
+            guard condition.field == "severity",
+                  condition.operation == .matchesSeverity,
+                  case .string(let value)? = condition.value,
+                  let severity = Severity(rawValue: value) else {
+                continue
+            }
+            return severity
+        }
+        return nil
+    }
+
+    private func appScopedRuleID(accountID: String, presetID: String) -> String {
+        let rawID = "rule_app_\(plugin.id)_\(accountID)_\(presetID)"
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_"))
+        return rawID
+            .lowercased()
+            .map { character in
+                String(character).rangeOfCharacter(from: allowed) == nil ? "_" : String(character)
+            }
+            .joined()
+    }
+}
+
+private struct CustomAppRuleRow: View {
+    let rule: Rule
+    let isSaving: Bool
+    let setEnabled: (Bool) -> Void
+    let edit: () -> Void
+    let delete: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(
+                isOn: Binding(
+                    get: { rule.enabled },
+                    set: { setEnabled($0) }
+                )
+            ) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(rule.name)
+                        .font(.caption)
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            HStack(spacing: 8) {
+                Button {
+                    edit()
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                .buttonStyle(.bordered)
+                Button(role: .destructive) {
+                    delete()
+                } label: {
+                    if isSaving {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(isSaving)
+            }
+        }
+        .padding(10)
+        .background(Color.statusBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var detail: String {
+        let actionNames = rule.actions.map(\.action).joined(separator: ", ")
+        return "\(rule.eventType) - \(rule.conditions.count) condition\(rule.conditions.count == 1 ? "" : "s") - \(actionNames)"
     }
 }
 

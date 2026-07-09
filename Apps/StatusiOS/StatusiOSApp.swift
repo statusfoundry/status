@@ -132,6 +132,8 @@ private struct IOSRootView: View {
                 .filter { $0.provider == plugin.id }
         } saveRule: { rule in
             try LocalStatusStore.openApplicationSupportStore().upsertRule(rule, updatedAt: Date())
+        } deleteRule: { rule in
+            try LocalStatusStore.openApplicationSupportStore().deleteRule(id: rule.id)
         } loadDashboardTileFields: { _, accountID in
             try dashboardTileFields(accountID: accountID)
         } saveDashboardTileFields: { plugin, accountID, fields in

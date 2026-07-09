@@ -301,6 +301,80 @@ import StatusCore
 }
 
 @MainActor
+@Test func pluginStoreViewModelManagesCustomAppNotificationRules() async throws {
+    let plugin = InstalledPlugin(
+        id: "com.status.github",
+        name: "GitHub",
+        author: "Status Foundry",
+        description: "GitHub repository checks.",
+        category: "development",
+        trustLevel: .official,
+        installedVersion: "0.1.0",
+        installPath: "/tmp/com.status.github",
+        installedAt: Date(timeIntervalSince1970: 1_783_433_520),
+        updatedAt: Date(timeIntervalSince1970: 1_783_433_520)
+    )
+    let account = PluginAccountConfiguration(
+        id: "acc_work",
+        pluginID: plugin.id,
+        accountName: "Work",
+        variables: [:]
+    )
+    var storedRules: [Rule] = []
+    var deletedRuleID: String?
+    let viewModel = PluginStoreViewModel(
+        loadInstalled: { [plugin] },
+        loadAvailable: { [] },
+        loadRules: { _ in storedRules },
+        saveRule: { rule in
+            storedRules.removeAll { $0.id == rule.id }
+            storedRules.append(rule)
+        },
+        deleteRule: { rule in
+            deletedRuleID = rule.id
+            storedRules.removeAll { $0.id == rule.id }
+        },
+        installPlugin: { _ in },
+        canConfigurePlugin: { _ in true },
+        loadAccounts: { _ in [account] }
+    )
+
+    await viewModel.reload()
+    await viewModel.saveAppNotificationRule(
+        for: plugin,
+        name: "Workflow warnings",
+        eventType: "github.workflow.failed",
+        minimumSeverity: .warning,
+        notificationTitle: "Workflow needs attention"
+    )
+
+    let created = try #require(storedRules.first)
+    #expect(created.id == "rule_custom_com_status_github_acc_work_workflow_warnings")
+    #expect(created.enabled == true)
+    #expect(created.scope == .app)
+    #expect(created.accountID == account.id)
+    #expect(created.provider == plugin.id)
+    #expect(created.eventType == "github.workflow.failed")
+    #expect(created.conditions == [
+        RuleCondition(field: "severity", operation: .matchesSeverity, value: .string("warning"))
+    ])
+    #expect(created.actions == [
+        RuleActionDefinition(action: "status.inbox.add"),
+        RuleActionDefinition(action: "notification.show", parameters: ["title": "Workflow needs attention"])
+    ])
+    #expect(viewModel.appRules[plugin.id] == [created])
+
+    await viewModel.setAppRule(created, enabled: false, for: plugin)
+    let disabled = try #require(storedRules.first)
+    #expect(disabled.enabled == false)
+
+    await viewModel.deleteAppRule(disabled, for: plugin)
+    #expect(deletedRuleID == created.id)
+    #expect(storedRules.isEmpty)
+    #expect(viewModel.appRules[plugin.id]?.isEmpty == true)
+}
+
+@MainActor
 @Test func pluginStoreViewModelBuildsOAuthConnectionURL() async throws {
     let plugin = InstalledPlugin(
         id: "com.status.oauthgithub",
