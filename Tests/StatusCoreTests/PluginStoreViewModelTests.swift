@@ -522,6 +522,9 @@ import StatusCore
             storedRules.removeAll { $0.id == rule.id }
             storedRules.append(rule)
         },
+        loadActions: { _ in [
+            PackagedPluginAction(id: "jira.createIssue", label: "Create Jira issue", requiresWritePermission: true, request: "create_issue")
+        ] },
         installPlugin: { _ in },
         loadPermissions: { _ in [
             InstalledPluginPermission(id: "plp_write", pluginID: plugin.id, permission: .writeActions, granted: granted)
@@ -610,6 +613,90 @@ import StatusCore
     let saved = try #require(storedRules.first)
     #expect(saved.actions == [
         RuleActionDefinition(action: "webhook.post", parameters: ["url": "https://example.com/hooks/status"])
+    ])
+}
+
+@MainActor
+@Test func pluginStoreViewModelSavesDeclaredThirdPartyWriteActionRule() async throws {
+    let plugin = InstalledPlugin(
+        id: "com.example.linear",
+        name: "Linear",
+        author: "Example",
+        description: "Linear issue creation.",
+        category: "operations",
+        trustLevel: .verifiedThirdParty,
+        installedVersion: "0.1.0",
+        installPath: "/tmp/com.example.linear",
+        installedAt: Date(timeIntervalSince1970: 1_783_433_520),
+        updatedAt: Date(timeIntervalSince1970: 1_783_433_520)
+    )
+    let account = PluginAccountConfiguration(
+        id: "acc_linear",
+        pluginID: plugin.id,
+        accountName: "Team",
+        variables: [:]
+    )
+    let action = PackagedPluginAction(
+        id: "linear.createIssue",
+        label: "Create Linear issue",
+        requiresWritePermission: true,
+        inputSchema: PackagedPluginActionInputSchema(fields: [
+            PackagedPluginActionInputField(
+                key: "title",
+                label: "Title",
+                type: .template,
+                required: true,
+                defaultValue: "{{event.title}}"
+            )
+        ]),
+        request: "create_issue"
+    )
+    var storedRules: [Rule] = []
+    var granted = false
+    let viewModel = PluginStoreViewModel(
+        loadInstalled: { [plugin] },
+        loadAvailable: { [] },
+        loadRules: { _ in storedRules },
+        saveRule: { rule in
+            storedRules.removeAll { $0.id == rule.id }
+            storedRules.append(rule)
+        },
+        loadActions: { _ in [action] },
+        installPlugin: { _ in },
+        loadPermissions: { _ in [
+            InstalledPluginPermission(id: "plp_write", pluginID: plugin.id, permission: .writeActions, granted: granted)
+        ] },
+        canConfigurePlugin: { _ in true },
+        loadAccounts: { _ in [account] }
+    )
+
+    await viewModel.reload()
+    await viewModel.saveCustomAppRule(
+        for: plugin,
+        name: "Linear workflow failures",
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [RuleActionDefinition(action: "linear.createIssue", parameters: ["title": "{{event.title}}"])]
+    )
+
+    #expect(storedRules.isEmpty)
+    #expect(viewModel.loadError == "Grant Write actions permission before saving this rule.")
+
+    granted = true
+    await viewModel.reload()
+    await viewModel.saveCustomAppRule(
+        for: plugin,
+        name: "Linear workflow failures",
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [RuleActionDefinition(action: "linear.createIssue", parameters: ["title": "{{event.title}}"])]
+    )
+
+    let saved = try #require(storedRules.first)
+    #expect(saved.provider == plugin.id)
+    #expect(saved.accountID == account.id)
+    #expect(saved.actions == [
+        RuleActionDefinition(action: "linear.createIssue", parameters: ["title": "{{event.title}}"])
     ])
 }
 

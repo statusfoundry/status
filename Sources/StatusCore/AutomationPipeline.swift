@@ -36,7 +36,11 @@ public final class AutomationPipeline {
         let cursor = actionRunner.effects.cursor()
 
         for match in matches {
-            for result in actionRunner.run(match, reviewPermissionGranted: reviewPermissionGranted) {
+            for result in actionRunner.run(
+                match,
+                reviewPermissionGranted: reviewPermissionGranted,
+                safetyLevel: actionSafetyLevel
+            ) {
                 try store.upsertActionRun(result.actionRun)
                 try store.insertAuditEntry(result.auditEntry)
                 actionResults.append(result)
@@ -171,7 +175,7 @@ public final class AutomationPipeline {
     }
 
     private func reviewPermissionGranted(rule: Rule, action: RuleActionDefinition) -> Bool {
-        guard ActionRunner.safetyLevel(for: action.action) == .reviewRequired else {
+        guard actionSafetyLevel(for: action) == .reviewRequired else {
             return false
         }
         let provider: String?
@@ -184,6 +188,27 @@ public final class AutomationPipeline {
         return ((try? store.pluginPermissions(pluginID: provider)) ?? []).contains { permission in
             permission.permission == .writeActions && permission.granted
         }
+    }
+
+    private func actionSafetyLevel(for action: RuleActionDefinition) -> ActionSafetyLevel {
+        guard let actionDeclaration = providerActionDeclaration(action.action) else {
+            return ActionRunner.safetyLevel(for: action.action)
+        }
+        return ActionRunner.safetyLevel(for: actionDeclaration)
+    }
+
+    private func providerActionDeclaration(_ action: String) -> PackagedPluginAction? {
+        guard let plugins = try? store.installedPlugins() else {
+            return nil
+        }
+        for plugin in plugins where plugin.enabled {
+            guard let definition = try? store.installedPluginDefinition(pluginID: plugin.id),
+                  let declaration = definition.actions.first(where: { $0.id == action }) else {
+                continue
+            }
+            return declaration
+        }
+        return nil
     }
 
     private func providerDeclaringAction(_ action: String) -> String? {

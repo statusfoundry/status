@@ -263,6 +263,59 @@ import Testing
     ])
 }
 
+@Test func automationPipelineExecutesDeclaredThirdPartyProviderAction() async throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_530)
+    let event = workflowFailedEvent(provider: "com.example.linear")
+    let rule = Rule(
+        id: "rul_create_linear",
+        name: "Create Linear issue",
+        enabled: true,
+        provider: "com.example.linear",
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [
+            RuleActionDefinition(action: "linear.createIssue", parameters: ["title": "{{event.title}}"])
+        ]
+    )
+    try installActionPlugin(
+        provider: "com.example.linear",
+        store: store,
+        at: now,
+        actions: [
+            PackagedPluginAction(id: "linear.createIssue", label: "Create issue", requiresWritePermission: true, request: "create_issue")
+        ],
+        requests: PackagedPluginRequests(requests: [
+            "create_issue": PackagedPluginRequest(method: "POST", url: "https://api.linear.app/graphql")
+        ])
+    )
+    try store.setPluginPermission(pluginID: "com.example.linear", permission: .writeActions, granted: true, grantedAt: now)
+    let executor = RecordingProviderActionExecutor(result: ["issue_id": "LIN-1"])
+    let pipeline = AutomationPipeline(
+        store: store,
+        actionRunner: ActionRunner(now: { now }),
+        providerActionExecutor: executor
+    )
+
+    let result = try await pipeline.process(event: event, rules: [rule])
+
+    let actionRun = try #require(result.actionResults.first?.actionRun)
+    let storedActionRun = try #require(try store.actionRun(id: actionRun.id))
+    #expect(storedActionRun.status == .success)
+    #expect(storedActionRun.result == ["issue_id": "LIN-1"])
+    #expect(executor.actions == [
+        ActionRuntimeProviderAction(
+            actionRunID: actionRun.id,
+            action: "linear.createIssue",
+            provider: event.provider,
+            parameters: ["title": "Workflow failed"],
+            event: event
+        )
+    ])
+}
+
 @Test func actionWebhookRequestBuilderCreatesJSONPostRequest() throws {
     let url = try #require(URL(string: "https://example.com/hooks/status"))
     let request = try ActionWebhookRequestBuilder().request(
@@ -384,6 +437,7 @@ private func installActionPlugin(
     requests: PackagedPluginRequests = PackagedPluginRequests()
 ) throws {
     let hasRequests = requests.requests.isEmpty == false
+    let packagePath = try actionPluginPackagePath(provider: provider, actions: actions, requests: requests)
     let manifest = PluginManifest(
         id: provider,
         name: provider,
@@ -401,6 +455,7 @@ private func installActionPlugin(
             manifest: manifest,
             trustLevel: .official,
             installPath: "/tmp/\(provider)",
+            packagePath: packagePath,
             verification: PluginPackageVerificationResult(
                 pluginID: provider,
                 version: manifest.version,
@@ -413,9 +468,124 @@ private func installActionPlugin(
     )
 }
 
+private func actionPluginPackagePath(
+    provider: String,
+    actions: [PackagedPluginAction],
+    requests: PackagedPluginRequests
+) throws -> String? {
+    guard actions.isEmpty == false || requests.requests.isEmpty == false else {
+        return nil
+    }
+    var files: [(String, Data)] = []
+    if requests.requests.isEmpty == false {
+        let requestObjects = requests.requests.mapValues { request in
+            [
+                "method": request.method,
+                "url": request.url
+            ]
+        }
+        files.append((
+            "requests.json",
+            try JSONSerialization.data(withJSONObject: ["requests": requestObjects], options: [.sortedKeys])
+        ))
+    }
+    if actions.isEmpty == false {
+        let actionObjects = actions.map { action in
+            [
+                "id": action.id,
+                "label": action.label,
+                "requiresWritePermission": action.requiresWritePermission,
+                "request": action.request
+            ] as [String: Any]
+        }
+        files.append((
+            "actions.json",
+            try JSONSerialization.data(withJSONObject: ["actions": actionObjects], options: [.sortedKeys])
+        ))
+    }
+    let packageURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("\(provider)-\(UUID().uuidString).statusplugin.zip")
+    try automationStoredZip(files: files).write(to: packageURL)
+    return packageURL.path
+}
+
 private func temporaryDatabase() throws -> SQLiteDatabase {
     let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("status-\(UUID().uuidString).sqlite")
         .path
     return try SQLiteDatabase(path: path)
+}
+
+private func automationStoredZip(files: [(String, Data)]) -> Data {
+    var archive = Data()
+    var centralDirectory = Data()
+    var offset: UInt32 = 0
+
+    for (name, data) in files {
+        let nameData = Data(name.utf8)
+        var localHeader = Data()
+        localHeader.appendUInt32LE(0x0403_4b50)
+        localHeader.appendUInt16LE(20)
+        localHeader.appendUInt16LE(0)
+        localHeader.appendUInt16LE(0)
+        localHeader.appendUInt16LE(0)
+        localHeader.appendUInt16LE(0)
+        localHeader.appendUInt32LE(0)
+        localHeader.appendUInt32LE(UInt32(data.count))
+        localHeader.appendUInt32LE(UInt32(data.count))
+        localHeader.appendUInt16LE(UInt16(nameData.count))
+        localHeader.appendUInt16LE(0)
+        localHeader.append(nameData)
+
+        var centralHeader = Data()
+        centralHeader.appendUInt32LE(0x0201_4b50)
+        centralHeader.appendUInt16LE(20)
+        centralHeader.appendUInt16LE(20)
+        centralHeader.appendUInt16LE(0)
+        centralHeader.appendUInt16LE(0)
+        centralHeader.appendUInt16LE(0)
+        centralHeader.appendUInt16LE(0)
+        centralHeader.appendUInt32LE(0)
+        centralHeader.appendUInt32LE(UInt32(data.count))
+        centralHeader.appendUInt32LE(UInt32(data.count))
+        centralHeader.appendUInt16LE(UInt16(nameData.count))
+        centralHeader.appendUInt16LE(0)
+        centralHeader.appendUInt16LE(0)
+        centralHeader.appendUInt16LE(0)
+        centralHeader.appendUInt16LE(0)
+        centralHeader.appendUInt32LE(0)
+        centralHeader.appendUInt32LE(offset)
+        centralHeader.append(nameData)
+
+        archive.append(localHeader)
+        archive.append(data)
+        centralDirectory.append(centralHeader)
+        offset += UInt32(localHeader.count + data.count)
+    }
+
+    let centralOffset = UInt32(archive.count)
+    archive.append(centralDirectory)
+    archive.appendUInt32LE(0x0605_4b50)
+    archive.appendUInt16LE(0)
+    archive.appendUInt16LE(0)
+    archive.appendUInt16LE(UInt16(files.count))
+    archive.appendUInt16LE(UInt16(files.count))
+    archive.appendUInt32LE(UInt32(centralDirectory.count))
+    archive.appendUInt32LE(centralOffset)
+    archive.appendUInt16LE(0)
+    return archive
+}
+
+private extension Data {
+    mutating func appendUInt16LE(_ value: UInt16) {
+        append(UInt8(value & 0xff))
+        append(UInt8((value >> 8) & 0xff))
+    }
+
+    mutating func appendUInt32LE(_ value: UInt32) {
+        append(UInt8(value & 0xff))
+        append(UInt8((value >> 8) & 0xff))
+        append(UInt8((value >> 16) & 0xff))
+        append(UInt8((value >> 24) & 0xff))
+    }
 }

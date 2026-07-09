@@ -262,10 +262,18 @@ public final class ActionRunner {
 
     public func run(
         _ match: RuleMatch,
-        reviewPermissionGranted: (Rule, RuleActionDefinition) -> Bool = { _, _ in false }
+        reviewPermissionGranted: (Rule, RuleActionDefinition) -> Bool = { _, _ in false },
+        safetyLevel: (RuleActionDefinition) -> ActionSafetyLevel = { ActionRunner.safetyLevel(for: $0.action) }
     ) -> [ActionExecutionResult] {
         match.actions.enumerated().map { index, action in
-            run(action, at: index, rule: match.rule, event: match.event, reviewPermissionGranted: reviewPermissionGranted)
+            run(
+                action,
+                at: index,
+                rule: match.rule,
+                event: match.event,
+                reviewPermissionGranted: reviewPermissionGranted,
+                safetyLevel: safetyLevel
+            )
         }
     }
 
@@ -273,11 +281,28 @@ public final class ActionRunner {
         switch action {
         case "notification.show", "status.inbox.add", "status.open_url", "audit.note":
             return .safe
-        case "webhook.post", "jira.createIssue", "github.createIssue", "github.comment", "email.createDraft":
+        case "webhook.post":
             return .reviewRequired
         default:
             return .unsupported
         }
+    }
+
+    public static func safetyLevel(for action: String, declaredActions: [PackagedPluginAction]) -> ActionSafetyLevel {
+        guard let declaration = declaredActions.first(where: { $0.id == action }) else {
+            return safetyLevel(for: action)
+        }
+        return safetyLevel(for: declaration)
+    }
+
+    public static func safetyLevel(for declaration: PackagedPluginAction) -> ActionSafetyLevel {
+        if declaration.safety == .dangerous {
+            return .dangerous
+        }
+        if declaration.safety == .unsupported {
+            return .unsupported
+        }
+        return .reviewRequired
     }
 
     private func run(
@@ -285,7 +310,8 @@ public final class ActionRunner {
         at index: Int,
         rule: Rule,
         event: Event,
-        reviewPermissionGranted: (Rule, RuleActionDefinition) -> Bool
+        reviewPermissionGranted: (Rule, RuleActionDefinition) -> Bool,
+        safetyLevel: (RuleActionDefinition) -> ActionSafetyLevel
     ) -> ActionExecutionResult {
         let startedAt = now()
         let runID = "run_\(rule.id)_\(event.id)_\(index)"
@@ -293,7 +319,7 @@ public final class ActionRunner {
         var result: [String: String] = [:]
         var error: String?
 
-        switch Self.safetyLevel(for: definition.action) {
+        switch safetyLevel(definition) {
         case .safe:
             do {
                 result = try performSafeAction(definition, event: event, actionRunID: runID)

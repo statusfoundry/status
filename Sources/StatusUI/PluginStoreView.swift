@@ -302,7 +302,7 @@ public final class PluginStoreViewModel: ObservableObject {
             loadError = "Save an app before enabling suggested rules."
             return
         }
-        if enabled, requiresWritePermission(preset.actions), hasGrantedPermission(.writeActions, for: plugin) == false {
+        if enabled, requiresWritePermission(preset.actions, for: plugin), hasGrantedPermission(.writeActions, for: plugin) == false {
             loadError = "Grant Write actions permission before enabling this rule."
             return
         }
@@ -381,11 +381,11 @@ public final class PluginStoreViewModel: ObservableObject {
             loadError = "At least one action is required."
             return
         }
-        if let unsupportedAction = actions.first(where: { ActionRunner.safetyLevel(for: $0.action) == .unsupported }) {
+        if let unsupportedAction = actions.first(where: { actionSafetyLevel(for: $0, plugin: plugin) == .unsupported }) {
             loadError = "\(unsupportedAction.action) is not supported by Status."
             return
         }
-        if requiresWritePermission(actions), hasGrantedPermission(.writeActions, for: plugin) == false {
+        if requiresWritePermission(actions, for: plugin), hasGrantedPermission(.writeActions, for: plugin) == false {
             loadError = "Grant Write actions permission before saving this rule."
             return
         }
@@ -803,8 +803,12 @@ public final class PluginStoreViewModel: ObservableObject {
             .joined()
     }
 
-    private func requiresWritePermission(_ actions: [RuleActionDefinition]) -> Bool {
-        actions.contains { ActionRunner.safetyLevel(for: $0.action) == .reviewRequired }
+    private func requiresWritePermission(_ actions: [RuleActionDefinition], for plugin: InstalledPlugin) -> Bool {
+        actions.contains { actionSafetyLevel(for: $0, plugin: plugin) == .reviewRequired }
+    }
+
+    private func actionSafetyLevel(for action: RuleActionDefinition, plugin: InstalledPlugin) -> ActionSafetyLevel {
+        ActionRunner.safetyLevel(for: action.action, declaredActions: pluginActions[plugin.id, default: []])
     }
 
     private func hasGrantedPermission(_ permission: PluginPermission, for plugin: InstalledPlugin) -> Bool {
@@ -2104,6 +2108,7 @@ private struct PluginSettingsPanel: View {
                         plugin: plugin,
                         selectedAccountID: selectedPersistedAccountID,
                         permissions: permissions,
+                        availableActions: actions,
                         presets: rulePresets,
                         appRules: appRules,
                         savingRuleID: savingRuleID,
@@ -2391,6 +2396,7 @@ private struct AppRulePresetsPanel: View {
     let plugin: InstalledPlugin
     let selectedAccountID: String?
     let permissions: [InstalledPluginPermission]
+    let availableActions: [PackagedPluginAction]
     let presets: [Rule]
     let appRules: [Rule]
     let savingRuleID: String?
@@ -2418,6 +2424,7 @@ private struct AppRulePresetsPanel: View {
                             selectedAccountID: selectedAccountID,
                             hasWritePermission: hasWritePermission,
                             savingRuleID: savingRuleID,
+                            actionSafetyLevel: actionSafetyLevel,
                             update: { enabled in
                                 setEnabled(preset, enabled)
                             }
@@ -2439,6 +2446,10 @@ private struct AppRulePresetsPanel: View {
         }
     }
 
+    private func actionSafetyLevel(for action: RuleActionDefinition) -> ActionSafetyLevel {
+        ActionRunner.safetyLevel(for: action.action, declaredActions: availableActions)
+    }
+
     private func appScopedRuleID(accountID: String, presetID: String) -> String {
         let rawID = "rule_app_\(plugin.id)_\(accountID)_\(presetID)"
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_"))
@@ -2458,6 +2469,7 @@ private struct AppRulePresetToggle: View {
     let selectedAccountID: String?
     let hasWritePermission: Bool
     let savingRuleID: String?
+    let actionSafetyLevel: (RuleActionDefinition) -> ActionSafetyLevel
     let update: (Bool) -> Void
 
     var body: some View {
@@ -2482,7 +2494,8 @@ private struct AppRulePresetToggle: View {
                 RuleReviewPreview(
                     ruleName: preset.name,
                     actions: preset.actions,
-                    hasWritePermission: hasWritePermission
+                    hasWritePermission: hasWritePermission,
+                    actionSafetyLevel: actionSafetyLevel
                 )
             }
         }
@@ -2496,7 +2509,7 @@ private struct AppRulePresetToggle: View {
     }
 
     private var requiresWritePermission: Bool {
-        preset.actions.contains { ActionRunner.safetyLevel(for: $0.action) == .reviewRequired }
+        preset.actions.contains { actionSafetyLevel($0) == .reviewRequired }
     }
 }
 
@@ -2611,7 +2624,8 @@ private struct CustomAppRulesPanel: View {
                     RuleReviewPreview(
                         ruleName: draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "this rule" : draftName,
                         actions: draftRuleActions,
-                        hasWritePermission: hasWritePermission
+                        hasWritePermission: hasWritePermission,
+                        actionSafetyLevel: actionSafetyLevel
                     )
                     HStack {
                         if editingRuleID != nil {
@@ -2673,7 +2687,7 @@ private struct CustomAppRulesPanel: View {
     }
 
     private var requiresWritePermission: Bool {
-        draftRuleActions.contains { ActionRunner.safetyLevel(for: $0.action) == .reviewRequired }
+        draftRuleActions.contains { actionSafetyLevel(for: $0) == .reviewRequired }
     }
 
     private var hasWritePermission: Bool {
@@ -2696,6 +2710,10 @@ private struct CustomAppRulesPanel: View {
 
     private func actionDefinition(for actionID: String) -> PackagedPluginAction? {
         availableActions.first { $0.id == actionID }
+    }
+
+    private func actionSafetyLevel(for action: RuleActionDefinition) -> ActionSafetyLevel {
+        ActionRunner.safetyLevel(for: action.action, declaredActions: availableActions)
     }
 
     private func load(_ rule: Rule) {
@@ -3049,6 +3067,9 @@ private struct RuleReviewPreview: View {
     let ruleName: String
     let actions: [RuleActionDefinition]
     let hasWritePermission: Bool
+    var actionSafetyLevel: (RuleActionDefinition) -> ActionSafetyLevel = {
+        ActionRunner.safetyLevel(for: $0.action)
+    }
 
     var body: some View {
         if reviewRequiredActions.isEmpty == false {
@@ -3073,7 +3094,7 @@ private struct RuleReviewPreview: View {
     }
 
     private var reviewRequiredActions: [RuleActionDefinition] {
-        actions.filter { ActionRunner.safetyLevel(for: $0.action) == .reviewRequired }
+        actions.filter { actionSafetyLevel($0) == .reviewRequired }
     }
 
     private var permissionText: String {
