@@ -55,6 +55,49 @@ import StatusCore
 }
 
 @MainActor
+@Test func pluginStoreViewModelLoadsPluginActionDefinitions() async throws {
+    let plugin = InstalledPlugin(
+        id: "com.status.jira",
+        name: "Jira",
+        author: "Status Foundry",
+        description: "Jira issue creation.",
+        category: "operations",
+        trustLevel: .official,
+        installedVersion: "0.1.0",
+        installPath: "/tmp/com.status.jira",
+        installedAt: Date(timeIntervalSince1970: 1_783_433_520),
+        updatedAt: Date(timeIntervalSince1970: 1_783_433_520)
+    )
+    let action = PackagedPluginAction(
+        id: "jira.createIssue",
+        label: "Create Jira issue",
+        description: "Create a reviewed Jira issue.",
+        requiresWritePermission: true,
+        safety: .reviewRequired,
+        inputSchema: PackagedPluginActionInputSchema(fields: [
+            PackagedPluginActionInputField(
+                key: "summary",
+                label: "Summary",
+                type: .template,
+                required: true,
+                defaultValue: "{{event.title}}"
+            )
+        ]),
+        request: "create_issue"
+    )
+    let viewModel = PluginStoreViewModel(
+        loadInstalled: { [plugin] },
+        loadAvailable: { [] },
+        loadActions: { _ in [action] },
+        installPlugin: { _ in }
+    )
+
+    await viewModel.reload()
+
+    #expect(viewModel.pluginActions[plugin.id] == [action])
+}
+
+@MainActor
 @Test func pluginStoreViewModelTestsConfiguredPluginRequest() async throws {
     let plugin = InstalledPlugin(
         id: "com.status.github",

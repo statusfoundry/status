@@ -60,6 +60,8 @@ private struct MacPluginSettingsWindow: View {
             try LocalStatusStore.openApplicationSupportStore().upsertRule(rule, updatedAt: Date())
         } deleteRule: { rule in
             try LocalStatusStore.openApplicationSupportStore().deleteRule(id: rule.id)
+        } loadActions: { plugin in
+            try LocalStatusStore.openApplicationSupportStore().installedPluginDefinition(pluginID: plugin.id)?.actions ?? []
         } loadDashboardTileFields: { _, accountID in
             try dashboardTileFields(accountID: accountID)
         } saveDashboardTileFields: { plugin, accountID, fields in
@@ -524,6 +526,8 @@ private struct MacRootView: View {
             try LocalStatusStore.openApplicationSupportStore().upsertRule(rule, updatedAt: Date())
         } deleteRule: { rule in
             try LocalStatusStore.openApplicationSupportStore().deleteRule(id: rule.id)
+        } loadActions: { plugin in
+            try LocalStatusStore.openApplicationSupportStore().installedPluginDefinition(pluginID: plugin.id)?.actions ?? []
         } loadDashboardTileFields: { _, accountID in
             try dashboardTileFields(accountID: accountID)
         } saveDashboardTileFields: { plugin, accountID, fields in

@@ -64,6 +64,7 @@ public final class PluginStoreViewModel: ObservableObject {
     @Published public private(set) var savingPermissionID: String?
     @Published public private(set) var installedTriggers: [String: [TriggerDefinition]]
     @Published public private(set) var savingTriggerID: String?
+    @Published public private(set) var pluginActions: [String: [PackagedPluginAction]]
     @Published public private(set) var runtimeStatuses: [String: PluginRuntimeStatus]
     @Published public private(set) var pluginResources: [String: [Resource]]
     @Published public private(set) var rulePresets: [String: [Rule]]
@@ -85,6 +86,7 @@ public final class PluginStoreViewModel: ObservableObject {
     private let loadRules: (InstalledPlugin) throws -> [Rule]
     private let saveRule: (Rule) async throws -> Void
     private let deleteRule: (Rule) async throws -> Void
+    private let loadActions: (InstalledPlugin) throws -> [PackagedPluginAction]
     private let loadDashboardTileFields: (InstalledPlugin, String) throws -> [String]
     private let saveDashboardTileFields: (InstalledPlugin, String, [String]) async throws -> Void
     private let installPlugin: (RegistryPluginSummary) async throws -> Void
@@ -113,6 +115,7 @@ public final class PluginStoreViewModel: ObservableObject {
         loadRules: @escaping (InstalledPlugin) throws -> [Rule] = { _ in [] },
         saveRule: @escaping (Rule) async throws -> Void = { _ in },
         deleteRule: @escaping (Rule) async throws -> Void = { _ in },
+        loadActions: @escaping (InstalledPlugin) throws -> [PackagedPluginAction] = { _ in [] },
         loadDashboardTileFields: @escaping (InstalledPlugin, String) throws -> [String] = { _, _ in [] },
         saveDashboardTileFields: @escaping (InstalledPlugin, String, [String]) async throws -> Void = { _, _, _ in },
         installPlugin: @escaping (RegistryPluginSummary) async throws -> Void,
@@ -147,6 +150,7 @@ public final class PluginStoreViewModel: ObservableObject {
         self.removingAccountID = nil
         self.installedPermissions = [:]
         self.installedTriggers = [:]
+        self.pluginActions = [:]
         self.runtimeStatuses = [:]
         self.pluginResources = [:]
         self.rulePresets = [:]
@@ -166,6 +170,7 @@ public final class PluginStoreViewModel: ObservableObject {
         self.loadRules = loadRules
         self.saveRule = saveRule
         self.deleteRule = deleteRule
+        self.loadActions = loadActions
         self.loadDashboardTileFields = loadDashboardTileFields
         self.saveDashboardTileFields = saveDashboardTileFields
         self.installPlugin = installPlugin
@@ -194,6 +199,7 @@ public final class PluginStoreViewModel: ObservableObject {
             refreshSetupValues(for: installed)
             refreshPermissions(for: installed)
             refreshTriggers(for: installed)
+            refreshPluginActions(for: installed)
             refreshRuntimeStatuses(for: installed)
             refreshPluginResources(for: installed)
             refreshRules(for: installed)
@@ -206,6 +212,7 @@ public final class PluginStoreViewModel: ObservableObject {
             refreshSetupValues(for: installed)
             refreshPermissions(for: installed)
             refreshTriggers(for: installed)
+            refreshPluginActions(for: installed)
             refreshRuntimeStatuses(for: installed)
             refreshPluginResources(for: installed)
             refreshRules(for: installed)
@@ -251,6 +258,7 @@ public final class PluginStoreViewModel: ObservableObject {
             selectedAccountIDs[plugin.id] = nil
             installedPermissions[plugin.id] = nil
             installedTriggers[plugin.id] = nil
+            pluginActions[plugin.id] = nil
             runtimeStatuses[plugin.id] = nil
             pluginResources[plugin.id] = nil
             rulePresets[plugin.id] = nil
@@ -720,6 +728,12 @@ public final class PluginStoreViewModel: ObservableObject {
         })
     }
 
+    private func refreshPluginActions(for plugins: [InstalledPlugin]) {
+        pluginActions = Dictionary(uniqueKeysWithValues: plugins.map { plugin in
+            (plugin.id, (try? loadActions(plugin)) ?? [])
+        })
+    }
+
     private func refreshRuntimeStatuses(for plugins: [InstalledPlugin]) {
         runtimeStatuses = (try? loadRuntimeStatuses(plugins)) ?? [:]
     }
@@ -900,6 +914,7 @@ public struct PluginStoreContainerView: View {
             pluginResources: viewModel.pluginResources,
             rulePresets: viewModel.rulePresets,
             appRules: viewModel.appRules,
+            pluginActions: viewModel.pluginActions,
             savingRuleID: viewModel.savingRuleID,
             dashboardTileFields: viewModel.dashboardTileFields,
             savingDashboardTileFieldKey: viewModel.savingDashboardTileFieldKey,
@@ -1193,6 +1208,7 @@ public struct PluginSettingsContainerView: View {
             resources: viewModel.pluginResources[plugin.id, default: []],
             rulePresets: viewModel.rulePresets[plugin.id, default: []],
             appRules: viewModel.appRules[plugin.id, default: []],
+            actions: viewModel.pluginActions[plugin.id, default: []],
             savingRuleID: viewModel.savingRuleID,
             selectedDashboardTileFields: viewModel.dashboardTileFields[key, default: []],
             savingDashboardTileFieldKey: viewModel.savingDashboardTileFieldKey,
@@ -1376,6 +1392,7 @@ public struct PluginStoreView: View {
     private let pluginResources: [String: [Resource]]
     private let rulePresets: [String: [Rule]]
     private let appRules: [String: [Rule]]
+    private let pluginActions: [String: [PackagedPluginAction]]
     private let savingRuleID: String?
     private let dashboardTileFields: [String: [String]]
     private let savingDashboardTileFieldKey: String?
@@ -1439,6 +1456,7 @@ public struct PluginStoreView: View {
         pluginResources: [String: [Resource]] = [:],
         rulePresets: [String: [Rule]] = [:],
         appRules: [String: [Rule]] = [:],
+        pluginActions: [String: [PackagedPluginAction]] = [:],
         savingRuleID: String? = nil,
         dashboardTileFields: [String: [String]] = [:],
         savingDashboardTileFieldKey: String? = nil,
@@ -1499,6 +1517,7 @@ public struct PluginStoreView: View {
         self.pluginResources = pluginResources
         self.rulePresets = rulePresets
         self.appRules = appRules
+        self.pluginActions = pluginActions
         self.savingRuleID = savingRuleID
         self.dashboardTileFields = dashboardTileFields
         self.savingDashboardTileFieldKey = savingDashboardTileFieldKey
@@ -1629,6 +1648,7 @@ public struct PluginStoreView: View {
             resources: pluginResources[plugin.id, default: []],
             rulePresets: rulePresets[plugin.id, default: []],
             appRules: appRules[plugin.id, default: []],
+            actions: pluginActions[plugin.id, default: []],
             savingRuleID: savingRuleID,
             selectedDashboardTileFields: dashboardTileFields[setupKey(pluginID: plugin.id, accountID: selectedAccountID), default: []],
             savingDashboardTileFieldKey: savingDashboardTileFieldKey,
@@ -1896,6 +1916,7 @@ private struct PluginSettingsPanel: View {
     let resources: [Resource]
     let rulePresets: [Rule]
     let appRules: [Rule]
+    let actions: [PackagedPluginAction]
     let savingRuleID: String?
     let selectedDashboardTileFields: [String]
     let savingDashboardTileFieldKey: String?
@@ -2094,6 +2115,7 @@ private struct PluginSettingsPanel: View {
                         plugin: plugin,
                         selectedAccountID: selectedPersistedAccountID,
                         permissions: permissions,
+                        availableActions: actions,
                         presets: rulePresets,
                         appRules: appRules,
                         savingRuleID: savingRuleID,
@@ -2482,6 +2504,7 @@ private struct CustomAppRulesPanel: View {
     let plugin: InstalledPlugin
     let selectedAccountID: String?
     let permissions: [InstalledPluginPermission]
+    let availableActions: [PackagedPluginAction]
     let presets: [Rule]
     let appRules: [Rule]
     let savingRuleID: String?
@@ -2571,6 +2594,7 @@ private struct CustomAppRulesPanel: View {
                         ForEach($draftActions) { $action in
                             CustomRuleActionDraftRow(
                                 action: $action,
+                                availableActions: availableActions,
                                 canDelete: draftActions.count > 1,
                                 delete: {
                                     draftActions.removeAll { $0.id == action.id }
@@ -2586,7 +2610,7 @@ private struct CustomAppRulesPanel: View {
                     }
                     RuleReviewPreview(
                         ruleName: draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "this rule" : draftName,
-                        actions: actions,
+                        actions: draftRuleActions,
                         hasWritePermission: hasWritePermission
                     )
                     HStack {
@@ -2603,7 +2627,7 @@ private struct CustomAppRulesPanel: View {
                                 draftName,
                                 draftEventType,
                                 conditions,
-                                actions
+                                draftRuleActions
                             )
                             resetDraft()
                         } label: {
@@ -2634,20 +2658,22 @@ private struct CustomAppRulesPanel: View {
         draftConditions.compactMap(\.ruleCondition)
     }
 
-    private var actions: [RuleActionDefinition] {
-        draftActions.compactMap(\.ruleAction)
+    private var draftRuleActions: [RuleActionDefinition] {
+        draftActions.compactMap { draft in
+            draft.ruleAction(actionDefinition: actionDefinition(for: draft.action))
+        }
     }
 
     private var isDraftValid: Bool {
         draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false &&
             draftEventType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false &&
             draftConditions.allSatisfy(\.isValid) &&
-            draftActions.allSatisfy(\.isValid) &&
-            actions.isEmpty == false
+            draftActions.allSatisfy { $0.isValid(actionDefinition: actionDefinition(for: $0.action)) } &&
+            draftRuleActions.isEmpty == false
     }
 
     private var requiresWritePermission: Bool {
-        actions.contains { ActionRunner.safetyLevel(for: $0.action) == .reviewRequired }
+        draftRuleActions.contains { ActionRunner.safetyLevel(for: $0.action) == .reviewRequired }
     }
 
     private var hasWritePermission: Bool {
@@ -2666,6 +2692,10 @@ private struct CustomAppRulesPanel: View {
         Array(Set((presets + appRules).map(\.eventType))).sorted { lhs, rhs in
             lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
         }
+    }
+
+    private func actionDefinition(for actionID: String) -> PackagedPluginAction? {
+        availableActions.first { $0.id == actionID }
     }
 
     private func load(_ rule: Rule) {
@@ -2765,6 +2795,7 @@ private struct CustomRuleActionDraft: Identifiable, Equatable {
     var id = UUID()
     var action: String = "notification.show"
     var value: String = ""
+    var parameters: [String: String] = [:]
 
     init() {}
 
@@ -2775,6 +2806,7 @@ private struct CustomRuleActionDraft: Identifiable, Equatable {
 
     init(action definition: RuleActionDefinition) {
         action = definition.action
+        parameters = definition.parameters
         switch definition.action {
         case "notification.show":
             value = definition.parameters["title"] ?? ""
@@ -2789,16 +2821,33 @@ private struct CustomRuleActionDraft: Identifiable, Equatable {
         }
     }
 
-    var isValid: Bool {
-        guard Self.availableActions.contains(action) else { return false }
+    func isValid(actionDefinition: PackagedPluginAction?) -> Bool {
+        if let actionDefinition {
+            return actionDefinition.inputSchema?.fields.allSatisfy { field in
+                guard field.required else { return true }
+                return parameters[field.key, default: field.defaultValue ?? ""].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            } ?? true
+        }
+        guard Self.builtInActions.contains(action) else { return false }
         if requiresValue {
             return value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
         }
         return true
     }
 
-    var ruleAction: RuleActionDefinition? {
-        guard isValid else { return nil }
+    func ruleAction(actionDefinition: PackagedPluginAction?) -> RuleActionDefinition? {
+        guard isValid(actionDefinition: actionDefinition) else { return nil }
+        if let actionDefinition {
+            let schemaFields = actionDefinition.inputSchema?.fields ?? []
+            var actionParameters: [String: String] = [:]
+            for field in schemaFields {
+                let value = parameters[field.key, default: field.defaultValue ?? ""].trimmingCharacters(in: .whitespacesAndNewlines)
+                if value.isEmpty == false {
+                    actionParameters[field.key] = value
+                }
+            }
+            return RuleActionDefinition(action: actionDefinition.id, parameters: actionParameters)
+        }
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         switch action {
         case "notification.show":
@@ -2835,7 +2884,7 @@ private struct CustomRuleActionDraft: Identifiable, Equatable {
         }
     }
 
-    static let availableActions = [
+    static let builtInActions = [
         "status.inbox.add",
         "notification.show",
         "status.open_url",
@@ -2908,6 +2957,7 @@ private struct CustomRuleConditionDraftRow: View {
 
 private struct CustomRuleActionDraftRow: View {
     @Binding var action: CustomRuleActionDraft
+    let availableActions: [PackagedPluginAction]
     let canDelete: Bool
     let delete: () -> Void
 
@@ -2915,8 +2965,11 @@ private struct CustomRuleActionDraftRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Picker("Action", selection: $action.action) {
-                    ForEach(CustomRuleActionDraft.availableActions, id: \.self) { action in
+                    ForEach(CustomRuleActionDraft.builtInActions, id: \.self) { action in
                         Text(action).tag(action)
+                    }
+                    ForEach(availableActions, id: \.id) { definition in
+                        Text(definition.label).tag(definition.id)
                     }
                 }
                 .pickerStyle(.menu)
@@ -2929,7 +2982,23 @@ private struct CustomRuleActionDraftRow: View {
                     .buttonStyle(.bordered)
                 }
             }
-            if action.action == "notification.show" || action.requiresValue {
+            if let definition = actionDefinition {
+                if let description = definition.description {
+                    Text(description)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(definition.inputSchema?.fields ?? [], id: \.key) { field in
+                    PluginActionInputFieldRow(
+                        field: field,
+                        value: Binding(
+                            get: { action.parameters[field.key, default: field.defaultValue ?? ""] },
+                            set: { action.parameters[field.key] = $0 }
+                        )
+                    )
+                }
+            } else if action.action == "notification.show" || action.requiresValue {
                 TextField(action.parameterLabel, text: $action.value)
                     .textFieldStyle(.roundedBorder)
             }
@@ -2937,6 +3006,42 @@ private struct CustomRuleActionDraftRow: View {
         .padding(8)
         .background(Color.statusSurface)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var actionDefinition: PackagedPluginAction? {
+        availableActions.first { $0.id == action.action }
+    }
+}
+
+private struct PluginActionInputFieldRow: View {
+    let field: PackagedPluginActionInputField
+    @Binding var value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if field.type == .select, field.options.isEmpty == false {
+                Picker(field.label, selection: $value) {
+                    ForEach(field.options, id: \.value) { option in
+                        Text(option.label).tag(option.value)
+                    }
+                }
+                .pickerStyle(.menu)
+            } else if field.type == .toggle {
+                Toggle(field.label, isOn: Binding(
+                    get: { value == "true" },
+                    set: { value = $0 ? "true" : "false" }
+                ))
+            } else {
+                TextField(field.placeholder ?? field.label, text: $value)
+                    .textFieldStyle(.roundedBorder)
+            }
+            if let help = field.help {
+                Text(help)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }
 
