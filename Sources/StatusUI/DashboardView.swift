@@ -3,9 +3,11 @@ import SwiftUI
 
 public struct DashboardView: View {
     private let snapshot: DashboardSnapshot
+    private let openApp: ((IntegrationSummary) -> Void)?
 
-    public init(snapshot: DashboardSnapshot) {
+    public init(snapshot: DashboardSnapshot, openApp: ((IntegrationSummary) -> Void)? = nil) {
         self.snapshot = snapshot
+        self.openApp = openApp
     }
 
     public var body: some View {
@@ -14,7 +16,7 @@ public struct DashboardView: View {
                 DashboardHeader(snapshot: snapshot)
                 AttentionSection(items: snapshot.statusItems)
                 MetricGrid(metrics: snapshot.metrics)
-                IntegrationSection(integrations: snapshot.integrations)
+                IntegrationSection(integrations: snapshot.integrations, openApp: openApp)
                 EventSection(events: snapshot.recentEvents)
                 AuditSection(entries: snapshot.auditEntries)
             }
@@ -102,30 +104,55 @@ private struct MetricGrid: View {
 
 private struct IntegrationSection: View {
     let integrations: [IntegrationSummary]
+    let openApp: ((IntegrationSummary) -> Void)?
 
     var body: some View {
         SectionBlock(title: "Apps") {
-            VStack(spacing: 10) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 12)], spacing: 12) {
                 ForEach(integrations) { integration in
-                    HStack(spacing: 12) {
-                        IntegrationIcon(provider: integration.provider, size: 30)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(integration.name)
-                                .font(.headline)
-                            Text(integration.lastSyncDescription)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text(integration.state)
-                            .font(.callout.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(14)
-                    .background(Color.statusSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    appTile(for: integration)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func appTile(for integration: IntegrationSummary) -> some View {
+        let tile = VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                IntegrationIcon(provider: integration.provider, size: 30)
+                Spacer(minLength: 12)
+                SeverityDot(severity: integration.severity)
+                    .padding(.top, 5)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(integration.name)
+                    .font(.headline)
+                    .lineLimit(2)
+                Text(integration.state)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(integration.lastSyncDescription)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
+        .padding(14)
+        .background(Color.statusSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+        if let openApp {
+            Button {
+                openApp(integration)
+            } label: {
+                tile
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Open \(integration.name)"))
+        } else {
+            tile
         }
     }
 }

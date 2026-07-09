@@ -228,7 +228,15 @@ private struct MacRootView: View {
             switch selection ?? .overview {
             case .overview:
                 detailWithIntegrationTabs {
-                    DashboardContainerView(viewModel: makeDashboardViewModel())
+                    DashboardContainerView(
+                        viewModel: makeDashboardViewModel(),
+                        openApp: { app in
+                            selection = .app(
+                                pluginID: app.provider,
+                                accountID: app.id == app.provider ? nil : app.id
+                            )
+                        }
+                    )
                 }
                     .navigationTitle("Overview")
             case .alerts:

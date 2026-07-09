@@ -29,13 +29,18 @@ public final class DashboardViewModel: ObservableObject {
 
 public struct DashboardContainerView: View {
     @StateObject private var viewModel: DashboardViewModel
+    private let openApp: ((IntegrationSummary) -> Void)?
 
-    public init(viewModel: @autoclosure @escaping () -> DashboardViewModel) {
+    public init(
+        viewModel: @autoclosure @escaping () -> DashboardViewModel,
+        openApp: ((IntegrationSummary) -> Void)? = nil
+    ) {
         _viewModel = StateObject(wrappedValue: viewModel())
+        self.openApp = openApp
     }
 
     public var body: some View {
-        DashboardView(snapshot: viewModel.snapshot)
+        DashboardView(snapshot: viewModel.snapshot, openApp: openApp)
             .overlay(alignment: .bottom) {
                 if let loadError = viewModel.loadError {
                     Text(loadError)

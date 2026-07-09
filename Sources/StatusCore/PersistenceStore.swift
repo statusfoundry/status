@@ -1059,7 +1059,7 @@ public final class StatusPersistenceStore {
     public func integrationSummaries() throws -> [IntegrationSummary] {
         let accountSummaries = try database.query(
             """
-            SELECT id, provider, display_name, status, last_error, last_refreshed_at
+            SELECT id, plugin_id AS provider, display_name, status, last_error, last_refreshed_at
             FROM accounts
             ORDER BY display_name ASC, id ASC
             """

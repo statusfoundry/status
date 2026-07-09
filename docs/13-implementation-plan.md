@@ -246,7 +246,7 @@ Acceptance: the UI no longer presents configured instances as "integrations"; th
 
 ### WP-3.8 App dashboard tiles and detail pages — Design Agent + macOS Agent
 
-Status: Partially implemented for macOS app detail navigation. The sidebar and collapsed top app strip now list configured apps/accounts separately, and selecting one opens a read-only app detail page rendered from plugin view descriptors with resources filtered to that configured app. Settings remain separate. Remaining work: dashboard tile configuration, click-through from dashboard tiles, iOS app detail navigation, and user-selectable tile fields.
+Status: Partially implemented for macOS app detail navigation. The sidebar and collapsed top app strip now list configured apps/accounts separately, and selecting one opens a read-only app detail page rendered from plugin view descriptors with resources filtered to that configured app. Dashboard app entries render as tiles, and selecting a tile on macOS opens the same app detail page. Settings remain separate. Remaining work: dashboard tile configuration, iOS app detail navigation, and user-selectable tile fields.
 
 Extend view descriptors and StatusUI so every configured app can render a dashboard tile and an app detail page. The plugin declares supported tile/detail fields; the user can choose the tile content for each configured app. Clicking a dashboard tile, sidebar item, or collapsed app-strip icon opens the configured app detail page.
 
