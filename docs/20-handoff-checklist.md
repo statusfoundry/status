@@ -1,6 +1,8 @@
 # Handoff Checklist
 
-This checklist is the operational runbook for turning the documentation-only repository into a working project without stopping for product questions.
+This checklist is the operational runbook for keeping Status moving without stopping for product questions.
+
+The repository is no longer documentation-only. It now contains the Swift package, macOS app, iOS app, Vue website, plugin packages, Cloudflare registry Worker, schemas, tests, and CI/deploy workflows. Keep this checklist current when the working baseline changes.
 
 Use this together with:
 
@@ -18,18 +20,18 @@ The immediate target is not the complete product. The immediate target is a work
 Tomorrow's "working project" means:
 
 ```txt
-1. Repository has real project structure.
-2. macOS app target builds.
-3. iOS app target builds or is scaffolded with clear build command.
-4. Shared core package exists.
-5. Shared UI package exists.
-6. App renders a native mocked dashboard.
-7. Documentation gaps are either closed or tracked in concrete files.
-8. Validation commands are documented in AGENTS.md.
-9. Changes are committed and pushed to origin/main.
+1. Repository has real project structure. DONE
+2. macOS app target builds. DONE
+3. iOS app target builds. DONE
+4. Shared core package exists. DONE
+5. Shared UI package exists. DONE
+6. App renders native persisted dashboard data, with mock dashboard reserved for previews/tests. DONE
+7. Documentation gaps are either closed or tracked in concrete files. DONE
+8. Validation commands are documented in AGENTS.md. DONE
+9. Changes are committed and pushed to origin/main. DONE PER SLICE
 ```
 
-If there is time after the skeleton builds, continue into schema/data-model work. Do not start real provider integrations before the contracts are documented.
+Continue with product hardening, launch polish, and deployment readiness. Do not add arbitrary plugin code, provider-owned UI, destructive actions, or public self-service plugin upload.
 
 ## Non-stop defaults
 
@@ -49,8 +51,7 @@ Use these decisions when implementation needs a default. Do not stop to ask unle
 
 ### First working app
 
-- Build a mocked dashboard before real integrations.
-- Use mocked normalized data, not provider APIs.
+- Build against persisted local data; keep `MockDashboard` for previews and tests.
 - Include overview, needs-attention list, integration list, recent events, and audit preview.
 - Use native SwiftUI controls.
 - Keep the UI calm, compact, and practical.
@@ -82,9 +83,9 @@ If Xcode project generation is easier, use XcodeGen and document the command. If
 
 ### Storage
 
-- Use SQLite through GRDB unless there is a clear local build blocker.
+- Use the local SQLite wrapper in `StatusCore`; do not add an ORM unless it removes real complexity.
 - Secrets are Keychain references only.
-- If persistence is not implemented on day one, create the protocol boundaries and mocked/in-memory stores.
+- Persistence is implemented. New behavior must include migrations, tests, and docs.
 
 ### Plugin contracts
 
@@ -128,18 +129,32 @@ If Xcode project generation is easier, use XcodeGen and document the command. If
 - CI runs `npm ci` and `npm run check`.
 - Manual Cloudflare deploy workflow requires `CLOUDFLARE_API_TOKEN` in GitHub repository secrets.
 
+## Current completed baseline
+
+- [x] Swift package exists with `StatusCore` and `StatusUI`.
+- [x] macOS app target builds and opens the shared dashboard/integration/rules/audit/settings surfaces.
+- [x] iOS app target builds and opens the shared dashboard/integration/rules/audit/settings surfaces.
+- [x] Bundled official plugins install locally on first database bootstrap.
+- [x] Dashboard reads persisted items, events, metrics, accounts, installed-plugin setup states, and audit entries.
+- [x] Plugin packages are declarative ZIPs with manifests, auth/setup/requests/mappings/triggers/events/actions/rule presets.
+- [x] Plugin package validation and example plugin validation run through `npm run plugins:check`.
+- [x] Registry Worker serves plugin metadata, details, versions, revocations, package artifacts, and compatibility filters.
+- [x] Cloudflare Pages website has home, download/beta, plugins, plugin details, developers, docs, privacy/security, and changelog routes.
+- [x] GitHub Actions CI covers Node checks, Swift tests, Xcode project generation, and macOS/iOS builds.
+- [x] Cloudflare deploy workflow is present and manual.
+
 ## First-pass checklist
 
 Run these checks before editing:
 
-- [ ] `git status --short --branch`
-- [ ] `git remote -v`
-- [ ] `rg --files`
-- [ ] Read `AGENTS.md`
-- [ ] Read `DOCTRINE.md`
-- [ ] Read `SPEC.md`
-- [ ] Read `docs/13-implementation-plan.md`
-- [ ] Read `docs/20-handoff-checklist.md`
+- [x] `git status --short --branch`
+- [x] `git remote -v`
+- [x] `rg --files`
+- [x] Read `AGENTS.md`
+- [x] Read `DOCTRINE.md`
+- [x] Read `SPEC.md`
+- [x] Read `docs/13-implementation-plan.md`
+- [x] Read `docs/20-handoff-checklist.md`
 
 Expected state before work:
 
@@ -155,12 +170,12 @@ If there are uncommitted changes, inspect them and preserve them. Do not revert 
 
 Do this first if the target is anything beyond a pure skeleton.
 
-- [ ] Create `docs/00-glossary.md`.
-- [ ] Define Event vs StatusItem vs Notification vs ActionRun vs AuditEntry.
-- [ ] Decide MVP integration wording: GitHub first, Jira next.
-- [ ] Mark Slack/calendar actions as future illustrative examples.
-- [ ] Clarify generic webhook local behavior before relay.
-- [ ] Link glossary from README.
+- [x] Create `docs/00-glossary.md`.
+- [x] Define Event vs StatusItem vs Notification vs ActionRun vs AuditEntry.
+- [x] Decide MVP integration wording: official App Store Connect, GitHub, and Website Uptime plugins first.
+- [x] Mark Slack/calendar actions as future illustrative examples.
+- [x] Clarify generic webhook local behavior before relay.
+- [x] Link glossary from README.
 
 Acceptance:
 
@@ -169,12 +184,12 @@ Acceptance:
 
 ### Step 2: Create project skeleton
 
-- [ ] Create shared core module.
-- [ ] Create shared UI module.
-- [ ] Create macOS app target.
-- [ ] Create iOS app target or documented scaffold.
-- [ ] Add placeholder app icon/assets only if required to build.
-- [ ] Add build command documentation to `AGENTS.md`.
+- [x] Create shared core module.
+- [x] Create shared UI module.
+- [x] Create macOS app target.
+- [x] Create iOS app target.
+- [x] Add placeholder app icon/assets only if required to build.
+- [x] Add build command documentation to `AGENTS.md`.
 
 Acceptance:
 
@@ -186,15 +201,15 @@ Acceptance:
 
 Create simple Swift models in `StatusCore`:
 
-- [ ] `Severity`
-- [ ] `Account`
-- [ ] `Resource`
-- [ ] `Event`
-- [ ] `StatusItem`
-- [ ] `Metric`
-- [ ] `ActionLink`
-- [ ] `NotificationMode`
-- [ ] `AuditEntry`
+- [x] `Severity`
+- [x] `Account`
+- [x] `Resource`
+- [x] `Event`
+- [x] `StatusItem`
+- [x] `Metric`
+- [x] `ActionLink`
+- [x] `NotificationMode`
+- [x] `AuditEntry`
 
 Acceptance:
 
@@ -202,38 +217,40 @@ Acceptance:
 - mocked data can answer dashboard questions;
 - no provider-specific types leak into shared UI.
 
-### Step 4: Build mocked UI
+### Step 4: Build native UI
 
 Create StatusUI primitives:
 
-- [ ] overview card;
-- [ ] status/attention list;
-- [ ] resource list;
-- [ ] recent events timeline/list;
-- [ ] metric tile;
-- [ ] audit row;
-- [ ] severity badge;
-- [ ] integration row.
+- [x] overview card;
+- [x] status/attention list;
+- [x] resource list;
+- [x] recent events timeline/list;
+- [x] metric tile;
+- [x] audit row;
+- [x] severity badge;
+- [x] integration row.
 
 macOS shell:
 
-- [ ] sidebar;
-- [ ] overview screen;
-- [ ] integrations screen placeholder;
-- [ ] audit screen placeholder;
-- [ ] settings screen placeholder.
+- [x] sidebar;
+- [x] overview screen;
+- [x] integrations screen;
+- [x] audit screen;
+- [x] settings screen.
 
 iOS shell:
 
-- [ ] overview tab;
-- [ ] alerts tab;
-- [ ] integrations tab;
-- [ ] settings tab.
+- [x] overview tab;
+- [x] alerts tab;
+- [x] integrations tab;
+- [x] rules tab;
+- [x] audit tab;
+- [x] settings tab.
 
 Acceptance:
 
 - app opens directly into the usable dashboard, not a landing page;
-- mocked dashboard answers:
+- dashboard answers:
   - Are all important products okay?
   - What changed?
   - What is stuck?
@@ -243,10 +260,10 @@ Acceptance:
 
 ### Step 5: Add basic tests or compile checks
 
-- [ ] Add unit test target if package setup supports it.
-- [ ] Test model decoding/encoding if models are Codable.
-- [ ] Test mocked dashboard data construction.
-- [ ] Document all commands in `AGENTS.md`.
+- [x] Add unit test target.
+- [x] Test model/persistence behavior where Codable or SQLite-backed.
+- [x] Test mocked dashboard data construction.
+- [x] Document all commands in `AGENTS.md`.
 
 Acceptance:
 
@@ -255,11 +272,11 @@ Acceptance:
 
 ### Step 6: Commit and push
 
-- [ ] `git status --short`
-- [ ] run documented validation command;
-- [ ] `git add` only intended files;
-- [ ] `git commit -m "..."`;
-- [ ] `git push`.
+- [x] `git status --short`
+- [x] run documented validation command;
+- [x] `git add` only intended files;
+- [x] `git commit -m "..."`;
+- [x] `git push`.
 
 Acceptance:
 
@@ -272,84 +289,84 @@ These can run in parallel with skeleton work, but plugin runtime work should not
 
 ### Data model
 
-- [ ] Create `docs/15-data-model.md`.
-- [ ] Define tables and fields.
-- [ ] Define IDs and timestamps.
-- [ ] Define indexes.
-- [ ] Define migration strategy.
-- [ ] Define Keychain reference pattern.
-- [ ] Confirm no secret columns.
+- [x] Create `docs/15-data-model.md`.
+- [x] Define tables and fields.
+- [x] Define IDs and timestamps.
+- [x] Define indexes.
+- [x] Define migration strategy.
+- [x] Define Keychain reference pattern.
+- [x] Confirm no secret columns.
 
 ### Plugin schemas
 
-- [ ] Create `schemas/plugin/v1/`.
-- [ ] Add schemas for manifest, auth, setup, requests, mappings, triggers, events, actions, views, rule presets.
-- [ ] Decide single source of truth for event declarations.
-- [ ] Validate examples.
-- [ ] Document unknown-field policy.
+- [x] Create `schemas/plugin/v1/`.
+- [x] Add schemas for manifest, auth, setup, requests, mappings, triggers, events, actions, views, rule presets.
+- [x] Decide single source of truth for event declarations.
+- [x] Validate examples.
+- [x] Document unknown-field policy.
 
 ### Mapping language
 
-- [ ] Create `docs/16-mapping-language.md`.
-- [ ] Define JSONPath subset.
-- [ ] Define comparison operators.
-- [ ] Define template syntax.
-- [ ] Define pagination.
-- [ ] Define conditional event emission.
-- [ ] Ban loops, arbitrary functions, and scripting.
+- [x] Create `docs/16-mapping-language.md`.
+- [x] Define JSONPath subset.
+- [x] Define comparison operators.
+- [x] Define template syntax.
+- [x] Define pagination.
+- [x] Define conditional event emission.
+- [x] Ban loops, arbitrary functions, and scripting.
 
 ### Event semantics
 
-- [ ] Create `docs/17-event-semantics.md`.
-- [ ] Define state-change detection.
-- [ ] Define fingerprint format.
-- [ ] Define dedup behavior.
-- [ ] Define StatusItem lifecycle.
-- [ ] Define recovery/resolution behavior.
-- [ ] Define snooze/dismiss behavior.
+- [x] Create `docs/17-event-semantics.md`.
+- [x] Define state-change detection.
+- [x] Define fingerprint format.
+- [x] Define dedup behavior.
+- [x] Define StatusItem lifecycle.
+- [x] Define recovery/resolution behavior.
+- [x] Define snooze/dismiss behavior.
 
 ### Auth
 
-- [ ] Update `docs/07-security-privacy.md`.
-- [ ] Update `docs/04-plugin-system.md`.
-- [ ] Decide OAuth status for v1.
-- [ ] Document PKCE if OAuth is kept.
-- [ ] Map MVP integrations to auth paths.
+- [x] Update `docs/07-security-privacy.md`.
+- [x] Update `docs/04-plugin-system.md`.
+- [x] Decide OAuth status for v1.
+- [x] Reject OAuth for v1 plugin packages; revisit PKCE only when OAuth is brought back.
+- [x] Map MVP integrations to auth paths.
 
 ### Signing
 
-- [ ] Define signing algorithm.
-- [ ] Define key custody.
-- [ ] Define package signature format.
-- [ ] Define app-pinned public key behavior.
-- [ ] Define revocation list format.
-- [ ] Define developer-mode warning flow.
+- [x] Define signing algorithm.
+- [x] Define key custody.
+- [x] Define package signature format.
+- [x] Define app-pinned public key behavior.
+- [x] Define revocation list format.
+- [x] Define developer-mode warning flow.
 
 ### iOS data posture
 
-- [ ] Update `SPEC.md`.
-- [ ] Update `docs/02-requirements.md`.
-- [ ] Pick v1 posture:
+- [x] Update `SPEC.md`.
+- [x] Update `docs/02-requirements.md`.
+- [x] Pick v1 posture:
   - independent account setup per device;
   - read-only iCloud sync;
   - or iOS dashboard shell first with no shared live data.
 
-Default if no decision is made:
+Current v1 posture:
 
 ```txt
-iOS dashboard shell with mocked/shared models first.
+iOS companion app with the same shared local models and independent local account setup per device.
 Real cross-device data sync deferred.
 ```
 
 ### Testing
 
-- [ ] Create `docs/18-testing.md`.
-- [ ] Define unit test expectations.
-- [ ] Define plugin schema validation tests.
-- [ ] Define mapping golden tests.
-- [ ] Define provider fixture policy.
-- [ ] Define rules/action/audit scenario tests.
-- [ ] Define CI commands.
+- [x] Create `docs/18-testing.md`.
+- [x] Define unit test expectations.
+- [x] Define plugin schema validation tests.
+- [x] Define mapping golden tests.
+- [x] Define provider fixture policy.
+- [x] Define rules/action/audit scenario tests.
+- [x] Define CI commands.
 
 ## Implementation checks
 
