@@ -800,12 +800,16 @@ public final class StatusPersistenceStore {
         return try resource(from: row)
     }
 
-    public func resources(pluginID: String, resourceType: String? = nil, limit: Int = 50) throws -> [Resource] {
+    public func resources(pluginID: String, accountID: String? = nil, resourceType: String? = nil, limit: Int = 50) throws -> [Resource] {
         var sql = """
         SELECT * FROM resources
         WHERE plugin_id = ? AND archived = 0
         """
         var bindings: [SQLiteValue] = [.text(pluginID)]
+        if let accountID {
+            sql += " AND account_id = ?"
+            bindings.append(.text(accountID))
+        }
         if let resourceType {
             sql += " AND type = ?"
             bindings.append(.text(resourceType))

@@ -169,30 +169,30 @@ private struct MacRootView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @State private var selection: MacSection? = .overview
-    @State private var sidebarPlugins: [InstalledPlugin] = []
+    @State private var sidebarApps: [SidebarApp] = []
     @State private var sidebarPluginError: String?
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             List(selection: $selection) {
                 Section("Apps") {
-                    if sidebarPlugins.isEmpty {
+                    if sidebarApps.isEmpty {
                         Text(sidebarPluginError ?? "No apps configured")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(sidebarPlugins) { plugin in
+                        ForEach(sidebarApps) { app in
                             Button {
-                                selection = .integrations
+                                selection = .app(pluginID: app.pluginID, accountID: app.accountID)
                             } label: {
                                 Label {
-                                    Text(plugin.name)
+                                    Text(app.name)
                                         .lineLimit(1)
                                 } icon: {
                                     IntegrationIcon(
-                                        provider: plugin.id,
-                                        icon: plugin.iconPath,
-                                        accentColor: plugin.accentColor,
+                                        provider: app.pluginID,
+                                        icon: app.iconPath,
+                                        accentColor: app.accentColor,
                                         size: 22
                                     )
                                 }
@@ -252,6 +252,24 @@ private struct MacRootView: View {
                     )
                 }
                     .navigationTitle("Apps")
+            case .app(let pluginID, let accountID):
+                detailWithIntegrationTabs {
+                    MacPluginAppDetail(
+                        pluginID: pluginID,
+                        accountID: accountID,
+                        openSettings: {
+                            openWindow(id: "integration-settings", value: pluginID)
+                        },
+                        runPlugin: { pluginID, accountID, accountName in
+                            try await runConfiguredPluginCheck(
+                                pluginID: pluginID,
+                                accountID: accountID,
+                                accountName: accountName
+                            )
+                        }
+                    )
+                }
+                    .navigationTitle("App")
             case .rules:
                 detailWithIntegrationTabs {
                     RulesContainerView(viewModel: makeRulesViewModel())
@@ -285,10 +303,35 @@ private struct MacRootView: View {
     private func loadSidebarPlugins() {
         do {
             try bootstrapBundledPlugins()
-            sidebarPlugins = try LocalStatusStore.openApplicationSupportStore().installedPlugins().filter(\.enabled)
+            let store = try LocalStatusStore.openApplicationSupportStore()
+            sidebarApps = try store.installedPlugins()
+                .filter(\.enabled)
+                .flatMap { plugin in
+                    let accounts = try store.accountConfigurations(pluginID: plugin.id)
+                    if accounts.isEmpty {
+                        return [
+                            SidebarApp(
+                                pluginID: plugin.id,
+                                accountID: nil,
+                                name: plugin.name,
+                                iconPath: plugin.iconPath,
+                                accentColor: plugin.accentColor
+                            )
+                        ]
+                    }
+                    return accounts.map { account in
+                        SidebarApp(
+                            pluginID: plugin.id,
+                            accountID: account.id,
+                            name: account.accountName,
+                            iconPath: plugin.iconPath,
+                            accentColor: plugin.accentColor
+                        )
+                    }
+                }
             sidebarPluginError = nil
         } catch {
-            sidebarPlugins = []
+            sidebarApps = []
             sidebarPluginError = error.localizedDescription
         }
     }
@@ -296,22 +339,22 @@ private struct MacRootView: View {
     @ViewBuilder
     private func detailWithIntegrationTabs<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(spacing: 0) {
-            if columnVisibility == .detailOnly && sidebarPlugins.isEmpty == false {
+            if columnVisibility == .detailOnly && sidebarApps.isEmpty == false {
                 HStack(spacing: 8) {
-                    ForEach(sidebarPlugins) { plugin in
+                    ForEach(sidebarApps) { app in
                         Button {
-                            selection = .integrations
+                            selection = .app(pluginID: app.pluginID, accountID: app.accountID)
                         } label: {
                             IntegrationIcon(
-                                provider: plugin.id,
-                                icon: plugin.iconPath,
-                                accentColor: plugin.accentColor,
+                                provider: app.pluginID,
+                                icon: app.iconPath,
+                                accentColor: app.accentColor,
                                 size: 28
                             )
                         }
                         .buttonStyle(.plain)
-                        .help(plugin.name)
-                        .accessibilityLabel(Text(plugin.name))
+                        .help(app.name)
+                        .accessibilityLabel(Text(app.name))
                     }
                     Spacer(minLength: 0)
                 }
@@ -719,10 +762,150 @@ private struct MacRootView: View {
     }
 }
 
+private struct SidebarApp: Identifiable, Hashable {
+    let pluginID: String
+    let accountID: String?
+    let name: String
+    let iconPath: String?
+    let accentColor: String?
+
+    var id: String {
+        "\(pluginID):\(accountID ?? "__setup__")"
+    }
+}
+
+private struct MacPluginAppDetail: View {
+    let pluginID: String
+    let accountID: String?
+    let openSettings: () -> Void
+    let runPlugin: (String, String, String) async throws -> String
+
+    @State private var plugin: InstalledPlugin?
+    @State private var app: PluginAccountConfiguration?
+    @State private var runtimeStatus: PluginRuntimeStatus?
+    @State private var resources: [Resource] = []
+    @State private var loadError: String?
+    @State private var runResult: String?
+    @State private var runError: String?
+    @State private var isRunning = false
+
+    var body: some View {
+        Group {
+            if let plugin {
+                PluginAppDetailView(
+                    plugin: plugin,
+                    app: app,
+                    runtimeStatus: runtimeStatus,
+                    resources: resources,
+                    openSettings: openSettings,
+                    run: runnableAction
+                )
+                .overlay(alignment: .bottom) {
+                    statusOverlay
+                }
+            } else if let loadError {
+                ContentUnavailableView("App unavailable", systemImage: "puzzlepiece.extension", description: Text(loadError))
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .task(id: "\(pluginID):\(accountID ?? "__setup__")") {
+            load()
+        }
+        .refreshable {
+            load()
+        }
+    }
+
+    @ViewBuilder
+    private var statusOverlay: some View {
+        if isRunning {
+            ProgressView()
+                .padding(10)
+                .background(.thinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding()
+        } else if let runResult {
+            Text(runResult)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(10)
+                .background(.thinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding()
+        } else if let runError {
+            Text(runError)
+                .font(.caption)
+                .foregroundStyle(.red)
+                .padding(10)
+                .background(.thinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding()
+        }
+    }
+
+    private var runnableAction: (() -> Void)? {
+        guard let accountID, let app else {
+            return nil
+        }
+        return {
+            Task {
+                await run(accountID: accountID, accountName: app.accountName)
+            }
+        }
+    }
+
+    private func load() {
+        do {
+            let store = try LocalStatusStore.openApplicationSupportStore()
+            let loadedPlugin = try store.installedPlugin(id: pluginID)
+            plugin = loadedPlugin
+            app = try accountID.flatMap { try store.accountConfiguration(accountID: $0) }
+            resources = try store.resources(pluginID: pluginID, accountID: accountID)
+            runtimeStatus = try recentRuntimeStatus(store: store, pluginID: pluginID)
+            loadError = loadedPlugin == nil ? "This plugin is not installed on this device." : nil
+        } catch {
+            plugin = nil
+            app = nil
+            resources = []
+            runtimeStatus = nil
+            loadError = error.localizedDescription
+        }
+    }
+
+    private func run(accountID: String, accountName: String) async {
+        isRunning = true
+        runResult = nil
+        runError = nil
+        do {
+            runResult = try await runPlugin(pluginID, accountID, accountName)
+            load()
+        } catch {
+            runError = error.localizedDescription
+        }
+        isRunning = false
+    }
+
+    private func recentRuntimeStatus(store: StatusPersistenceStore, pluginID: String) throws -> PluginRuntimeStatus? {
+        guard let job = try store.recentJobs(pluginID: pluginID, limit: 1).first else {
+            return nil
+        }
+        return PluginRuntimeStatus(
+            pluginID: job.pluginID,
+            status: job.status,
+            detail: job.error ?? "Job \(job.id) completed from \(job.triggerID).",
+            timestamp: job.finishedAt ?? job.startedAt ?? job.queuedAt,
+            emittedEventCount: job.emittedEventIDs.count
+        )
+    }
+}
+
 private enum MacSection: Hashable {
     case overview
     case alerts
     case integrations
+    case app(pluginID: String, accountID: String?)
     case rules
     case audit
     case settings

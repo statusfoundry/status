@@ -665,6 +665,89 @@ public struct PluginSettingsContainerView: View {
     }
 }
 
+public struct PluginAppDetailView: View {
+    private let plugin: InstalledPlugin
+    private let app: PluginAccountConfiguration?
+    private let runtimeStatus: PluginRuntimeStatus?
+    private let resources: [Resource]
+    private let openSettings: (() -> Void)?
+    private let run: (() -> Void)?
+
+    public init(
+        plugin: InstalledPlugin,
+        app: PluginAccountConfiguration?,
+        runtimeStatus: PluginRuntimeStatus?,
+        resources: [Resource],
+        openSettings: (() -> Void)? = nil,
+        run: (() -> Void)? = nil
+    ) {
+        self.plugin = plugin
+        self.app = app
+        self.runtimeStatus = runtimeStatus
+        self.resources = resources
+        self.openSettings = openSettings
+        self.run = run
+    }
+
+    public var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                header
+                if let runtimeStatus {
+                    PluginRuntimeStatusView(status: runtimeStatus)
+                }
+                if plugin.views.isEmpty {
+                    EmptyPluginState(
+                        title: "No app views",
+                        detail: "\(plugin.name) does not declare dashboard or detail views yet."
+                    )
+                } else {
+                    PluginDeclaredViewsPanel(plugin: plugin, resources: resources)
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: 920, alignment: .leading)
+        }
+        .background(Color.statusBackground)
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: 14) {
+            IntegrationIcon(provider: plugin.id, icon: plugin.iconPath, accentColor: plugin.accentColor, size: 42)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(app?.accountName ?? plugin.name)
+                    .font(.system(size: 34, weight: .semibold, design: .default))
+                Text("\(plugin.name) app")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                Text("\(resources.count) stored resource\(resources.count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer(minLength: 12)
+            HStack(spacing: 8) {
+                if let run {
+                    Button {
+                        run()
+                    } label: {
+                        Label("Run", systemImage: "play")
+                    }
+                    .buttonStyle(.bordered)
+                }
+                if let openSettings {
+                    Button {
+                        openSettings()
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+        }
+    }
+}
+
 public struct PluginStoreView: View {
     private let catalog: PluginStoreCatalog
     private let installingPluginID: String?
