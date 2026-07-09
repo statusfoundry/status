@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { renderMarkdown } from "./lib/render-markdown.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputPath = path.join(root, "web", "src", "generated", "docs.json");
@@ -78,30 +79,39 @@ function fallbackTitle(sourcePath) {
     .join(" ");
 }
 
-const generated = {
-  generatedAt: "2026-07-09T00:00:00Z",
-  documents: await Promise.all(documents.map(async (document) => {
-    const content = await readFile(path.join(root, document.sourcePath), "utf8");
-    return {
-      slug: document.slug,
-      title: titleFromMarkdown(content, fallbackTitle(document.sourcePath)),
-      path: `/docs/${document.slug}/`,
-      sourcePath: document.sourcePath,
-      sourceUrl: `${repositoryBaseURL}/${document.sourcePath}`,
-      summary: document.summary,
-      content
-    };
-  }))
-};
+async function main() {
+  const generated = {
+    generatedAt: "2026-07-09T00:00:00Z",
+    documents: await Promise.all(documents.map(async (document) => {
+      const content = await readFile(path.join(root, document.sourcePath), "utf8");
+      const { html } = await renderMarkdown(content, { stripTitle: true });
+      return {
+        slug: document.slug,
+        title: titleFromMarkdown(content, fallbackTitle(document.sourcePath)),
+        path: `/docs/${document.slug}/`,
+        sourcePath: document.sourcePath,
+        sourceUrl: `${repositoryBaseURL}/${document.sourcePath}`,
+        summary: document.summary,
+        content,
+        html,
+      };
+    })),
+  };
 
-const output = `${JSON.stringify(generated, null, 2)}\n`;
+  const output = `${JSON.stringify(generated, null, 2)}\n`;
 
-if (checkOnly) {
-  const current = await readFile(outputPath, "utf8");
-  if (current !== output) {
-    throw new Error("web/src/generated/docs.json is out of date. Run npm run docs:build.");
+  if (checkOnly) {
+    const current = await readFile(outputPath, "utf8");
+    if (current !== output) {
+      throw new Error("web/src/generated/docs.json is out of date. Run npm run docs:build.");
+    }
+  } else {
+    await writeFile(outputPath, output);
+    console.log(`Wrote ${generated.documents.length} documentation page(s) to web/src/generated/docs.json.`);
   }
-} else {
-  await writeFile(outputPath, output);
-  console.log(`Wrote ${generated.documents.length} documentation page(s) to web/src/generated/docs.json.`);
 }
+
+main().catch((error) => {
+  console.error(error.message ?? error);
+  process.exit(1);
+});

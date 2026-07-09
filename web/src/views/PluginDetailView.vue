@@ -2,14 +2,13 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useBemm } from 'bemm'
+import MarkdownContent from '@/components/MarkdownContent.vue'
 import SiteLayout from '@/components/SiteLayout.vue'
 import pluginsData from '@/generated/plugins.json'
 import registryData from '@/generated/registry.json'
 
 const bemm = useBemm('page', { return: 'string' })
 const factsBemm = useBemm('plugin-facts', { return: 'string' })
-const articleBemm = useBemm('plugin-readme', { return: 'string' })
-
 const route = useRoute()
 
 const pluginDoc = computed(() => {
@@ -68,9 +67,7 @@ const domainList = computed(() => {
 
         <section :class="bemm('body')">
           <div :class="bemm('container')">
-            <article :class="articleBemm()">
-              <pre>{{ pluginDoc.readme }}</pre>
-            </article>
+            <MarkdownContent :html="pluginDoc.readmeHtml" />
 
             <div :class="[bemm('grid'), bemm('grid', 'after-readme')]">
               <article :class="bemm('card')">
@@ -152,23 +149,8 @@ const domainList = computed(() => {
 </template>
 
 <style lang="scss">
-.plugin-readme {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+.markdown-content {
   margin-bottom: var(--space-l);
-  padding: var(--space-l);
-
-  pre {
-    margin: 0;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    color: var(--color-text-primary);
-    font-family: var(--font-family-monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
-    font-size: var(--font-size-sm);
-    line-height: var(--line-height-relaxed);
-  }
 }
 
 .plugin-facts {

@@ -1,4 +1,5 @@
 import '@sil/ui/styles'
+import 'nizel-style'
 import './styles/index.scss'
 
 import { createApp } from 'vue'

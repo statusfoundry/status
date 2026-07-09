@@ -1,0 +1,19 @@
+.nizel-content {
+  --nizel-foreground: var(--color-text-primary);
+  --nizel-background: var(--color-surface);
+  --nizel-surface: var(--color-bg);
+  --nizel-border: var(--color-border-light);
+  --nizel-primary: var(--color-accent);
+  --nizel-secondary: var(--color-secondary, var(--color-accent));
+  --nizel-font-body: var(--font-family);
+  --nizel-font-heading: var(--font-family);
+  --nizel-font-code: var(--font-family-monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+}
+
+.markdown-content {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-l);
+}

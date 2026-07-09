@@ -1,6 +1,7 @@
 @use 'mixins' as *;
 @forward 'variables';
 @forward 'base';
+@use 'nizel';
 
 .page {
   min-height: 100vh;

@@ -2,11 +2,11 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useBemm } from 'bemm'
+import MarkdownContent from '@/components/MarkdownContent.vue'
 import SiteLayout from '@/components/SiteLayout.vue'
 import docsData from '@/generated/docs.json'
 
 const bemm = useBemm('page', { return: 'string' })
-const articleBemm = useBemm('doc-article', { return: 'string' })
 
 const route = useRoute()
 
@@ -34,9 +34,7 @@ const document = computed(() => {
 
         <section :class="bemm('body')">
           <div :class="bemm('container')">
-            <article :class="articleBemm()">
-              <pre>{{ document.content }}</pre>
-            </article>
+            <MarkdownContent :html="document.html" />
           </div>
         </section>
       </template>
@@ -56,23 +54,3 @@ const document = computed(() => {
     </main>
   </SiteLayout>
 </template>
-
-<style lang="scss">
-.doc-article {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-l);
-
-  pre {
-    margin: 0;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    color: var(--color-text-primary);
-    font-family: var(--font-family-monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
-    font-size: var(--font-size-sm);
-    line-height: var(--line-height-relaxed);
-  }
-}
-</style>

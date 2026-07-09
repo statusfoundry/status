@@ -29,7 +29,9 @@
   "dependencies": {
     "@sil/ui": "^2.6.0",
     "bemm": "^1.4.0",
+    "nizel": "^0.1.12",
     "nizel-plugin-shiki": "^0.1.0",
+    "nizel-style": "^0.1.2",
     "sass": "^1.97.0",
     "shiki": "^4.3.1",
     "typescript": "^5.9.3",
