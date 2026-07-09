@@ -375,6 +375,72 @@ import StatusCore
 }
 
 @MainActor
+@Test func pluginStoreViewModelSavesCustomAppRuleConditionsAndSafeActions() async throws {
+    let plugin = InstalledPlugin(
+        id: "com.status.github",
+        name: "GitHub",
+        author: "Status Foundry",
+        description: "GitHub repository checks.",
+        category: "development",
+        trustLevel: .official,
+        installedVersion: "0.1.0",
+        installPath: "/tmp/com.status.github",
+        installedAt: Date(timeIntervalSince1970: 1_783_433_520),
+        updatedAt: Date(timeIntervalSince1970: 1_783_433_520)
+    )
+    let account = PluginAccountConfiguration(
+        id: "acc_personal",
+        pluginID: plugin.id,
+        accountName: "Personal",
+        variables: [:]
+    )
+    var storedRules: [Rule] = []
+    let viewModel = PluginStoreViewModel(
+        loadInstalled: { [plugin] },
+        loadAvailable: { [] },
+        loadRules: { _ in storedRules },
+        saveRule: { rule in
+            storedRules.removeAll { $0.id == rule.id }
+            storedRules.append(rule)
+        },
+        installPlugin: { _ in },
+        canConfigurePlugin: { _ in true },
+        loadAccounts: { _ in [account] }
+    )
+
+    await viewModel.reload()
+    await viewModel.saveCustomAppRule(
+        for: plugin,
+        name: "Repository release watch",
+        eventType: "github.release.published",
+        conditions: [
+            RuleCondition(field: "severity", operation: .matchesSeverity, value: .string("notice")),
+            RuleCondition(field: "resourceName", operation: .contains, value: .string("status"))
+        ],
+        actions: [
+            RuleActionDefinition(action: "status.inbox.add"),
+            RuleActionDefinition(action: "status.open_url", parameters: ["url": "{{event.actionUrl}}"]),
+            RuleActionDefinition(action: "audit.note", parameters: ["note": "Release seen for {{event.resourceName}}"])
+        ]
+    )
+
+    let created = try #require(storedRules.first)
+    #expect(created.id == "rule_custom_com_status_github_acc_personal_repository_release_watch")
+    #expect(created.scope == .app)
+    #expect(created.accountID == account.id)
+    #expect(created.provider == plugin.id)
+    #expect(created.conditions == [
+        RuleCondition(field: "severity", operation: .matchesSeverity, value: .string("notice")),
+        RuleCondition(field: "resourceName", operation: .contains, value: .string("status"))
+    ])
+    #expect(created.actions == [
+        RuleActionDefinition(action: "status.inbox.add"),
+        RuleActionDefinition(action: "status.open_url", parameters: ["url": "{{event.actionUrl}}"]),
+        RuleActionDefinition(action: "audit.note", parameters: ["note": "Release seen for {{event.resourceName}}"])
+    ])
+}
+
+@MainActor
 @Test func pluginStoreViewModelBuildsOAuthConnectionURL() async throws {
     let plugin = InstalledPlugin(
         id: "com.status.oauthgithub",

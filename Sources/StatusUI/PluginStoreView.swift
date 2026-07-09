@@ -321,6 +321,35 @@ public final class PluginStoreViewModel: ObservableObject {
         minimumSeverity: Severity?,
         notificationTitle: String
     ) async {
+        let conditions = minimumSeverity.map {
+            [RuleCondition(field: "severity", operation: .matchesSeverity, value: .string($0.rawValue))]
+        } ?? []
+        let title = notificationTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let actions = [
+            RuleActionDefinition(action: "status.inbox.add"),
+            RuleActionDefinition(
+                action: "notification.show",
+                parameters: title.isEmpty ? [:] : ["title": title]
+            )
+        ]
+        await saveCustomAppRule(
+            for: plugin,
+            ruleID: ruleID,
+            name: name,
+            eventType: eventType,
+            conditions: conditions,
+            actions: actions
+        )
+    }
+
+    public func saveCustomAppRule(
+        for plugin: InstalledPlugin,
+        ruleID: String? = nil,
+        name: String,
+        eventType: String,
+        conditions: [RuleCondition],
+        actions: [RuleActionDefinition]
+    ) async {
         guard savingRuleID == nil else { return }
         guard let account = selectedAccount(for: plugin) else {
             loadError = "Save an app before editing rules."
@@ -336,23 +365,20 @@ public final class PluginStoreViewModel: ObservableObject {
             loadError = "Event type is required."
             return
         }
+        guard actions.isEmpty == false else {
+            loadError = "At least one action is required."
+            return
+        }
+        if let unsupportedAction = actions.first(where: { ActionRunner.safetyLevel(for: $0.action) == .unsupported }) {
+            loadError = "\(unsupportedAction.action) is not supported by Status."
+            return
+        }
 
         let ruleID = ruleID ?? customAppRuleID(pluginID: plugin.id, accountID: account.id, name: trimmedName)
         savingRuleID = ruleID
         defer { savingRuleID = nil }
 
         do {
-            let title = notificationTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-            let conditions = minimumSeverity.map {
-                [RuleCondition(field: "severity", operation: .matchesSeverity, value: .string($0.rawValue))]
-            } ?? []
-            let actions = [
-                RuleActionDefinition(action: "status.inbox.add"),
-                RuleActionDefinition(
-                    action: "notification.show",
-                    parameters: title.isEmpty ? [:] : ["title": title]
-                )
-            ]
             try await saveRule(
                 Rule(
                     id: ruleID,
@@ -930,15 +956,15 @@ public struct PluginStoreContainerView: View {
                     await viewModel.setRulePreset(preset, enabled: enabled, for: plugin)
                 }
             },
-            saveAppNotificationRule: { plugin, ruleID, name, eventType, minimumSeverity, notificationTitle in
+            saveCustomAppRule: { plugin, ruleID, name, eventType, conditions, actions in
                 Task {
-                    await viewModel.saveAppNotificationRule(
+                    await viewModel.saveCustomAppRule(
                         for: plugin,
                         ruleID: ruleID,
                         name: name,
                         eventType: eventType,
-                        minimumSeverity: minimumSeverity,
-                        notificationTitle: notificationTitle
+                        conditions: conditions,
+                        actions: actions
                     )
                 }
             },
@@ -1201,15 +1227,15 @@ public struct PluginSettingsContainerView: View {
             setRulePresetEnabled: { plugin, preset, enabled in
                 Task { await viewModel.setRulePreset(preset, enabled: enabled, for: plugin) }
             },
-            saveAppNotificationRule: { plugin, ruleID, name, eventType, minimumSeverity, notificationTitle in
+            saveCustomAppRule: { plugin, ruleID, name, eventType, conditions, actions in
                 Task {
-                    await viewModel.saveAppNotificationRule(
+                    await viewModel.saveCustomAppRule(
                         for: plugin,
                         ruleID: ruleID,
                         name: name,
                         eventType: eventType,
-                        minimumSeverity: minimumSeverity,
-                        notificationTitle: notificationTitle
+                        conditions: conditions,
+                        actions: actions
                     )
                 }
             },
@@ -1356,7 +1382,7 @@ public struct PluginStoreView: View {
     private let setPermissionGrant: (InstalledPlugin, PluginPermission, Bool) -> Void
     private let setTriggerEnabled: (InstalledPlugin, TriggerDefinition, Bool) -> Void
     private let setRulePresetEnabled: (InstalledPlugin, Rule, Bool) -> Void
-    private let saveAppNotificationRule: (InstalledPlugin, String?, String, String, Severity?, String) -> Void
+    private let saveCustomAppRule: (InstalledPlugin, String?, String, String, [RuleCondition], [RuleActionDefinition]) -> Void
     private let setAppRuleEnabled: (InstalledPlugin, Rule, Bool) -> Void
     private let deleteAppRule: (InstalledPlugin, Rule) -> Void
     private let setDashboardTileField: (InstalledPlugin, String, Bool) -> Void
@@ -1419,7 +1445,7 @@ public struct PluginStoreView: View {
         setPermissionGrant: @escaping (InstalledPlugin, PluginPermission, Bool) -> Void = { _, _, _ in },
         setTriggerEnabled: @escaping (InstalledPlugin, TriggerDefinition, Bool) -> Void = { _, _, _ in },
         setRulePresetEnabled: @escaping (InstalledPlugin, Rule, Bool) -> Void = { _, _, _ in },
-        saveAppNotificationRule: @escaping (InstalledPlugin, String?, String, String, Severity?, String) -> Void = { _, _, _, _, _, _ in },
+        saveCustomAppRule: @escaping (InstalledPlugin, String?, String, String, [RuleCondition], [RuleActionDefinition]) -> Void = { _, _, _, _, _, _ in },
         setAppRuleEnabled: @escaping (InstalledPlugin, Rule, Bool) -> Void = { _, _, _ in },
         deleteAppRule: @escaping (InstalledPlugin, Rule) -> Void = { _, _ in },
         setDashboardTileField: @escaping (InstalledPlugin, String, Bool) -> Void = { _, _, _ in },
@@ -1479,7 +1505,7 @@ public struct PluginStoreView: View {
         self.setPermissionGrant = setPermissionGrant
         self.setTriggerEnabled = setTriggerEnabled
         self.setRulePresetEnabled = setRulePresetEnabled
-        self.saveAppNotificationRule = saveAppNotificationRule
+        self.saveCustomAppRule = saveCustomAppRule
         self.setAppRuleEnabled = setAppRuleEnabled
         self.deleteAppRule = deleteAppRule
         self.setDashboardTileField = setDashboardTileField
@@ -1615,7 +1641,7 @@ public struct PluginStoreView: View {
             setPermissionGrant: setPermissionGrant,
             setTriggerEnabled: setTriggerEnabled,
             setRulePresetEnabled: setRulePresetEnabled,
-            saveAppNotificationRule: saveAppNotificationRule,
+            saveCustomAppRule: saveCustomAppRule,
             setAppRuleEnabled: setAppRuleEnabled,
             deleteAppRule: deleteAppRule,
             setDashboardTileField: setDashboardTileField
@@ -1880,7 +1906,7 @@ private struct PluginSettingsPanel: View {
     let setPermissionGrant: (InstalledPlugin, PluginPermission, Bool) -> Void
     let setTriggerEnabled: (InstalledPlugin, TriggerDefinition, Bool) -> Void
     let setRulePresetEnabled: (InstalledPlugin, Rule, Bool) -> Void
-    let saveAppNotificationRule: (InstalledPlugin, String?, String, String, Severity?, String) -> Void
+    let saveCustomAppRule: (InstalledPlugin, String?, String, String, [RuleCondition], [RuleActionDefinition]) -> Void
     let setAppRuleEnabled: (InstalledPlugin, Rule, Bool) -> Void
     let deleteAppRule: (InstalledPlugin, Rule) -> Void
     let setDashboardTileField: (InstalledPlugin, String, Bool) -> Void
@@ -2051,8 +2077,8 @@ private struct PluginSettingsPanel: View {
                         presets: rulePresets,
                         appRules: appRules,
                         savingRuleID: savingRuleID,
-                        saveRule: { ruleID, name, eventType, severity, notificationTitle in
-                            saveAppNotificationRule(plugin, ruleID, name, eventType, severity, notificationTitle)
+                        saveRule: { ruleID, name, eventType, conditions, actions in
+                            saveCustomAppRule(plugin, ruleID, name, eventType, conditions, actions)
                         },
                         setRuleEnabled: { rule, enabled in
                             setAppRuleEnabled(plugin, rule, enabled)
@@ -2422,14 +2448,17 @@ private struct CustomAppRulesPanel: View {
     let presets: [Rule]
     let appRules: [Rule]
     let savingRuleID: String?
-    let saveRule: (String?, String, String, Severity?, String) -> Void
+    let saveRule: (String?, String, String, [RuleCondition], [RuleActionDefinition]) -> Void
     let setRuleEnabled: (Rule, Bool) -> Void
     let deleteRule: (Rule) -> Void
     @State private var editingRuleID: String?
     @State private var draftName = ""
     @State private var draftEventType = ""
-    @State private var draftSeverity = Severity.warning.rawValue
-    @State private var draftNotificationTitle = ""
+    @State private var draftConditions = [CustomRuleConditionDraft(field: "severity", operation: .matchesSeverity, value: Severity.warning.rawValue)]
+    @State private var draftActions = [
+        CustomRuleActionDraft(action: "status.inbox.add"),
+        CustomRuleActionDraft(action: "notification.show", value: "{{event.title}}")
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -2478,15 +2507,46 @@ private struct CustomAppRulesPanel: View {
                         }
                         .pickerStyle(.menu)
                     }
-                    Picker("Minimum severity", selection: $draftSeverity) {
-                        Text("Any").tag("")
-                        ForEach(Severity.allCases, id: \.rawValue) { severity in
-                            Text(severity.rawValue.capitalized).tag(severity.rawValue)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Conditions")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                        ForEach($draftConditions) { $condition in
+                            CustomRuleConditionDraftRow(
+                                condition: $condition,
+                                canDelete: draftConditions.count > 1,
+                                delete: {
+                                    draftConditions.removeAll { $0.id == condition.id }
+                                }
+                            )
                         }
+                        Button {
+                            draftConditions.append(CustomRuleConditionDraft())
+                        } label: {
+                            Label("Add Condition", systemImage: "plus.circle")
+                        }
+                        .buttonStyle(.bordered)
                     }
-                    .pickerStyle(.menu)
-                    TextField("Notification title", text: $draftNotificationTitle)
-                        .textFieldStyle(.roundedBorder)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Actions")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                        ForEach($draftActions) { $action in
+                            CustomRuleActionDraftRow(
+                                action: $action,
+                                canDelete: draftActions.count > 1,
+                                delete: {
+                                    draftActions.removeAll { $0.id == action.id }
+                                }
+                            )
+                        }
+                        Button {
+                            draftActions.append(CustomRuleActionDraft())
+                        } label: {
+                            Label("Add Action", systemImage: "plus.circle")
+                        }
+                        .buttonStyle(.bordered)
+                    }
                     HStack {
                         if editingRuleID != nil {
                             Button("Cancel") {
@@ -2500,8 +2560,8 @@ private struct CustomAppRulesPanel: View {
                                 editingRuleID,
                                 draftName,
                                 draftEventType,
-                                Severity(rawValue: draftSeverity),
-                                draftNotificationTitle
+                                conditions,
+                                actions
                             )
                             resetDraft()
                         } label: {
@@ -2513,7 +2573,7 @@ private struct CustomAppRulesPanel: View {
                             }
                         }
                         .buttonStyle(.bordered)
-                        .disabled(draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draftEventType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || savingRuleID != nil)
+                        .disabled(isDraftValid == false || savingRuleID != nil)
                     }
                 }
                 .padding(10)
@@ -2526,6 +2586,22 @@ private struct CustomAppRulesPanel: View {
                 draftEventType = eventTypeSuggestions.first ?? ""
             }
         }
+    }
+
+    private var conditions: [RuleCondition] {
+        draftConditions.compactMap(\.ruleCondition)
+    }
+
+    private var actions: [RuleActionDefinition] {
+        draftActions.compactMap(\.ruleAction)
+    }
+
+    private var isDraftValid: Bool {
+        draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false &&
+            draftEventType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false &&
+            draftConditions.allSatisfy(\.isValid) &&
+            draftActions.allSatisfy(\.isValid) &&
+            actions.isEmpty == false
     }
 
     private var customRules: [Rule] {
@@ -2546,29 +2622,19 @@ private struct CustomAppRulesPanel: View {
         editingRuleID = rule.id
         draftName = rule.name
         draftEventType = rule.eventType
-        draftSeverity = minimumSeverity(in: rule)?.rawValue ?? ""
-        draftNotificationTitle = rule.actions.first { $0.action == "notification.show" }?.parameters["title"] ?? ""
+        draftConditions = rule.conditions.isEmpty ? [CustomRuleConditionDraft()] : rule.conditions.map(CustomRuleConditionDraft.init)
+        draftActions = rule.actions.isEmpty ? [CustomRuleActionDraft()] : rule.actions.map(CustomRuleActionDraft.init)
     }
 
     private func resetDraft() {
         editingRuleID = nil
         draftName = ""
         draftEventType = eventTypeSuggestions.first ?? ""
-        draftSeverity = Severity.warning.rawValue
-        draftNotificationTitle = ""
-    }
-
-    private func minimumSeverity(in rule: Rule) -> Severity? {
-        for condition in rule.conditions {
-            guard condition.field == "severity",
-                  condition.operation == .matchesSeverity,
-                  case .string(let value)? = condition.value,
-                  let severity = Severity(rawValue: value) else {
-                continue
-            }
-            return severity
-        }
-        return nil
+        draftConditions = [CustomRuleConditionDraft(field: "severity", operation: .matchesSeverity, value: Severity.warning.rawValue)]
+        draftActions = [
+            CustomRuleActionDraft(action: "status.inbox.add"),
+            CustomRuleActionDraft(action: "notification.show", value: "{{event.title}}")
+        ]
     }
 
     private func appScopedRuleID(accountID: String, presetID: String) -> String {
@@ -2580,6 +2646,240 @@ private struct CustomAppRulesPanel: View {
                 String(character).rangeOfCharacter(from: allowed) == nil ? "_" : String(character)
             }
             .joined()
+    }
+}
+
+private struct CustomRuleConditionDraft: Identifiable, Equatable {
+    var id = UUID()
+    var field: String = "severity"
+    var operation: RuleOperator = .matchesSeverity
+    var value: String = Severity.warning.rawValue
+
+    init() {}
+
+    init(field: String, operation: RuleOperator, value: String) {
+        self.field = field
+        self.operation = operation
+        self.value = value
+    }
+
+    init(condition: RuleCondition) {
+        field = condition.field
+        operation = condition.operation
+        switch condition.value {
+        case .string(let value):
+            self.value = value
+        case .number(let value):
+            self.value = String(value)
+        case .bool(let value):
+            self.value = value ? "true" : "false"
+        case .null, nil:
+            self.value = ""
+        }
+    }
+
+    var isValid: Bool {
+        let trimmedField = field.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedField.isEmpty == false else { return false }
+        guard requiresValue else { return true }
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedValue.isEmpty == false else { return false }
+        if operation == .greaterThan || operation == .lessThan {
+            return Double(trimmedValue) != nil
+        }
+        if operation == .matchesSeverity {
+            return Severity(rawValue: trimmedValue) != nil
+        }
+        return true
+    }
+
+    var ruleCondition: RuleCondition? {
+        guard isValid else { return nil }
+        let trimmedField = field.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard requiresValue else {
+            return RuleCondition(field: trimmedField, operation: operation)
+        }
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if operation == .greaterThan || operation == .lessThan, let number = Double(trimmedValue) {
+            return RuleCondition(field: trimmedField, operation: operation, value: .number(number))
+        }
+        return RuleCondition(field: trimmedField, operation: operation, value: .string(trimmedValue))
+    }
+
+    var requiresValue: Bool {
+        operation != .isEmpty && operation != .isNotEmpty
+    }
+}
+
+private struct CustomRuleActionDraft: Identifiable, Equatable {
+    var id = UUID()
+    var action: String = "notification.show"
+    var value: String = ""
+
+    init() {}
+
+    init(action: String, value: String = "") {
+        self.action = action
+        self.value = value
+    }
+
+    init(action definition: RuleActionDefinition) {
+        action = definition.action
+        switch definition.action {
+        case "notification.show":
+            value = definition.parameters["title"] ?? ""
+        case "status.open_url":
+            value = definition.parameters["url"] ?? ""
+        case "audit.note":
+            value = definition.parameters["note"] ?? ""
+        default:
+            value = ""
+        }
+    }
+
+    var isValid: Bool {
+        guard Self.safeActions.contains(action) else { return false }
+        if requiresValue {
+            return value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        }
+        return true
+    }
+
+    var ruleAction: RuleActionDefinition? {
+        guard isValid else { return nil }
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch action {
+        case "notification.show":
+            return RuleActionDefinition(action: action, parameters: trimmedValue.isEmpty ? [:] : ["title": trimmedValue])
+        case "status.open_url":
+            return RuleActionDefinition(action: action, parameters: ["url": trimmedValue])
+        case "audit.note":
+            return RuleActionDefinition(action: action, parameters: ["note": trimmedValue])
+        case "status.inbox.add":
+            return RuleActionDefinition(action: action)
+        default:
+            return nil
+        }
+    }
+
+    var requiresValue: Bool {
+        action == "status.open_url" || action == "audit.note"
+    }
+
+    var parameterLabel: String {
+        switch action {
+        case "notification.show":
+            "Notification title"
+        case "status.open_url":
+            "URL"
+        case "audit.note":
+            "Note"
+        default:
+            "Parameter"
+        }
+    }
+
+    static let safeActions = [
+        "status.inbox.add",
+        "notification.show",
+        "status.open_url",
+        "audit.note"
+    ]
+}
+
+private struct CustomRuleConditionDraftRow: View {
+    @Binding var condition: CustomRuleConditionDraft
+    let canDelete: Bool
+    let delete: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Picker("Field", selection: $condition.field) {
+                    if Self.fields.contains(condition.field) == false {
+                        Text(condition.field).tag(condition.field)
+                    }
+                    ForEach(Self.fields, id: \.self) { field in
+                        Text(field).tag(field)
+                    }
+                }
+                .pickerStyle(.menu)
+                Picker("Operator", selection: $condition.operation) {
+                    ForEach(RuleOperator.allCases, id: \.rawValue) { operation in
+                        Text(operation.rawValue).tag(operation)
+                    }
+                }
+                .pickerStyle(.menu)
+                if canDelete {
+                    Button(role: .destructive) {
+                        delete()
+                    } label: {
+                        Label("Remove", systemImage: "minus.circle")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            if condition.requiresValue {
+                if condition.operation == .matchesSeverity {
+                    Picker("Value", selection: $condition.value) {
+                        ForEach(Severity.allCases, id: \.rawValue) { severity in
+                            Text(severity.rawValue.capitalized).tag(severity.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                } else {
+                    TextField("Value", text: $condition.value)
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+        }
+        .padding(8)
+        .background(Color.statusSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private static let fields = [
+        "severity",
+        "title",
+        "summary",
+        "resourceName",
+        "resourceID",
+        "fingerprint",
+        "actionURL"
+    ]
+}
+
+private struct CustomRuleActionDraftRow: View {
+    @Binding var action: CustomRuleActionDraft
+    let canDelete: Bool
+    let delete: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Picker("Action", selection: $action.action) {
+                    ForEach(CustomRuleActionDraft.safeActions, id: \.self) { action in
+                        Text(action).tag(action)
+                    }
+                }
+                .pickerStyle(.menu)
+                if canDelete {
+                    Button(role: .destructive) {
+                        delete()
+                    } label: {
+                        Label("Remove", systemImage: "minus.circle")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            if action.action == "notification.show" || action.requiresValue {
+                TextField(action.parameterLabel, text: $action.value)
+                    .textFieldStyle(.roundedBorder)
+            }
+        }
+        .padding(8)
+        .background(Color.statusSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
