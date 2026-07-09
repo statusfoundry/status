@@ -71,6 +71,57 @@ public struct PluginRequestPreviewResult: Equatable, Sendable {
     }
 }
 
+public struct ProviderActionRequestPreviewResult: Equatable, Sendable {
+    public var pluginID: String
+    public var action: String
+    public var requestID: String
+    public var accountID: String
+    public var method: String
+    public var url: URL
+    public var headers: [String: String]
+    public var bodyPreview: String?
+
+    public init(
+        pluginID: String,
+        action: String,
+        requestID: String,
+        accountID: String,
+        method: String,
+        url: URL,
+        headers: [String: String],
+        bodyPreview: String? = nil
+    ) {
+        self.pluginID = pluginID
+        self.action = action
+        self.requestID = requestID
+        self.accountID = accountID
+        self.method = method
+        self.url = url
+        self.headers = headers
+        self.bodyPreview = bodyPreview
+    }
+
+    public var summary: String {
+        var parts = [
+            "\(method) \(url.absoluteString)",
+            "Plugin \(pluginID)",
+            "Action \(action)",
+            "Request \(requestID)",
+            "Account \(accountID)"
+        ]
+        let headerLines = headers
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key): \($0.value)" }
+        if headerLines.isEmpty == false {
+            parts.append("Headers\n\(headerLines.joined(separator: "\n"))")
+        }
+        if let bodyPreview, bodyPreview.isEmpty == false {
+            parts.append("Body\n\(bodyPreview)")
+        }
+        return parts.joined(separator: "\n")
+    }
+}
+
 private extension String {
     var nonEmpty: String? {
         isEmpty ? nil : self
@@ -577,6 +628,7 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
         try requireGrantedPermissionIfDeclared(pluginID: target.plugin.id, manifest: target.manifest, permission: .writeActions)
         try requireGrantedPermissionIfDeclared(pluginID: target.plugin.id, manifest: target.manifest, permission: .network)
         let account = try providerActionAccount(for: action, pluginID: target.plugin.id)
+        let actionParameters = renderedActionParameters(action)
         let headers = try await resolvedHeaders(
             base: [:],
             pluginID: target.plugin.id,
@@ -588,7 +640,7 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
             accountID: account.id,
             provider: target.plugin.id,
             requestID: target.action.request,
-            variables: account.variables.merging(action.parameters) { _, actionValue in actionValue },
+            variables: account.variables.merging(actionParameters) { _, actionValue in actionValue },
             headers: headers,
             capturedAt: Date()
         )
@@ -599,7 +651,7 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
         let request = try runner.request(
             definition: target.request,
             input: requestInput,
-            context: providerActionTemplateContext(action: action, account: account)
+            context: providerActionTemplateContext(action: action, account: account, actionParameters: actionParameters)
         )
         let response = try await runner.response(for: request, requestID: target.action.request)
         guard (200..<300).contains(response.statusCode) else {
@@ -616,6 +668,42 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
             result["body"] = body
         }
         return result
+    }
+
+    public func previewProviderActionRequest(
+        _ action: ActionRuntimeProviderAction
+    ) async throws -> ProviderActionRequestPreviewResult {
+        let target = try providerActionTarget(for: action)
+        let account = try providerActionAccount(for: action, pluginID: target.plugin.id)
+        let actionParameters = renderedActionParameters(action)
+        let requestInput = PluginRequestJobInput(
+            pluginID: target.plugin.id,
+            accountID: account.id,
+            provider: target.plugin.id,
+            requestID: target.action.request,
+            variables: account.variables.merging(actionParameters) { _, actionValue in actionValue },
+            headers: try redactedCredentialHeaders(pluginID: target.plugin.id, configuration: account),
+            capturedAt: Date()
+        )
+        let runner = PluginRequestJobRunner(
+            transport: transport,
+            committer: PluginMappingOutputCommitter(store: store)
+        )
+        let request = try runner.request(
+            definition: target.request,
+            input: requestInput,
+            context: providerActionTemplateContext(action: action, account: account, actionParameters: actionParameters)
+        )
+        return ProviderActionRequestPreviewResult(
+            pluginID: target.plugin.id,
+            action: action.action,
+            requestID: target.action.request,
+            accountID: account.id,
+            method: request.method,
+            url: request.url,
+            headers: redactedHeaders(request.headers),
+            bodyPreview: request.body.flatMap { bodyPreview(from: $0) }
+        )
     }
 
     private struct ProviderActionTarget {
@@ -678,12 +766,13 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
 
     private func providerActionTemplateContext(
         action: ActionRuntimeProviderAction,
-        account: PluginAccountConfiguration
+        account: PluginAccountConfiguration,
+        actionParameters: [String: String]
     ) -> MappingTemplateContext {
         let accountValue = MappingJSONValue.object(account.variables.mapValues(MappingJSONValue.string))
-        let actionValue = MappingJSONValue.object(action.parameters.mapValues(MappingJSONValue.string))
+        let actionValue = MappingJSONValue.object(actionParameters.mapValues(MappingJSONValue.string))
         let item = account.variables
-            .merging(action.parameters) { _, actionValue in actionValue }
+            .merging(actionParameters) { _, actionValue in actionValue }
             .mapValues(MappingJSONValue.string)
         return MappingTemplateContext(scopes: [
             "item": .object(item),
@@ -691,6 +780,11 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
             "action": actionValue,
             "event": action.event.mappingValue
         ])
+    }
+
+    private func renderedActionParameters(_ action: ActionRuntimeProviderAction) -> [String: String] {
+        let context = MappingTemplateContext(scopes: ["event": action.event.mappingValue])
+        return action.parameters.mapValues { MappingTemplateRenderer.render($0, context: context) }
     }
 
     private func isDueCronTrigger(_ trigger: TriggerDefinition, at date: Date) -> Bool {
@@ -832,6 +926,42 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
             break
         }
         return resolved
+    }
+
+    private func redactedCredentialHeaders(
+        pluginID: String,
+        configuration: PluginAccountConfiguration
+    ) throws -> [String: String] {
+        guard configuration.credentialRef != nil else {
+            return [:]
+        }
+        switch configuration.authType {
+        case AuthKind.bearerToken.rawValue,
+             AuthKind.basicAuth.rawValue,
+             AuthKind.jwtAPIKey.rawValue,
+             AuthKind.oauth2.rawValue:
+            return ["Authorization": "<redacted>"]
+        case AuthKind.apiKey.rawValue:
+            return [try apiKeyHeaderName(pluginID: pluginID): "<redacted>"]
+        default:
+            return [:]
+        }
+    }
+
+    private func redactedHeaders(_ headers: [String: String]) -> [String: String] {
+        Dictionary(uniqueKeysWithValues: headers.map { key, value in
+            (key, isSensitiveHeader(key) ? "<redacted>" : value)
+        })
+    }
+
+    private func isSensitiveHeader(_ header: String) -> Bool {
+        let normalized = header.lowercased()
+        return normalized == "authorization" ||
+            normalized == "proxy-authorization" ||
+            normalized.contains("api-key") ||
+            normalized.contains("apikey") ||
+            normalized.contains("token") ||
+            normalized.contains("secret")
     }
 
     private func refreshOAuthTokenSet(

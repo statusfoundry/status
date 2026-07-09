@@ -1511,16 +1511,28 @@ import Testing
         timestamp: now,
         fingerprint: "github:workflow.failed:res_status_repo:failure"
     )
-
-    let result = try await service.execute(
-        ActionRuntimeProviderAction(
-            actionRunID: "run_01",
-            action: "jira.createIssue",
-            provider: event.provider,
-            parameters: ["project": "STATUS", "summary": "Workflow failed"],
-            event: event
-        )
+    let action = ActionRuntimeProviderAction(
+        actionRunID: "run_01",
+        action: "jira.createIssue",
+        provider: event.provider,
+        parameters: ["project": "STATUS", "summary": "{{event.title}}"],
+        event: event
     )
+
+    let preview = try await service.previewProviderActionRequest(action)
+
+    #expect(preview.pluginID == "com.status.jira")
+    #expect(preview.action == "jira.createIssue")
+    #expect(preview.requestID == "create_issue")
+    #expect(preview.accountID == "acct_com_status_jira_example_atlassian_net")
+    #expect(preview.method == "POST")
+    #expect(preview.url == url)
+    #expect(preview.headers["Accept"] == "application/json")
+    #expect(preview.headers["Authorization"] == "<redacted>")
+    #expect(preview.headers["Content-Type"] == "application/json")
+    #expect(preview.bodyPreview == #"{"fields":{"description":"CI failed on main.","project":{"key":"STATUS"},"summary":"Workflow failed"}}"#)
+
+    let result = try await service.execute(action)
 
     #expect(result["plugin_id"] == "com.status.jira")
     #expect(result["account_id"] == "acct_com_status_jira_example_atlassian_net")

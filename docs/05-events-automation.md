@@ -312,6 +312,7 @@ Current implementation status:
 - `notification.show`, `status.inbox.add`, `status.open_url`, and `audit.note` are safe local core actions.
 - `webhook.post` is review-required and dispatches a platform-owned webhook runtime effect only when the rule provider has a granted `write-actions` permission. macOS and iOS post that effect as JSON through the shared HTTP transport. Delivery failures are reported back to the core with the originating action-run id so the stored action run and audit row are marked failed.
 - Provider actions are review-required from the installed plugin's `actions.json` metadata, not from hardcoded action names. They execute only when an installed declarative plugin declares the action in `actions.json`, binds it to a request in `requests.json`, has a configured account, and has granted `write-actions` plus any required network/keychain permissions.
+- Provider actions can be previewed without dispatching the request. The preview resolves the declaring plugin, configured app/account, request method, URL, non-secret headers, redacted credential headers, and rendered request body from account/action/event scopes.
 - Unknown actions are recorded as unsupported rather than executed.
 
 ## Action safety levels
