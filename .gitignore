@@ -7,6 +7,7 @@ Status.xcodeproj/
 DerivedData/
 
 # Web builds
+dist/
 web/dist/
 
 # Cloudflare / Wrangler local state
