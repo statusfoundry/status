@@ -441,6 +441,136 @@ import StatusCore
 }
 
 @MainActor
+@Test func pluginStoreViewModelRequiresWriteGrantForReviewRequiredPreset() async throws {
+    let plugin = InstalledPlugin(
+        id: "com.status.jira",
+        name: "Jira",
+        author: "Status Foundry",
+        description: "Jira issue creation.",
+        category: "operations",
+        trustLevel: .official,
+        installedVersion: "0.1.0",
+        installPath: "/tmp/com.status.jira",
+        installedAt: Date(timeIntervalSince1970: 1_783_433_520),
+        updatedAt: Date(timeIntervalSince1970: 1_783_433_520)
+    )
+    let account = PluginAccountConfiguration(
+        id: "acc_ops",
+        pluginID: plugin.id,
+        accountName: "Ops",
+        variables: [:]
+    )
+    let preset = Rule(
+        id: "rule_jira_issue",
+        name: "Create Jira issue",
+        enabled: false,
+        provider: plugin.id,
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [RuleActionDefinition(action: "jira.createIssue", parameters: ["summary": "{{event.title}}"])]
+    )
+    var storedRules: [Rule] = []
+    var granted = false
+    let viewModel = PluginStoreViewModel(
+        loadInstalled: { [plugin] },
+        loadAvailable: { [] },
+        loadRules: { _ in [preset] + storedRules },
+        saveRule: { rule in
+            storedRules.removeAll { $0.id == rule.id }
+            storedRules.append(rule)
+        },
+        installPlugin: { _ in },
+        loadPermissions: { _ in [
+            InstalledPluginPermission(id: "plp_write", pluginID: plugin.id, permission: .writeActions, granted: granted)
+        ] },
+        canConfigurePlugin: { _ in true },
+        loadAccounts: { _ in [account] }
+    )
+
+    await viewModel.reload()
+    await viewModel.setRulePreset(preset, enabled: true, for: plugin)
+
+    #expect(storedRules.isEmpty)
+    #expect(viewModel.loadError == "Grant Write actions permission before enabling this rule.")
+
+    granted = true
+    await viewModel.reload()
+    await viewModel.setRulePreset(preset, enabled: true, for: plugin)
+
+    let saved = try #require(storedRules.first)
+    #expect(saved.enabled)
+    #expect(saved.scope == .app)
+    #expect(saved.accountID == account.id)
+    #expect(saved.actions == preset.actions)
+}
+
+@MainActor
+@Test func pluginStoreViewModelRequiresWriteGrantForCustomWebhookRule() async throws {
+    let plugin = InstalledPlugin(
+        id: "com.status.github",
+        name: "GitHub",
+        author: "Status Foundry",
+        description: "GitHub repository checks.",
+        category: "development",
+        trustLevel: .official,
+        installedVersion: "0.1.0",
+        installPath: "/tmp/com.status.github",
+        installedAt: Date(timeIntervalSince1970: 1_783_433_520),
+        updatedAt: Date(timeIntervalSince1970: 1_783_433_520)
+    )
+    let account = PluginAccountConfiguration(
+        id: "acc_work",
+        pluginID: plugin.id,
+        accountName: "Work",
+        variables: [:]
+    )
+    var storedRules: [Rule] = []
+    var granted = false
+    let viewModel = PluginStoreViewModel(
+        loadInstalled: { [plugin] },
+        loadAvailable: { [] },
+        loadRules: { _ in storedRules },
+        saveRule: { rule in
+            storedRules.removeAll { $0.id == rule.id }
+            storedRules.append(rule)
+        },
+        installPlugin: { _ in },
+        loadPermissions: { _ in [
+            InstalledPluginPermission(id: "plp_write", pluginID: plugin.id, permission: .writeActions, granted: granted)
+        ] },
+        canConfigurePlugin: { _ in true },
+        loadAccounts: { _ in [account] }
+    )
+
+    await viewModel.reload()
+    await viewModel.saveCustomAppRule(
+        for: plugin,
+        name: "Webhook workflow failures",
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [RuleActionDefinition(action: "webhook.post", parameters: ["url": "https://example.com/hooks/status"])]
+    )
+
+    #expect(storedRules.isEmpty)
+    #expect(viewModel.loadError == "Grant Write actions permission before saving this rule.")
+
+    granted = true
+    await viewModel.reload()
+    await viewModel.saveCustomAppRule(
+        for: plugin,
+        name: "Webhook workflow failures",
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [RuleActionDefinition(action: "webhook.post", parameters: ["url": "https://example.com/hooks/status"])]
+    )
+
+    let saved = try #require(storedRules.first)
+    #expect(saved.actions == [
+        RuleActionDefinition(action: "webhook.post", parameters: ["url": "https://example.com/hooks/status"])
+    ])
+}
+
+@MainActor
 @Test func pluginStoreViewModelBuildsOAuthConnectionURL() async throws {
     let plugin = InstalledPlugin(
         id: "com.status.oauthgithub",

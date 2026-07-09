@@ -294,6 +294,10 @@ public final class PluginStoreViewModel: ObservableObject {
             loadError = "Save an app before enabling suggested rules."
             return
         }
+        if enabled, requiresWritePermission(preset.actions), hasGrantedPermission(.writeActions, for: plugin) == false {
+            loadError = "Grant Write actions permission before enabling this rule."
+            return
+        }
 
         let appRuleID = appScopedRuleID(pluginID: plugin.id, accountID: account.id, presetID: preset.id)
         savingRuleID = appRuleID
@@ -371,6 +375,10 @@ public final class PluginStoreViewModel: ObservableObject {
         }
         if let unsupportedAction = actions.first(where: { ActionRunner.safetyLevel(for: $0.action) == .unsupported }) {
             loadError = "\(unsupportedAction.action) is not supported by Status."
+            return
+        }
+        if requiresWritePermission(actions), hasGrantedPermission(.writeActions, for: plugin) == false {
+            loadError = "Grant Write actions permission before saving this rule."
             return
         }
 
@@ -779,6 +787,16 @@ public final class PluginStoreViewModel: ObservableObject {
                 String(character).rangeOfCharacter(from: allowed) == nil ? "_" : String(character)
             }
             .joined()
+    }
+
+    private func requiresWritePermission(_ actions: [RuleActionDefinition]) -> Bool {
+        actions.contains { ActionRunner.safetyLevel(for: $0.action) == .reviewRequired }
+    }
+
+    private func hasGrantedPermission(_ permission: PluginPermission, for plugin: InstalledPlugin) -> Bool {
+        installedPermissions[plugin.id, default: []].contains {
+            $0.permission == permission && $0.granted
+        }
     }
 
     private func selectedAccount(for plugin: InstalledPlugin) -> PluginAccountConfiguration? {
@@ -2064,6 +2082,7 @@ private struct PluginSettingsPanel: View {
                     AppRulePresetsPanel(
                         plugin: plugin,
                         selectedAccountID: selectedPersistedAccountID,
+                        permissions: permissions,
                         presets: rulePresets,
                         appRules: appRules,
                         savingRuleID: savingRuleID,
@@ -2074,6 +2093,7 @@ private struct PluginSettingsPanel: View {
                     CustomAppRulesPanel(
                         plugin: plugin,
                         selectedAccountID: selectedPersistedAccountID,
+                        permissions: permissions,
                         presets: rulePresets,
                         appRules: appRules,
                         savingRuleID: savingRuleID,
@@ -2348,6 +2368,7 @@ private struct DashboardTileFieldsPanel: View {
 private struct AppRulePresetsPanel: View {
     let plugin: InstalledPlugin
     let selectedAccountID: String?
+    let permissions: [InstalledPluginPermission]
     let presets: [Rule]
     let appRules: [Rule]
     let savingRuleID: String?
@@ -2373,6 +2394,7 @@ private struct AppRulePresetsPanel: View {
                                 appScopedRuleID(accountID: $0, presetID: preset.id)
                             },
                             selectedAccountID: selectedAccountID,
+                            hasWritePermission: hasWritePermission,
                             savingRuleID: savingRuleID,
                             update: { enabled in
                                 setEnabled(preset, enabled)
@@ -2382,6 +2404,10 @@ private struct AppRulePresetsPanel: View {
                 }
             }
         }
+    }
+
+    private var hasWritePermission: Bool {
+        permissions.contains { $0.permission == .writeActions && $0.granted }
     }
 
     private func appRule(for preset: Rule) -> Rule? {
@@ -2408,6 +2434,7 @@ private struct AppRulePresetToggle: View {
     let appRule: Rule?
     let expectedRuleID: String?
     let selectedAccountID: String?
+    let hasWritePermission: Bool
     let savingRuleID: String?
     let update: (Bool) -> Void
 
@@ -2430,9 +2457,14 @@ private struct AppRulePresetToggle: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+                RuleReviewPreview(
+                    ruleName: preset.name,
+                    actions: preset.actions,
+                    hasWritePermission: hasWritePermission
+                )
             }
         }
-        .disabled(selectedAccountID == nil || savingRuleID == expectedRuleID)
+        .disabled(selectedAccountID == nil || savingRuleID == expectedRuleID || (appRule?.enabled != true && requiresWritePermission && hasWritePermission == false))
     }
 
     private var detail: String {
@@ -2440,11 +2472,16 @@ private struct AppRulePresetToggle: View {
         let actionCount = preset.actions.count
         return "\(preset.eventType) · \(conditionCount) condition\(conditionCount == 1 ? "" : "s") · \(actionCount) action\(actionCount == 1 ? "" : "s")"
     }
+
+    private var requiresWritePermission: Bool {
+        preset.actions.contains { ActionRunner.safetyLevel(for: $0.action) == .reviewRequired }
+    }
 }
 
 private struct CustomAppRulesPanel: View {
     let plugin: InstalledPlugin
     let selectedAccountID: String?
+    let permissions: [InstalledPluginPermission]
     let presets: [Rule]
     let appRules: [Rule]
     let savingRuleID: String?
@@ -2547,6 +2584,11 @@ private struct CustomAppRulesPanel: View {
                         }
                         .buttonStyle(.bordered)
                     }
+                    RuleReviewPreview(
+                        ruleName: draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "this rule" : draftName,
+                        actions: actions,
+                        hasWritePermission: hasWritePermission
+                    )
                     HStack {
                         if editingRuleID != nil {
                             Button("Cancel") {
@@ -2573,7 +2615,7 @@ private struct CustomAppRulesPanel: View {
                             }
                         }
                         .buttonStyle(.bordered)
-                        .disabled(isDraftValid == false || savingRuleID != nil)
+                        .disabled(isDraftValid == false || savingRuleID != nil || (requiresWritePermission && hasWritePermission == false))
                     }
                 }
                 .padding(10)
@@ -2602,6 +2644,14 @@ private struct CustomAppRulesPanel: View {
             draftConditions.allSatisfy(\.isValid) &&
             draftActions.allSatisfy(\.isValid) &&
             actions.isEmpty == false
+    }
+
+    private var requiresWritePermission: Bool {
+        actions.contains { ActionRunner.safetyLevel(for: $0.action) == .reviewRequired }
+    }
+
+    private var hasWritePermission: Bool {
+        permissions.contains { $0.permission == .writeActions && $0.granted }
     }
 
     private var customRules: [Rule] {
@@ -2732,13 +2782,15 @@ private struct CustomRuleActionDraft: Identifiable, Equatable {
             value = definition.parameters["url"] ?? ""
         case "audit.note":
             value = definition.parameters["note"] ?? ""
+        case "webhook.post":
+            value = definition.parameters["url"] ?? ""
         default:
             value = ""
         }
     }
 
     var isValid: Bool {
-        guard Self.safeActions.contains(action) else { return false }
+        guard Self.availableActions.contains(action) else { return false }
         if requiresValue {
             return value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
         }
@@ -2755,6 +2807,8 @@ private struct CustomRuleActionDraft: Identifiable, Equatable {
             return RuleActionDefinition(action: action, parameters: ["url": trimmedValue])
         case "audit.note":
             return RuleActionDefinition(action: action, parameters: ["note": trimmedValue])
+        case "webhook.post":
+            return RuleActionDefinition(action: action, parameters: ["url": trimmedValue])
         case "status.inbox.add":
             return RuleActionDefinition(action: action)
         default:
@@ -2763,7 +2817,7 @@ private struct CustomRuleActionDraft: Identifiable, Equatable {
     }
 
     var requiresValue: Bool {
-        action == "status.open_url" || action == "audit.note"
+        action == "status.open_url" || action == "audit.note" || action == "webhook.post"
     }
 
     var parameterLabel: String {
@@ -2774,16 +2828,19 @@ private struct CustomRuleActionDraft: Identifiable, Equatable {
             "URL"
         case "audit.note":
             "Note"
+        case "webhook.post":
+            "Webhook URL"
         default:
             "Parameter"
         }
     }
 
-    static let safeActions = [
+    static let availableActions = [
         "status.inbox.add",
         "notification.show",
         "status.open_url",
-        "audit.note"
+        "audit.note",
+        "webhook.post"
     ]
 }
 
@@ -2858,7 +2915,7 @@ private struct CustomRuleActionDraftRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Picker("Action", selection: $action.action) {
-                    ForEach(CustomRuleActionDraft.safeActions, id: \.self) { action in
+                    ForEach(CustomRuleActionDraft.availableActions, id: \.self) { action in
                         Text(action).tag(action)
                     }
                 }
@@ -2880,6 +2937,51 @@ private struct CustomRuleActionDraftRow: View {
         .padding(8)
         .background(Color.statusSurface)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct RuleReviewPreview: View {
+    let ruleName: String
+    let actions: [RuleActionDefinition]
+    let hasWritePermission: Bool
+
+    var body: some View {
+        if reviewRequiredActions.isEmpty == false {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Review required", systemImage: "exclamationmark.triangle")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(hasWritePermission ? Color.secondary : Color.orange)
+                Text(permissionText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(auditPreview)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.statusSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    private var reviewRequiredActions: [RuleActionDefinition] {
+        actions.filter { ActionRunner.safetyLevel(for: $0.action) == .reviewRequired }
+    }
+
+    private var permissionText: String {
+        let actionList = reviewRequiredActions.map(\.action).joined(separator: ", ")
+        if hasWritePermission {
+            return "Write actions permission is granted for \(actionList)."
+        }
+        return "Grant Write actions permission before enabling \(actionList)."
+    }
+
+    private var auditPreview: String {
+        let actionList = reviewRequiredActions.map(\.action).joined(separator: ", ")
+        return "Audit preview: Status records action runs and audit entries when \(ruleName) runs \(actionList) for a matching event."
     }
 }
 
