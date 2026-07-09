@@ -244,9 +244,7 @@ public enum PluginManifestValidator {
             if manifest.permissions.contains(.userConfiguredDomains) {
                 continue
             }
-            guard declaredDomains.contains(host) else {
-                throw PluginValidationError.undeclaredRequestDomain(host)
-            }
+            try validateDeclaredDomain(host, declaredDomains: declaredDomains)
         }
 
         let authDefinitions = input.authDefinitions.isEmpty
@@ -265,9 +263,11 @@ public enum PluginManifestValidator {
             guard auth.applicationId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
                 throw PluginValidationError.oauthMissingApplicationID(manifest.id)
             }
-            guard auth.oauth2 != nil else {
+            guard let oauth = auth.oauth2 else {
                 throw PluginValidationError.oauthMissingConfiguration(manifest.id)
             }
+            try validateDeclaredDomain(oauth.authorizationURL.host?.lowercased() ?? "", declaredDomains: declaredDomains)
+            try validateDeclaredDomain(oauth.tokenURL.host?.lowercased() ?? "", declaredDomains: declaredDomains)
         }
 
         let hasWritePermission = manifest.permissions.contains(.writeActions)
@@ -322,6 +322,12 @@ public enum PluginManifestValidator {
         let isValid = symbol.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]*$"#, options: .regularExpression) != nil
         if isValid == false {
             throw PluginValidationError.invalidIcon(icon)
+        }
+    }
+
+    private static func validateDeclaredDomain(_ host: String, declaredDomains: Set<String>) throws {
+        guard declaredDomains.contains(host) else {
+            throw PluginValidationError.undeclaredRequestDomain(host)
         }
     }
 

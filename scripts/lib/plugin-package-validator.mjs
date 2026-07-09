@@ -419,7 +419,25 @@ function validateActions(actionsFile, requestIDs, manifest, sourceName) {
   }
 }
 
-function validateAuth(authFile, sourceName) {
+function declaredDomainSet(manifest) {
+  return new Set((manifest.domains ?? []).map((domain) => domain.toLowerCase()));
+}
+
+function hostFromURL(value, sourceName, fieldName) {
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    fail(`${sourceName}: ${fieldName} must be a valid URL`);
+  }
+}
+
+function validateDeclaredHost(manifest, host, sourceName, fieldName) {
+  if (declaredDomainSet(manifest).has(host) === false) {
+    fail(`${sourceName}: ${fieldName} uses undeclared domain ${host}`);
+  }
+}
+
+function validateAuth(authFile, manifest, sourceName) {
   if (!authFile) {
     return;
   }
@@ -439,6 +457,20 @@ function validateAuth(authFile, sourceName) {
   if (authFile.type === "oauth2" && (!authFile.oauth2 || typeof authFile.oauth2 !== "object" || Array.isArray(authFile.oauth2))) {
     fail(`${sourceName}: oauth2 auth requires oauth2 endpoint configuration`);
   }
+  if (authFile.type === "oauth2") {
+    validateDeclaredHost(
+      manifest,
+      hostFromURL(authFile.oauth2.authorizationUrl, sourceName, "auth.oauth2.authorizationUrl"),
+      sourceName,
+      "auth.oauth2.authorizationUrl"
+    );
+    validateDeclaredHost(
+      manifest,
+      hostFromURL(authFile.oauth2.tokenUrl, sourceName, "auth.oauth2.tokenUrl"),
+      sourceName,
+      "auth.oauth2.tokenUrl"
+    );
+  }
 }
 
 export async function validatePluginPackage(pluginDirectory, manifest, sourceName) {
@@ -451,7 +483,7 @@ export async function validatePluginPackage(pluginDirectory, manifest, sourceNam
   const viewsFile = await readOptionalJSON(path.join(pluginDirectory, "views.json"));
   const actionsFile = await readOptionalJSON(path.join(pluginDirectory, "actions.json"));
 
-  validateAuth(authFile, sourceName);
+  validateAuth(authFile, manifest, sourceName);
   const requestIDs = validateRequestDefinitions(manifest, requestsFile, sourceName);
   const eventTypes = validateEvents(eventsFile, sourceName);
   validateTriggers(triggersFile, requestIDs, sourceName);

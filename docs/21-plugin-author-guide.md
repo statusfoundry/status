@@ -53,6 +53,7 @@ When a provider needs a registered application (GitHub OAuth app, Jira app, etc.
 ```
 
 Never put client secrets in the plugin package.
+For OAuth plugins, also list the authorization and token endpoint hosts in `manifest.json` `domains`; Status makes those network calls during connect and refresh.
 
 ### Standalone template repository
 

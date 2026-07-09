@@ -83,6 +83,7 @@ import Testing
 
     var oauthManifest = manifest
     oauthManifest.permissions.append(.oauth)
+    oauthManifest.domains = ["api.appstoreconnect.apple.com", "github.com"]
     let auth = PackagedPluginAuth(
         type: .oauth2,
         provider: "github",
@@ -98,6 +99,27 @@ import Testing
     try PluginManifestValidator.validate(
         PluginValidationInput(manifest: oauthManifest, authDefinitions: [auth])
     )
+}
+
+@Test func oauthEndpointDomainsMustBeDeclaredByPlugin() throws {
+    var manifest = appStoreConnectManifest()
+    manifest.permissions.append(.oauth)
+    let auth = PackagedPluginAuth(
+        type: .oauth2,
+        provider: "github",
+        applicationId: "status-foundry.github",
+        oauth2: PackagedPluginOAuth2(
+            authorizationURL: try #require(URL(string: "https://github.com/login/oauth/authorize")),
+            tokenURL: try #require(URL(string: "https://github.com/login/oauth/access_token")),
+            redirectURI: "status://oauth/github"
+        )
+    )
+
+    #expect(throws: PluginValidationError.undeclaredRequestDomain("github.com")) {
+        try PluginManifestValidator.validate(
+            PluginValidationInput(manifest: manifest, authDefinitions: [auth])
+        )
+    }
 }
 
 @Test func pluginManifestRequiresIconAndAccentColor() {
