@@ -24,6 +24,8 @@ public enum PluginSetupConfigurationError: Error, Equatable, LocalizedError, Sen
 }
 
 public enum PluginSetupConfiguration {
+    public static let dashboardTileFieldsKey = "_status.dashboardTileFields"
+
     public static func configuredValues(pluginID: String, store: StatusPersistenceStore) throws -> [String: String] {
         try store.accountConfigurations(pluginID: pluginID).first?.variables ?? [:]
     }
@@ -84,6 +86,12 @@ public enum PluginSetupConfiguration {
                 continue
             }
             normalized[field.id] = try normalize(trimmed, field: field)
+        }
+        if let accountID,
+           let existing = try service.store.accountConfiguration(accountID: accountID) {
+            for (key, value) in existing.variables where key.hasPrefix("_status.") {
+                normalized[key] = value
+            }
         }
 
         let displayName = displayNameOverride?

@@ -64,7 +64,7 @@ public enum PluginRuntimeServiceError: Error, Equatable, LocalizedError, Sendabl
 }
 
 public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Sendable {
-    private let store: StatusPersistenceStore
+    let store: StatusPersistenceStore
     private let transport: PluginRequestHTTPTransport
     private let credentialStore: CredentialStore?
     private let actionRunner: ActionRunner

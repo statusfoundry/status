@@ -126,6 +126,10 @@ private struct IOSRootView: View {
                 .filter { $0.provider == plugin.id }
         } saveRule: { rule in
             try LocalStatusStore.openApplicationSupportStore().upsertRule(rule, updatedAt: Date())
+        } loadDashboardTileFields: { _, accountID in
+            try dashboardTileFields(accountID: accountID)
+        } saveDashboardTileFields: { plugin, accountID, fields in
+            try saveDashboardTileFields(pluginID: plugin.id, accountID: accountID, fields: fields)
         } installPlugin: { plugin in
             guard let latestVersion = plugin.latestVersion else { return }
             let store = try LocalStatusStore.openApplicationSupportStore()
@@ -415,6 +419,22 @@ private struct IOSRootView: View {
             accountID: accountID,
             displayNameOverride: displayName
         )
+    }
+
+    private func dashboardTileFields(accountID: String) throws -> [String] {
+        let store = try LocalStatusStore.openApplicationSupportStore()
+        let value = try store.accountConfiguration(accountID: accountID)?
+            .variables[PluginSetupConfiguration.dashboardTileFieldsKey] ?? ""
+        return value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+    }
+
+    private func saveDashboardTileFields(pluginID: String, accountID: String, fields: [String]) throws {
+        let store = try LocalStatusStore.openApplicationSupportStore()
+        guard var configuration = try store.accountConfiguration(accountID: accountID) else {
+            throw PluginRuntimeServiceError.accountNotConfigured(pluginID)
+        }
+        configuration.variables[PluginSetupConfiguration.dashboardTileFieldsKey] = fields.joined(separator: ",")
+        try store.upsertAccountConfiguration(configuration, updatedAt: Date())
     }
 
     private func runBackgroundPluginLoop() async {

@@ -377,14 +377,36 @@ public struct IntegrationSummary: Identifiable, Codable, Equatable, Sendable {
     public var state: String
     public var severity: Severity
     public var lastSyncDescription: String
+    public var tileItems: [DashboardTileItem]
 
-    public init(id: String, name: String, provider: String, state: String, severity: Severity, lastSyncDescription: String) {
+    public init(
+        id: String,
+        name: String,
+        provider: String,
+        state: String,
+        severity: Severity,
+        lastSyncDescription: String,
+        tileItems: [DashboardTileItem] = []
+    ) {
         self.id = id
         self.name = name
         self.provider = provider
         self.state = state
         self.severity = severity
         self.lastSyncDescription = lastSyncDescription
+        self.tileItems = tileItems
+    }
+}
+
+public struct DashboardTileItem: Identifiable, Codable, Equatable, Sendable {
+    public var id: String
+    public var label: String
+    public var value: String
+
+    public init(id: String, label: String, value: String) {
+        self.id = id
+        self.label = label
+        self.value = value
     }
 }
 

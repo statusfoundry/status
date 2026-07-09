@@ -136,9 +136,28 @@ private struct IntegrationSection: View {
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
+            if integration.tileItems.isEmpty == false {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(integration.tileItems.prefix(3)) { item in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(item.label)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                            Spacer(minLength: 8)
+                            Text(item.value)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                    }
+                }
+                .padding(.top, 2)
+            }
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 150, alignment: .leading)
         .padding(14)
         .background(Color.statusSurface)
         .clipShape(RoundedRectangle(cornerRadius: 8))
