@@ -75,7 +75,7 @@ Acceptance: each roadmapped integration through Phase 7 has a named, feasible au
 
 ### WP-0.6 Plugin signing and registry security spec — Security Agent
 
-"Signature" appears throughout but no scheme is defined. Specify in `docs/07-security-privacy.md`: signing algorithm (e.g. Ed25519), key custody, how the app pins/obtains the registry public key, signature format inside the package, revocation list format and check frequency, and the unsigned-plugin developer-mode warning flow.
+Status: implemented for the current development registry path. `docs/07-security-privacy.md` defines Ed25519 package signatures over raw ZIP bytes, SHA-256 package hashes, app-pinned signing keys, registry signature metadata, revocation targets, and the unsigned-plugin Developer Mode boundary. The Swift verifier enforces hash, signature, trusted key, and revocation checks before install. Production distribution still needs release key custody and rotation to replace the repository development key.
 
 Acceptance: an agent could implement package verification from the doc alone; threat model section updated.
 

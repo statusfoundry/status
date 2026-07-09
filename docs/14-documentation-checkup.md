@@ -197,21 +197,21 @@ Covered by implementation plan:
 
 ### 6. Plugin signing is named but not specified
 
-Many docs require signatures, but the signing scheme is not defined.
+The signing scheme is now defined and implemented for the development registry path.
 
 Impact:
 
-- Plugin registry implementation cannot be secure or interoperable.
-- Revocation/blocklist behavior will vary.
-- Developer mode warnings may be inconsistent.
+- Production registry signing still needs release key custody and rotation.
+- Developer Mode unsigned install UX remains future work.
 
 Required fix:
 
-- Define algorithm, package signature format, registry key pinning, revocation format, and verification order.
+- Replace the repository development signing key with production release custody before public distribution.
+- Finish the Developer Mode unsigned install surface.
 
 Covered by implementation plan:
 
-- `WP-0.6 Plugin signing and registry security spec`.
+- `docs/07-security-privacy.md` and the implemented `PluginPackageVerifier`.
 
 ### 7. iOS companion data model is contradictory
 
@@ -360,4 +360,3 @@ Suggested first assignments:
 6. Design/macOS Agent: mocked dashboard shell only, using mock data.
 
 This keeps the project moving while preventing agents from inventing core contracts independently.
-
