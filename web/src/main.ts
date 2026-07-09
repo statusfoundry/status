@@ -20,9 +20,25 @@ const router = createRouter({
     { path: '/privacy/', component: () => import('./views/PrivacyView.vue') },
     { path: '/changelog/', component: () => import('./views/ChangelogView.vue') },
   ],
-  scrollBehavior() {
-    return { top: 0 }
+  scrollBehavior(_to, _from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    }
+
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        resolve({ top: 0, left: 0 })
+      })
+    })
   },
+})
+
+router.afterEach((to, from) => {
+  if (to.fullPath === from.fullPath) {
+    return
+  }
+
+  window.scrollTo({ top: 0, left: 0 })
 })
 
 createApp(App).use(router).mount('#app')
