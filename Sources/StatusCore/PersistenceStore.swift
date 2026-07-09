@@ -805,6 +805,54 @@ public final class StatusPersistenceStore {
         }
     }
 
+    public func deleteAccountConfiguration(accountID: String) throws {
+        guard let configuration = try accountConfiguration(accountID: accountID) else {
+            return
+        }
+        try database.execute(
+            """
+            DELETE FROM notification_preferences
+            WHERE account_id = ?
+            """,
+            bindings: [.text(accountID)]
+        )
+        try database.execute(
+            """
+            DELETE FROM rules
+            WHERE scope = 'app' AND account_id = ?
+            """,
+            bindings: [.text(accountID)]
+        )
+        try database.execute(
+            """
+            DELETE FROM triggers
+            WHERE account_id = ?
+            """,
+            bindings: [.text(accountID)]
+        )
+        try database.execute(
+            """
+            DELETE FROM jobs
+            WHERE account_id = ?
+            """,
+            bindings: [.text(accountID)]
+        )
+        try database.execute(
+            """
+            DELETE FROM sync_state
+            WHERE owner_type = 'account-configuration' AND owner_id = ?
+            """,
+            bindings: [.text(accountID)]
+        )
+        try database.execute(
+            """
+            DELETE FROM accounts
+            WHERE id = ? AND plugin_id = ?
+            """,
+            bindings: [.text(accountID), .text(configuration.pluginID)]
+        )
+    }
+
     public func upsertResource(_ resource: Resource, externalID: String, fields: [String: String] = [:], seenAt: Date) throws {
         try database.execute(
             """

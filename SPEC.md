@@ -112,6 +112,7 @@ Rules:
 - the plugin catalog shows available plugins and starts app setup;
 - each app has an editable local display name;
 - app settings open separately from the plugin catalog;
+- removing an app deletes that configured app's local setup, schedules, app-scoped rules, notification overrides, credential reference, active resources, metrics, and sync state without uninstalling the plugin or deleting historical events and audit entries;
 - rules and notification preferences are app-scoped by default;
 - cross-app rules exist only when the user explicitly links two or more apps.
 

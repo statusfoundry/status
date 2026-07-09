@@ -57,6 +57,7 @@ public final class PluginStoreViewModel: ObservableObject {
     @Published public private(set) var configuredAccounts: [String: [PluginAccountConfiguration]]
     @Published public private(set) var selectedAccountIDs: [String: String]
     @Published public private(set) var savingSetupPluginID: String?
+    @Published public private(set) var removingAccountID: String?
     @Published public private(set) var setupResults: [String: String]
     @Published public private(set) var setupErrors: [String: String]
     @Published public private(set) var installedPermissions: [String: [InstalledPluginPermission]]
@@ -97,6 +98,7 @@ public final class PluginStoreViewModel: ObservableObject {
     private let loadAccounts: (InstalledPlugin) throws -> [PluginAccountConfiguration]
     private let loadConfigurationValues: (InstalledPlugin, String?) throws -> [String: String]
     private let saveConfigurationValues: (InstalledPlugin, String?, String?, [String: String]) async throws -> String
+    private let deleteConfiguration: (InstalledPlugin, PluginAccountConfiguration) async throws -> String
     private let completeOAuthConnection: (InstalledPlugin, String?, String?, [String: String], PluginOAuthAuthorizationRequest, URL) async throws -> String
     private let testPluginRequest: (InstalledPlugin, PluginAccountConfiguration, String) async throws -> String
     private var oauthConnectionRequests: [String: PluginOAuthAuthorizationRequest]
@@ -123,6 +125,9 @@ public final class PluginStoreViewModel: ObservableObject {
         loadAccounts: @escaping (InstalledPlugin) throws -> [PluginAccountConfiguration] = { _ in [] },
         loadConfigurationValues: @escaping (InstalledPlugin, String?) throws -> [String: String] = { _, _ in [:] },
         saveConfigurationValues: @escaping (InstalledPlugin, String?, String?, [String: String]) async throws -> String = { _, _, _, _ in "" },
+        deleteConfiguration: @escaping (InstalledPlugin, PluginAccountConfiguration) async throws -> String = { _, account in
+            "Removed \(account.accountName)."
+        },
         completeOAuthConnection: @escaping (InstalledPlugin, String?, String?, [String: String], PluginOAuthAuthorizationRequest, URL) async throws -> String = { _, _, _, _, _, _ in
             "OAuth callback received."
         },
@@ -137,6 +142,7 @@ public final class PluginStoreViewModel: ObservableObject {
         self.selectedAccountIDs = [:]
         self.setupResults = [:]
         self.setupErrors = [:]
+        self.removingAccountID = nil
         self.installedPermissions = [:]
         self.installedTriggers = [:]
         self.runtimeStatuses = [:]
@@ -171,6 +177,7 @@ public final class PluginStoreViewModel: ObservableObject {
         self.loadAccounts = loadAccounts
         self.loadConfigurationValues = loadConfigurationValues
         self.saveConfigurationValues = saveConfigurationValues
+        self.deleteConfiguration = deleteConfiguration
         self.completeOAuthConnection = completeOAuthConnection
         self.testPluginRequest = testPluginRequest
     }
@@ -386,6 +393,26 @@ public final class PluginStoreViewModel: ObservableObject {
         do {
             setupResults[key] = try await saveConfigurationValues(plugin, persistedAccountID(from: selectedAccountID), accountName, values)
             await reload()
+        } catch {
+            setupErrors[key] = error.localizedDescription
+        }
+    }
+
+    public func removeSelectedAccount(for plugin: InstalledPlugin) async {
+        guard removingAccountID == nil,
+              let account = selectedAccount(for: plugin) else { return }
+        let key = setupKey(pluginID: plugin.id, accountID: account.id)
+        removingAccountID = account.id
+        setupResults[key] = nil
+        setupErrors[key] = nil
+        defer { removingAccountID = nil }
+
+        do {
+            let result = try await deleteConfiguration(plugin, account)
+            await reload()
+            let nextSelection = selectedAccountIDs[plugin.id]
+            let resultKey = setupKey(pluginID: plugin.id, accountID: nextSelection)
+            setupResults[resultKey] = result
         } catch {
             setupErrors[key] = error.localizedDescription
         }
@@ -694,6 +721,7 @@ public struct PluginStoreContainerView: View {
             configuredAccounts: viewModel.configuredAccounts,
             selectedAccountIDs: viewModel.selectedAccountIDs,
             savingSetupPluginID: viewModel.savingSetupPluginID,
+            removingAccountID: viewModel.removingAccountID,
             setupResults: viewModel.setupResults,
             setupErrors: viewModel.setupErrors,
             installedPermissions: viewModel.installedPermissions,
@@ -730,6 +758,11 @@ public struct PluginStoreContainerView: View {
             saveSetup: { plugin in
                 Task {
                     await viewModel.saveSetup(plugin)
+                }
+            },
+            removeSelectedAccount: { plugin in
+                Task {
+                    await viewModel.removeSelectedAccount(for: plugin)
                 }
             },
             beginOAuthConnection: { plugin in
@@ -959,6 +992,7 @@ public struct PluginSettingsContainerView: View {
             accountDisplayName: viewModel.accountDisplayNames[key, default: ""],
             setupValues: viewModel.setupValues[key, default: [:]],
             isSavingSetup: viewModel.savingSetupPluginID == plugin.id,
+            isRemovingAccount: viewModel.removingAccountID == selectedAccountID,
             setupResult: viewModel.setupResults[key],
             setupError: viewModel.setupErrors[key],
             permissions: viewModel.installedPermissions[plugin.id, default: []],
@@ -991,6 +1025,9 @@ public struct PluginSettingsContainerView: View {
             },
             saveSetup: { plugin in
                 Task { await viewModel.saveSetup(plugin) }
+            },
+            removeSelectedAccount: { plugin in
+                Task { await viewModel.removeSelectedAccount(for: plugin) }
             },
             beginOAuthConnection: { plugin in
                 viewModel.beginOAuthConnection(plugin)
@@ -1120,6 +1157,7 @@ public struct PluginStoreView: View {
     private let configuredAccounts: [String: [PluginAccountConfiguration]]
     private let selectedAccountIDs: [String: String]
     private let savingSetupPluginID: String?
+    private let removingAccountID: String?
     private let setupResults: [String: String]
     private let setupErrors: [String: String]
     private let installedPermissions: [String: [InstalledPluginPermission]]
@@ -1144,6 +1182,7 @@ public struct PluginStoreView: View {
     private let selectAccount: (InstalledPlugin, String) -> Void
     private let addAccount: (InstalledPlugin) -> Void
     private let saveSetup: (InstalledPlugin) -> Void
+    private let removeSelectedAccount: (InstalledPlugin) -> Void
     private let beginOAuthConnection: (InstalledPlugin) -> URL?
     private let testRequest: (InstalledPlugin, String) -> Void
     private let canRun: (InstalledPlugin) -> Bool
@@ -1178,6 +1217,7 @@ public struct PluginStoreView: View {
         configuredAccounts: [String: [PluginAccountConfiguration]] = [:],
         selectedAccountIDs: [String: String] = [:],
         savingSetupPluginID: String? = nil,
+        removingAccountID: String? = nil,
         setupResults: [String: String] = [:],
         setupErrors: [String: String] = [:],
         installedPermissions: [String: [InstalledPluginPermission]] = [:],
@@ -1202,6 +1242,7 @@ public struct PluginStoreView: View {
         selectAccount: @escaping (InstalledPlugin, String) -> Void = { _, _ in },
         addAccount: @escaping (InstalledPlugin) -> Void = { _ in },
         saveSetup: @escaping (InstalledPlugin) -> Void = { _ in },
+        removeSelectedAccount: @escaping (InstalledPlugin) -> Void = { _ in },
         beginOAuthConnection: @escaping (InstalledPlugin) -> URL? = { _ in nil },
         testRequest: @escaping (InstalledPlugin, String) -> Void = { _, _ in },
         canRun: @escaping (InstalledPlugin) -> Bool = { _ in false },
@@ -1233,6 +1274,7 @@ public struct PluginStoreView: View {
         self.configuredAccounts = configuredAccounts
         self.selectedAccountIDs = selectedAccountIDs
         self.savingSetupPluginID = savingSetupPluginID
+        self.removingAccountID = removingAccountID
         self.setupResults = setupResults
         self.setupErrors = setupErrors
         self.installedPermissions = installedPermissions
@@ -1257,6 +1299,7 @@ public struct PluginStoreView: View {
         self.selectAccount = selectAccount
         self.addAccount = addAccount
         self.saveSetup = saveSetup
+        self.removeSelectedAccount = removeSelectedAccount
         self.beginOAuthConnection = beginOAuthConnection
         self.testRequest = testRequest
         self.canRun = canRun
@@ -1358,6 +1401,7 @@ public struct PluginStoreView: View {
             accountDisplayName: accountDisplayNames[setupKey(pluginID: plugin.id, accountID: selectedAccountID), default: ""],
             setupValues: setupValues[setupKey(pluginID: plugin.id, accountID: selectedAccountID), default: [:]],
             isSavingSetup: savingSetupPluginID == plugin.id,
+            isRemovingAccount: removingAccountID == selectedAccountID,
             setupResult: setupResults[setupKey(pluginID: plugin.id, accountID: selectedAccountID)],
             setupError: setupErrors[setupKey(pluginID: plugin.id, accountID: selectedAccountID)],
             permissions: installedPermissions[plugin.id, default: []],
@@ -1381,6 +1425,7 @@ public struct PluginStoreView: View {
             selectAccount: selectAccount,
             addAccount: addAccount,
             saveSetup: saveSetup,
+            removeSelectedAccount: removeSelectedAccount,
             beginOAuthConnection: beginOAuthConnection,
             testRequest: testRequest,
             canRun: canRun(plugin),
@@ -1620,6 +1665,7 @@ private struct PluginSettingsPanel: View {
     let accountDisplayName: String
     let setupValues: [String: String]
     let isSavingSetup: Bool
+    let isRemovingAccount: Bool
     let setupResult: String?
     let setupError: String?
     let permissions: [InstalledPluginPermission]
@@ -1643,6 +1689,7 @@ private struct PluginSettingsPanel: View {
     let selectAccount: (InstalledPlugin, String) -> Void
     let addAccount: (InstalledPlugin) -> Void
     let saveSetup: (InstalledPlugin) -> Void
+    let removeSelectedAccount: (InstalledPlugin) -> Void
     let beginOAuthConnection: (InstalledPlugin) -> URL?
     let testRequest: (InstalledPlugin, String) -> Void
     let canRun: Bool
@@ -1658,6 +1705,7 @@ private struct PluginSettingsPanel: View {
     let setTriggerEnabled: (InstalledPlugin, TriggerDefinition, Bool) -> Void
     let setRulePresetEnabled: (InstalledPlugin, Rule, Bool) -> Void
     let setDashboardTileField: (InstalledPlugin, String, Bool) -> Void
+    @State private var confirmsAppRemoval = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1842,6 +1890,32 @@ private struct PluginSettingsPanel: View {
                         .buttonStyle(.bordered)
                         .disabled(isSavingSetup || hasMissingRequiredSetupValue)
                     }
+                    if selectedPersistedAccountID != nil {
+                        Divider()
+                        HStack(alignment: .center, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Remove app")
+                                    .font(.caption.weight(.semibold))
+                                Text("Deletes this app's local configuration and active data. Historical events and audit entries stay in place.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 12)
+                            Button(role: .destructive) {
+                                confirmsAppRemoval = true
+                            } label: {
+                                if isRemovingAccount {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Label("Remove App", systemImage: "trash")
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(isRemovingAccount)
+                        }
+                    }
                 }
             }
             if let setupResult {
@@ -1878,6 +1952,18 @@ private struct PluginSettingsPanel: View {
         .padding(14)
         .background(Color.statusSurface)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .confirmationDialog(
+            "Remove app?",
+            isPresented: $confirmsAppRemoval,
+            titleVisibility: .visible
+        ) {
+            Button("Remove \(accountDisplayName.isEmpty ? plugin.name : accountDisplayName)", role: .destructive) {
+                removeSelectedAccount(plugin)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Status will delete this app's local configuration, schedules, app-scoped rules, notification overrides, credentials reference, and active resources. Historical events and audit entries stay in place.")
+        }
     }
 
     private var setupFields: [PackagedPluginSetupField] {

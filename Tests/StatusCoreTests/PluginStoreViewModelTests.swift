@@ -102,6 +102,57 @@ import StatusCore
 }
 
 @MainActor
+@Test func pluginStoreViewModelRemovesSelectedConfiguredApp() async throws {
+    let plugin = InstalledPlugin(
+        id: "com.status.github",
+        name: "GitHub",
+        author: "Status Foundry",
+        description: "GitHub repository checks.",
+        category: "development",
+        trustLevel: .official,
+        installedVersion: "0.1.0",
+        installPath: "/tmp/com.status.github",
+        installedAt: Date(timeIntervalSince1970: 1_783_433_520),
+        updatedAt: Date(timeIntervalSince1970: 1_783_433_520)
+    )
+    let work = PluginAccountConfiguration(
+        id: "acc_work",
+        pluginID: plugin.id,
+        accountName: "Work GitHub",
+        variables: ["owner": "statusfoundry"]
+    )
+    let personal = PluginAccountConfiguration(
+        id: "acc_personal",
+        pluginID: plugin.id,
+        accountName: "Personal GitHub",
+        variables: ["owner": "sil"]
+    )
+    var accounts = [work, personal]
+    var deletedAccountID: String?
+    let viewModel = PluginStoreViewModel(
+        loadInstalled: { [plugin] },
+        loadAvailable: { [] },
+        installPlugin: { _ in },
+        canConfigurePlugin: { _ in true },
+        loadAccounts: { _ in accounts },
+        deleteConfiguration: { _, account in
+            deletedAccountID = account.id
+            accounts.removeAll { $0.id == account.id }
+            return "Removed \(account.accountName)."
+        }
+    )
+
+    await viewModel.reload()
+    viewModel.selectAccount(work.id, for: plugin)
+    await viewModel.removeSelectedAccount(for: plugin)
+
+    #expect(deletedAccountID == work.id)
+    #expect(viewModel.configuredAccounts[plugin.id]?.map(\.id) == [personal.id])
+    #expect(viewModel.selectedAccountIDs[plugin.id] == personal.id)
+    #expect(viewModel.setupResults["\(plugin.id):\(personal.id)"] == "Removed Work GitHub.")
+}
+
+@MainActor
 @Test func pluginStoreViewModelLoadsResourcesForInstalledPlugins() async throws {
     let plugin = InstalledPlugin(
         id: "com.status.website",

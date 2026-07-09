@@ -597,6 +597,155 @@ import Testing
     #expect(try store.rules(eventType: "app.review.rejected", accountID: nil) == [pluginRule])
 }
 
+@Test func accountConfigurationDeleteRemovesAppDataAndKeepsHistory() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let manifest = PluginManifest(
+        id: "com.status.github",
+        name: "GitHub",
+        version: "0.1.0",
+        author: PluginAuthor(name: "Status Foundry", publisherId: "status-foundry"),
+        category: "developer",
+        description: "Read-only GitHub status events.",
+        minCoreVersion: "0.1.0",
+        platforms: [.macOS, .iOS],
+        permissions: [.network, .keychain],
+        domains: ["api.github.com"]
+    )
+    try store.installPlugin(
+        PluginInstallRecord(
+            manifest: manifest,
+            trustLevel: .official,
+            installPath: "/Application Support/Status/Plugins/com.status.github",
+            verification: PluginPackageVerificationResult(
+                pluginID: manifest.id,
+                version: manifest.version,
+                sha256: "abc123",
+                signedBy: "status-foundry-dev"
+            ),
+            installedAt: now
+        )
+    )
+    try store.upsertAccountConfiguration(
+        PluginAccountConfiguration(
+            id: "acc_work",
+            pluginID: manifest.id,
+            accountName: "Work GitHub",
+            variables: ["owner": "statusfoundry"],
+            authType: "bearer-token",
+            credentialRef: "kc_work"
+        ),
+        updatedAt: now
+    )
+    try store.upsertAccountConfiguration(
+        PluginAccountConfiguration(
+            id: "acc_personal",
+            pluginID: manifest.id,
+            accountName: "Personal GitHub",
+            variables: ["owner": "sil"],
+            authType: "bearer-token",
+            credentialRef: "kc_personal"
+        ),
+        updatedAt: now
+    )
+    try store.upsertResource(
+        Resource(id: "res_work", accountID: "acc_work", pluginID: manifest.id, type: "repository", name: "status"),
+        externalID: "status",
+        seenAt: now
+    )
+    let appRule = Rule(
+        id: "rule_app",
+        name: "Work workflow failed",
+        enabled: true,
+        scope: .app,
+        accountID: "acc_work",
+        provider: manifest.id,
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [RuleActionDefinition(action: "notification.show")]
+    )
+    let pluginRule = Rule(
+        id: "rule_plugin",
+        name: "Any workflow failed",
+        enabled: true,
+        provider: manifest.id,
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [RuleActionDefinition(action: "notification.show")]
+    )
+    try store.upsertRule(appRule, updatedAt: now)
+    try store.upsertRule(pluginRule, updatedAt: now)
+    try store.upsertNotificationPreference(
+        NotificationPreference(
+            id: "ntp_work",
+            scope: .app,
+            pluginID: manifest.id,
+            accountID: "acc_work",
+            mode: .immediate,
+            createdAt: now,
+            updatedAt: now
+        )
+    )
+    try store.upsertTrigger(
+        TriggerDefinition(
+            id: "trg_work",
+            pluginID: manifest.id,
+            accountID: "acc_work",
+            kind: .cron,
+            label: "Poll Work GitHub",
+            enabled: true,
+            intervalSeconds: 900
+        ),
+        updatedAt: now
+    )
+    try store.upsertJob(
+        JobRecord(
+            id: "job_work",
+            pluginID: manifest.id,
+            triggerID: "trg_work",
+            accountID: "acc_work",
+            status: .success,
+            queuedAt: now
+        )
+    )
+    let event = Event(
+        id: "evt_history",
+        provider: manifest.id,
+        type: "github.workflow.failed",
+        resourceID: "res_work",
+        resourceName: "status",
+        severity: .critical,
+        title: "Workflow failed",
+        summary: "CI failed on main.",
+        timestamp: now,
+        fingerprint: "github:workflow.failed:res_work"
+    )
+    let auditEntry = AuditEntry(
+        id: "aud_history",
+        title: "App removed",
+        detail: "Historical audit entries stay readable.",
+        timestamp: now,
+        status: "success",
+        eventID: event.id
+    )
+    try store.insertEvent(event)
+    try store.insertAuditEntry(auditEntry)
+
+    try store.deleteAccountConfiguration(accountID: "acc_work")
+
+    #expect(try store.installedPlugin(id: manifest.id) != nil)
+    #expect(try store.accountConfigurations(pluginID: manifest.id).map(\.id) == ["acc_personal"])
+    #expect(try store.resources(pluginID: manifest.id, accountID: "acc_work").isEmpty)
+    #expect(try store.rules().map(\.id) == [pluginRule.id])
+    #expect(try store.notificationPreferences(pluginID: manifest.id).isEmpty)
+    #expect(try store.trigger(id: "trg_work") == nil)
+    #expect(try store.job(id: "job_work") == nil)
+    #expect(try store.event(id: event.id) == event)
+    #expect(try store.auditEntry(id: auditEntry.id) == auditEntry)
+}
+
 @Test func resourceStateSnapshotRoundTripsThroughSQLite() throws {
     let database = try temporaryDatabase()
     try StatusDatabaseMigrator.migrate(database)
