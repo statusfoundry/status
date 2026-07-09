@@ -39,3 +39,51 @@ import StatusCore
     #expect(loadedStatusPluginIDs == [[plugin.id]])
     #expect(viewModel.runtimeStatuses == [plugin.id: runtimeStatus])
 }
+
+@MainActor
+@Test func pluginStoreViewModelLoadsResourcesForInstalledPlugins() async throws {
+    let plugin = InstalledPlugin(
+        id: "com.status.website",
+        name: "Website",
+        author: "Status Foundry",
+        description: "Website checks.",
+        category: "operations",
+        trustLevel: .official,
+        installedVersion: "0.1.0",
+        installPath: "/tmp/com.status.website",
+        views: [
+            PackagedPluginView(
+                id: "websites",
+                type: .resourceList,
+                resourceType: "website",
+                fields: ["statusCode"]
+            )
+        ],
+        installedAt: Date(timeIntervalSince1970: 1_783_433_520),
+        updatedAt: Date(timeIntervalSince1970: 1_783_433_520)
+    )
+    let resource = Resource(
+        id: "res_com_status_website_example",
+        accountID: "acc_website",
+        pluginID: plugin.id,
+        type: "website",
+        name: "example.com",
+        fields: ["statusCode": "200"]
+    )
+    var loadedResourcePluginIDs: [String] = []
+    let viewModel = PluginStoreViewModel(
+        loadInstalled: { [plugin] },
+        loadAvailable: { [] },
+        loadRuntimeStatuses: { _ in [:] },
+        loadPluginResources: { plugin in
+            loadedResourcePluginIDs.append(plugin.id)
+            return [resource]
+        },
+        installPlugin: { _ in }
+    )
+
+    await viewModel.reload()
+
+    #expect(loadedResourcePluginIDs == [plugin.id])
+    #expect(viewModel.pluginResources == [plugin.id: [resource]])
+}

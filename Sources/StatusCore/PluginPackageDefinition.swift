@@ -8,6 +8,7 @@ public struct PluginPackageDefinition: Equatable, Sendable {
     public var events: [EventTypeDeclaration]
     public var actions: [PackagedPluginAction]
     public var mappings: PackagedPluginMappings
+    public var views: [PackagedPluginView]
     public var rulePresets: [PackagedRulePreset]
 
     public init(
@@ -18,6 +19,7 @@ public struct PluginPackageDefinition: Equatable, Sendable {
         events: [EventTypeDeclaration] = [],
         actions: [PackagedPluginAction] = [],
         mappings: PackagedPluginMappings = PackagedPluginMappings(),
+        views: [PackagedPluginView] = [],
         rulePresets: [PackagedRulePreset] = []
     ) {
         self.auth = auth
@@ -27,6 +29,7 @@ public struct PluginPackageDefinition: Equatable, Sendable {
         self.events = events
         self.actions = actions
         self.mappings = mappings
+        self.views = views
         self.rulePresets = rulePresets
     }
 
@@ -62,13 +65,17 @@ public struct PluginPackageDefinition: Equatable, Sendable {
             try decoder.decode(PackagedPluginMappings.self, from: data)
         } ?? PackagedPluginMappings()
 
+        let views = try archive.file(named: "views.json").map { data in
+            try decoder.decode(PackagedPluginViewsFile.self, from: data).views
+        } ?? []
+
         let presets = try archive.file(named: "rules.presets.json").map { data in
             try decoder.decode(PackagedRulePresetsFile.self, from: data).presets
         } ?? []
 
         try validateActionRequests(actions, requests: requests)
 
-        return PluginPackageDefinition(auth: auth, setup: setup, triggers: triggers, requests: requests, events: events, actions: actions, mappings: mappings, rulePresets: presets)
+        return PluginPackageDefinition(auth: auth, setup: setup, triggers: triggers, requests: requests, events: events, actions: actions, mappings: mappings, views: views, rulePresets: presets)
     }
 
     private static func validateActionRequests(_ actions: [PackagedPluginAction], requests: PackagedPluginRequests) throws {
@@ -85,6 +92,58 @@ public struct PackagedPluginEventsFile: Decodable, Equatable, Sendable {
 
 public struct PackagedPluginActionsFile: Decodable, Equatable, Sendable {
     public var actions: [PackagedPluginAction]
+}
+
+public struct PackagedPluginViewsFile: Decodable, Equatable, Sendable {
+    public var views: [PackagedPluginView]
+}
+
+public struct PackagedPluginView: Codable, Equatable, Sendable, Identifiable {
+    public var id: String
+    public var type: PackagedPluginViewType
+    public var title: String?
+    public var resourceType: String?
+    public var fields: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case type
+        case title
+        case resourceType
+        case fields
+    }
+
+    public init(
+        id: String,
+        type: PackagedPluginViewType,
+        title: String? = nil,
+        resourceType: String? = nil,
+        fields: [String] = []
+    ) {
+        self.id = id
+        self.type = type
+        self.title = title
+        self.resourceType = resourceType
+        self.fields = fields
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        type = try container.decode(PackagedPluginViewType.self, forKey: .type)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        resourceType = try container.decodeIfPresent(String.self, forKey: .resourceType)
+        fields = try container.decodeIfPresent([String].self, forKey: .fields) ?? []
+    }
+}
+
+public enum PackagedPluginViewType: String, Codable, Equatable, Sendable {
+    case overviewCards = "overview_cards"
+    case resourceList = "resource_list"
+    case resourceDetail = "resource_detail"
+    case timeline
+    case metricGrid = "metric_grid"
+    case alertList = "alert_list"
 }
 
 public struct PackagedPluginAction: Decodable, Equatable, Sendable {

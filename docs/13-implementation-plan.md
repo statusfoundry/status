@@ -202,7 +202,13 @@ Acceptance: sample plugin's setup schema renders, stores, and can reconnect afte
 
 ### WP-3.5 View descriptor renderer — Design Agent
 
+Status: Implemented for the v1 native settings surface.
+
 views.json descriptors → StatusUI primitives with plugin-specified fields.
+Plugin packages now decode `views.json`, bundled packages include basic
+descriptors, the package builder validates view type/resource references, and
+integration settings render descriptor-driven native lists, detail panels,
+metric-style grids, timelines, and alert lists from persisted resources.
 
 Depends: WP-3.1, WP-1.4.
 Acceptance: sample plugin's overview/list/detail views render natively on macOS and iOS.

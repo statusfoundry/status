@@ -53,6 +53,7 @@ Use these decisions when implementation needs a default. Do not stop to ask unle
 
 - Build against persisted local data; keep `MockDashboard` for previews and tests.
 - Include overview, needs-attention list, integration list, recent events, and audit preview.
+- Render plugin-declared `views.json` descriptors with app-owned native views in integration settings.
 - Use native SwiftUI controls.
 - Keep the UI calm, compact, and practical.
 

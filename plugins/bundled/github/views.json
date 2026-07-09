@@ -1,0 +1,18 @@
+{
+  "views": [
+    {
+      "id": "repositories",
+      "type": "resource_list",
+      "title": "Repositories",
+      "resourceType": "repository",
+      "fields": ["name"]
+    },
+    {
+      "id": "repository_activity",
+      "type": "timeline",
+      "title": "Recent Repository Activity",
+      "resourceType": "repository",
+      "fields": ["name"]
+    }
+  ]
+}

@@ -3,18 +3,9 @@
     {
       "id": "overview",
       "title": "Mock Operations",
-      "type": "list",
+      "type": "resource_list",
       "resourceType": "service",
-      "fields": [
-        {
-          "label": "State",
-          "path": "state"
-        },
-        {
-          "label": "Region",
-          "path": "region"
-        }
-      ]
+      "fields": ["state", "region"]
     }
   ]
 }

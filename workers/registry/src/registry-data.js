@@ -28,8 +28,8 @@ export const registry = {
           ],
           "packageUrl": "https://status-registry.hakobs.com/plugins/com.status.appstoreconnect/0.1.0/com.status.appstoreconnect-0.1.0.statusplugin.zip",
           "manifestUrl": "https://status-registry.hakobs.com/plugins/com.status.appstoreconnect/0.1.0/manifest.json",
-          "sha256": "bdb69dcccc1baaab3dbbb3f9a40b46360596815fabfccecc2270a4c59c08337a",
-          "signature": "qYi/WfsCr6vUeIhkGWLsu0nq0VIZXiXNYwOqbVj1XakZtc0uBhPldfpj6ka2IqQqu7lqKCrlLD2GpuQEu1vcAg==",
+          "sha256": "f073deda441a714eaea42c3165ae763b97869849c8b65ce0c5e6e56a5fb0ab9f",
+          "signature": "TqpVY83St+nj6Qz8VARvTJycNudtySO35nErAJSQhp+ToneyFzTPPzYiLFKFOKAcpPaszDlZre+BNZvnRYq/Dw==",
           "signedBy": "status-foundry-dev",
           "releasedAt": "2026-07-07T12:00:00Z"
         }
@@ -61,8 +61,8 @@ export const registry = {
           ],
           "packageUrl": "https://status-registry.hakobs.com/plugins/com.status.github/0.1.0/com.status.github-0.1.0.statusplugin.zip",
           "manifestUrl": "https://status-registry.hakobs.com/plugins/com.status.github/0.1.0/manifest.json",
-          "sha256": "d863c60ee2bcefb8436b028c3b1c806e16b5f1fed049502d745cf151ee63a39b",
-          "signature": "IJBcS39fjs6kr8mq9nbqviHsFxYuUejPzhVsupJHQ6mZ0rAZ/xBb9FoGAef5WCBsvvUKrqoDIzI28X8Qmbr+Aw==",
+          "sha256": "47a057c490bcd941da44a68f25a91e2af1901212a072db6b8346cd1f6a398692",
+          "signature": "gzTVdjL8HleZMshqlM1EqfRmpLzn3xUGTdQANhEDNeg5gdb0csfZjnJMvQD5bGkzegC0eaG71RBl9xICV868CA==",
           "signedBy": "status-foundry-dev",
           "releasedAt": "2026-07-07T12:00:00Z"
         }
@@ -92,8 +92,8 @@ export const registry = {
           ],
           "packageUrl": "https://status-registry.hakobs.com/plugins/com.status.website/0.1.0/com.status.website-0.1.0.statusplugin.zip",
           "manifestUrl": "https://status-registry.hakobs.com/plugins/com.status.website/0.1.0/manifest.json",
-          "sha256": "1d973370cfa0e6413b713abc8396a8596d1947ac8172cd60e55f8607f12e1c20",
-          "signature": "uqAyAF4YqJXCEIMsbKh6b2paLj0erqmm2DNYM87x8zZCZsy+PB06XAzPpi/Ff0B8R+hKnN/1p65IKSgi5RiEBw==",
+          "sha256": "db66ba5d7ca1e96a1af4055ea2c8c6778a0f0897c387bd6cf05686a609f6005a",
+          "signature": "kOFPIddeIzD5qolFxdQwxd3tss5QyugQ6gtQGXfYxdoOokDbQEeuZyd7v5dDIPG1spiJgGQ50x9uu6Gub5G3Aw==",
           "signedBy": "status-foundry-dev",
           "releasedAt": "2026-07-07T12:00:00Z"
         }

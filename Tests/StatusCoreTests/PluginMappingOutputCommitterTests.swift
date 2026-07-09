@@ -75,7 +75,20 @@ import Testing
     #expect(result.resourceIDs == [resource.id])
     #expect(result.eventResults == [.inserted(eventID: event.id, statusItemID: "sti_\(event.id.dropFirst(4))")])
     #expect(result.metricIDs == ["\(resource.id):metric:response_time"])
-    #expect(try store.resource(id: resource.id) == resource)
+    #expect(try store.resource(id: resource.id) == Resource(
+        id: resource.id,
+        accountID: resource.accountID,
+        pluginID: resource.pluginID,
+        type: resource.type,
+        name: resource.name,
+        fields: [
+            "id": "status.hakobs.com",
+            "name": "status.hakobs.com",
+            "reachable": "false",
+            "statusCode": "503"
+        ],
+        actionURL: actionURL
+    ))
     #expect(try store.resourceStateSnapshot(resourceID: resource.id)?.state["statusCode"] == "503")
     #expect(try store.event(id: event.id) == event)
     #expect(try store.metrics() == [

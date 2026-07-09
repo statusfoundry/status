@@ -800,6 +800,21 @@ public final class StatusPersistenceStore {
         return try resource(from: row)
     }
 
+    public func resources(pluginID: String, resourceType: String? = nil, limit: Int = 50) throws -> [Resource] {
+        var sql = """
+        SELECT * FROM resources
+        WHERE plugin_id = ? AND archived = 0
+        """
+        var bindings: [SQLiteValue] = [.text(pluginID)]
+        if let resourceType {
+            sql += " AND type = ?"
+            bindings.append(.text(resourceType))
+        }
+        sql += " ORDER BY last_seen_at DESC, name COLLATE NOCASE ASC LIMIT ?"
+        bindings.append(.integer(Int64(limit)))
+        return try database.query(sql, bindings: bindings).map(resource(from:))
+    }
+
     public func upsertResourceStateSnapshot(_ snapshot: ResourceStateSnapshot) throws {
         let stateJSON = try String(decoding: stateEncoder.encode(snapshot.state), as: UTF8.self)
         try database.execute(
@@ -1403,6 +1418,7 @@ public final class StatusPersistenceStore {
             enabled: row.optionalInteger("enabled") != 0,
             auth: installedPluginAuth(pluginID: pluginID, version: installedVersion),
             setup: installedPluginSetup(pluginID: pluginID, version: installedVersion),
+            views: installedPluginViews(pluginID: pluginID, version: installedVersion),
             installedAt: ISO8601.date(from: row.requiredText("installed_at")),
             updatedAt: ISO8601.date(from: row.requiredText("updated_at"))
         )
@@ -1414,6 +1430,10 @@ public final class StatusPersistenceStore {
 
     private func installedPluginAuth(pluginID: String, version: String) -> PackagedPluginAuth? {
         installedPluginDefinition(pluginID: pluginID, version: version)?.auth
+    }
+
+    private func installedPluginViews(pluginID: String, version: String) -> [PackagedPluginView] {
+        installedPluginDefinition(pluginID: pluginID, version: version)?.views ?? []
     }
 
     private func installedPluginDefinition(pluginID: String, version: String) -> PluginPackageDefinition? {
@@ -1549,6 +1569,7 @@ public final class StatusPersistenceStore {
             pluginID: row.requiredText("plugin_id"),
             type: row.requiredText("type"),
             name: row.requiredText("name"),
+            fields: try optionalJSON([String: String].self, from: row.optionalText("fields_json")) ?? [:],
             actionURL: row.optionalURL("action_url")
         )
     }

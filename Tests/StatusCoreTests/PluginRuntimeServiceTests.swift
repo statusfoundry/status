@@ -905,6 +905,48 @@ import Testing
     ])
 }
 
+@Test func pluginPackageDefinitionDecodesViews() throws {
+    let packageData = runtimeStoredZip(files: [
+        ("views.json", Data("""
+        {
+          "views": [
+            {
+              "id": "repositories",
+              "type": "resource_list",
+              "title": "Repositories",
+              "resourceType": "repository",
+              "fields": ["name", "visibility"]
+            },
+            {
+              "id": "timeline",
+              "type": "timeline",
+              "title": "Recent Activity",
+              "resourceType": "repository"
+            }
+          ]
+        }
+        """.utf8))
+    ])
+
+    let definition = try PluginPackageDefinition.decode(from: packageData)
+
+    #expect(definition.views == [
+        PackagedPluginView(
+            id: "repositories",
+            type: .resourceList,
+            title: "Repositories",
+            resourceType: "repository",
+            fields: ["name", "visibility"]
+        ),
+        PackagedPluginView(
+            id: "timeline",
+            type: .timeline,
+            title: "Recent Activity",
+            resourceType: "repository"
+        )
+    ])
+}
+
 @Test func pluginPackageDefinitionRejectsActionWithMissingRequest() throws {
     let packageData = runtimeStoredZip(files: [
         ("actions.json", Data("""

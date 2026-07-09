@@ -50,6 +50,90 @@ import Testing
     #expect(columns.contains("secret") == false)
 }
 
+@Test func resourcesQueryReturnsPersistedFieldsByPluginAndType() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let nowString = "2026-07-07T12:00:00Z"
+    try database.execute(
+        """
+        INSERT INTO plugins
+        (id, name, author, description, category, trust_level, installed_version, install_path, installed_at, updated_at)
+        VALUES
+          ('com.status.website', 'Website', 'Status Foundry', 'Website checks.', 'operations', 'official', '0.1.0', '/tmp/website', ?, ?),
+          ('com.status.github', 'GitHub', 'Status Foundry', 'GitHub checks.', 'development', 'official', '0.1.0', '/tmp/github', ?, ?)
+        """,
+        bindings: [
+            .text(nowString),
+            .text(nowString),
+            .text(nowString),
+            .text(nowString)
+        ]
+    )
+    try store.upsertAccount(
+        Account(
+            id: "acc_website",
+            pluginID: "com.status.website",
+            provider: "com.status.website",
+            displayName: "Website"
+        ),
+        updatedAt: now
+    )
+    try store.upsertAccount(
+        Account(
+            id: "acc_github",
+            pluginID: "com.status.github",
+            provider: "com.status.github",
+            displayName: "GitHub"
+        ),
+        updatedAt: now
+    )
+
+    let website = Resource(
+        id: "res_website_example",
+        accountID: "acc_website",
+        pluginID: "com.status.website",
+        type: "website",
+        name: "example.com",
+        actionURL: URL(string: "https://example.com")
+    )
+    let repository = Resource(
+        id: "res_github_repo",
+        accountID: "acc_github",
+        pluginID: "com.status.github",
+        type: "repository",
+        name: "status"
+    )
+
+    try store.upsertResource(
+        website,
+        externalID: "example.com",
+        fields: ["statusCode": "200", "reachable": "true"],
+        seenAt: now
+    )
+    try store.upsertResource(
+        repository,
+        externalID: "status",
+        fields: ["visibility": "public"],
+        seenAt: now
+    )
+
+    let resources = try store.resources(pluginID: "com.status.website", resourceType: "website")
+
+    #expect(resources == [
+        Resource(
+            id: "res_website_example",
+            accountID: "acc_website",
+            pluginID: "com.status.website",
+            type: "website",
+            name: "example.com",
+            fields: ["reachable": "true", "statusCode": "200"],
+            actionURL: URL(string: "https://example.com")
+        )
+    ])
+}
+
 @Test func migrationAddsPluginVersionSigningKeyColumn() throws {
     let database = try temporaryDatabase()
     try database.execute(

@@ -42,6 +42,8 @@ private struct MacPluginSettingsWindow: View {
             try await registry.plugins(platform: platform, coreVersion: "0.1.0")
         } loadRuntimeStatuses: { plugins in
             try pluginRuntimeStatuses(for: plugins)
+        } loadPluginResources: { plugin in
+            try LocalStatusStore.openApplicationSupportStore().resources(pluginID: plugin.id)
         } installPlugin: { _ in
         } removePlugin: { _ in
         } loadPermissions: { plugin in
@@ -320,6 +322,8 @@ private struct MacRootView: View {
             try await registry.plugins(platform: platform, coreVersion: "0.1.0")
         } loadRuntimeStatuses: { plugins in
             try pluginRuntimeStatuses(for: plugins)
+        } loadPluginResources: { plugin in
+            try LocalStatusStore.openApplicationSupportStore().resources(pluginID: plugin.id)
         } installPlugin: { plugin in
             guard let latestVersion = plugin.latestVersion else { return }
             let store = try LocalStatusStore.openApplicationSupportStore()

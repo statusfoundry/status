@@ -5,6 +5,11 @@
       "request": "check_site",
       "id": "{{host}}",
       "name": "{{host}}",
+      "fields": {
+        "statusCode": "{{statusCode}}",
+        "reachable": "{{reachable}}",
+        "responseTimeMs": "{{responseTimeMs}}"
+      },
       "actionUrl": "https://{{host}}"
     }
   ],

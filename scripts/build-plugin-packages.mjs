@@ -30,6 +30,14 @@ const allowedPermissions = new Set([
   "write-actions",
   "local-notification-suggestion"
 ]);
+const allowedViewTypes = new Set([
+  "overview_cards",
+  "resource_list",
+  "resource_detail",
+  "timeline",
+  "metric_grid",
+  "alert_list"
+]);
 
 const crcTable = new Uint32Array(256);
 for (let index = 0; index < crcTable.length; index += 1) {
@@ -293,13 +301,18 @@ function validateEvents(eventsFile, sourceName) {
 }
 
 function validateMappings(mappingsFile, requestIDs, eventTypes, sourceName) {
+  const resourceTypes = new Set();
   if (!mappingsFile) {
-    return;
+    return resourceTypes;
   }
   for (const resource of mappingsFile.resources ?? []) {
     if (resource.request && requestIDs.has(resource.request) === false) {
       fail(`${sourceName}: resource mapping references missing request ${resource.request}`);
     }
+    if (typeof resource.type !== "string" || /^[a-z][a-z0-9_]*$/.test(resource.type) === false) {
+      fail(`${sourceName}: resource mapping has invalid type ${resource.type}`);
+    }
+    resourceTypes.add(resource.type);
   }
   for (const event of mappingsFile.events ?? []) {
     if (eventTypes.has(event.type) === false) {
@@ -312,6 +325,60 @@ function validateMappings(mappingsFile, requestIDs, eventTypes, sourceName) {
   for (const metric of mappingsFile.metrics ?? []) {
     if (metric.request && requestIDs.has(metric.request) === false) {
       fail(`${sourceName}: metric mapping ${metric.name ?? "(unnamed)"} references missing request ${metric.request}`);
+    }
+  }
+  return resourceTypes;
+}
+
+function validateViews(viewsFile, resourceTypes, sourceName) {
+  if (!viewsFile) {
+    return;
+  }
+  if (!Array.isArray(viewsFile.views) || viewsFile.views.length === 0) {
+    fail(`${sourceName}: views.json must contain views`);
+  }
+
+  const ids = new Set();
+  for (const view of viewsFile.views) {
+    if (!view || typeof view !== "object") {
+      fail(`${sourceName}: every view must be an object`);
+    }
+    if (typeof view.id !== "string" || /^[a-z][a-z0-9_-]*$/.test(view.id) === false) {
+      fail(`${sourceName}: view has invalid id ${view.id}`);
+    }
+    if (ids.has(view.id)) {
+      fail(`${sourceName}: duplicate view id ${view.id}`);
+    }
+    ids.add(view.id);
+
+    if (allowedViewTypes.has(view.type) === false) {
+      fail(`${sourceName}: view ${view.id} has unsupported type ${view.type}`);
+    }
+    if (["resource_list", "resource_detail"].includes(view.type) && !view.resourceType) {
+      fail(`${sourceName}: view ${view.id} requires resourceType`);
+    }
+    if (view.resourceType) {
+      if (typeof view.resourceType !== "string" || /^[a-z][a-z0-9_]*$/.test(view.resourceType) === false) {
+        fail(`${sourceName}: view ${view.id} has invalid resourceType ${view.resourceType}`);
+      }
+      if (resourceTypes.has(view.resourceType) === false) {
+        fail(`${sourceName}: view ${view.id} references undeclared resource type ${view.resourceType}`);
+      }
+    }
+    if (view.fields !== undefined) {
+      if (!Array.isArray(view.fields) || view.fields.length === 0) {
+        fail(`${sourceName}: view ${view.id} fields must be a non-empty array`);
+      }
+      const fields = new Set();
+      for (const field of view.fields) {
+        if (typeof field !== "string" || field.trim() === "") {
+          fail(`${sourceName}: view ${view.id} has invalid field`);
+        }
+        if (fields.has(field)) {
+          fail(`${sourceName}: view ${view.id} has duplicate field ${field}`);
+        }
+        fields.add(field);
+      }
     }
   }
 }
@@ -340,11 +407,13 @@ async function validatePluginPackage(pluginDirectory, manifest, sourceName) {
   const eventsFile = await readOptionalJSON(path.join(pluginDirectory, "events.json"));
   const mappingsFile = await readOptionalJSON(path.join(pluginDirectory, "mappings.json"));
   const presetsFile = await readOptionalJSON(path.join(pluginDirectory, "rules.presets.json"));
+  const viewsFile = await readOptionalJSON(path.join(pluginDirectory, "views.json"));
 
   const requestIDs = validateRequestDefinitions(manifest, requestsFile, sourceName);
   const eventTypes = validateEvents(eventsFile, sourceName);
   validateTriggers(triggersFile, requestIDs, sourceName);
-  validateMappings(mappingsFile, requestIDs, eventTypes, sourceName);
+  const resourceTypes = validateMappings(mappingsFile, requestIDs, eventTypes, sourceName);
+  validateViews(viewsFile, resourceTypes, sourceName);
   validateRulePresets(presetsFile, eventTypes, sourceName);
 }
 

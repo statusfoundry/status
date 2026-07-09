@@ -155,14 +155,24 @@ public struct Resource: Identifiable, Codable, Equatable, Sendable {
     public var pluginID: String
     public var type: String
     public var name: String
+    public var fields: [String: String]
     public var actionURL: URL?
 
-    public init(id: String, accountID: String, pluginID: String, type: String, name: String, actionURL: URL? = nil) {
+    public init(
+        id: String,
+        accountID: String,
+        pluginID: String,
+        type: String,
+        name: String,
+        fields: [String: String] = [:],
+        actionURL: URL? = nil
+    ) {
         self.id = id
         self.accountID = accountID
         self.pluginID = pluginID
         self.type = type
         self.name = name
+        self.fields = fields
         self.actionURL = actionURL
     }
 }

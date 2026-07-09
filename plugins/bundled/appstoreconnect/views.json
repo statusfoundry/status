@@ -1,0 +1,18 @@
+{
+  "views": [
+    {
+      "id": "apps",
+      "type": "resource_list",
+      "title": "Apps",
+      "resourceType": "app",
+      "fields": ["bundleId", "sku"]
+    },
+    {
+      "id": "app_detail",
+      "type": "resource_detail",
+      "title": "App Detail",
+      "resourceType": "app",
+      "fields": ["bundleId", "sku"]
+    }
+  ]
+}

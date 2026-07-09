@@ -1,0 +1,18 @@
+{
+  "views": [
+    {
+      "id": "overview",
+      "type": "overview_cards",
+      "title": "Website Overview",
+      "resourceType": "website",
+      "fields": ["statusCode", "reachable", "responseTimeMs"]
+    },
+    {
+      "id": "websites",
+      "type": "resource_list",
+      "title": "Tracked Websites",
+      "resourceType": "website",
+      "fields": ["statusCode", "reachable", "responseTimeMs"]
+    }
+  ]
+}

@@ -345,7 +345,21 @@ Example:
 }
 ```
 
-The app renders the view natively.
+The app renders every view natively. Plugins do not ship view code. In v1 the
+package decoder loads `views.json`, the package build script validates view
+types and referenced resource types, and the integration settings surface
+renders these descriptor types against locally stored resources:
+
+- `overview_cards`
+- `resource_list`
+- `resource_detail`
+- `timeline`
+- `metric_grid`
+- `alert_list`
+
+`resource_list` and `resource_detail` must declare `resourceType`. `fields`
+must reference normalized resource fields produced by `mappings.json`; missing
+fields are simply omitted from the rendered native view.
 
 ## Rule presets
 

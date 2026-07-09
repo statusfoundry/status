@@ -48,10 +48,12 @@ public final class PluginStoreViewModel: ObservableObject {
     @Published public private(set) var installedTriggers: [String: [TriggerDefinition]]
     @Published public private(set) var savingTriggerID: String?
     @Published public private(set) var runtimeStatuses: [String: PluginRuntimeStatus]
+    @Published public private(set) var pluginResources: [String: [Resource]]
 
     private let loadInstalled: () throws -> [InstalledPlugin]
     private let loadAvailable: () async throws -> [RegistryPluginSummary]
     private let loadRuntimeStatuses: ([InstalledPlugin]) throws -> [String: PluginRuntimeStatus]
+    private let loadPluginResources: (InstalledPlugin) throws -> [Resource]
     private let installPlugin: (RegistryPluginSummary) async throws -> Void
     private let removePlugin: (InstalledPlugin) async throws -> Void
     private let loadPermissions: (InstalledPlugin) throws -> [InstalledPluginPermission]
@@ -70,6 +72,7 @@ public final class PluginStoreViewModel: ObservableObject {
         loadInstalled: @escaping () throws -> [InstalledPlugin],
         loadAvailable: @escaping () async throws -> [RegistryPluginSummary],
         loadRuntimeStatuses: @escaping ([InstalledPlugin]) throws -> [String: PluginRuntimeStatus] = { _ in [:] },
+        loadPluginResources: @escaping (InstalledPlugin) throws -> [Resource] = { _ in [] },
         installPlugin: @escaping (RegistryPluginSummary) async throws -> Void,
         removePlugin: @escaping (InstalledPlugin) async throws -> Void = { _ in },
         loadPermissions: @escaping (InstalledPlugin) throws -> [InstalledPluginPermission] = { _ in [] },
@@ -95,9 +98,11 @@ public final class PluginStoreViewModel: ObservableObject {
         self.installedPermissions = [:]
         self.installedTriggers = [:]
         self.runtimeStatuses = [:]
+        self.pluginResources = [:]
         self.loadInstalled = loadInstalled
         self.loadAvailable = loadAvailable
         self.loadRuntimeStatuses = loadRuntimeStatuses
+        self.loadPluginResources = loadPluginResources
         self.installPlugin = installPlugin
         self.removePlugin = removePlugin
         self.loadPermissions = loadPermissions
@@ -122,6 +127,7 @@ public final class PluginStoreViewModel: ObservableObject {
             refreshPermissions(for: installed)
             refreshTriggers(for: installed)
             refreshRuntimeStatuses(for: installed)
+            refreshPluginResources(for: installed)
             loadError = nil
         } catch {
             let installed = (try? loadInstalled()) ?? []
@@ -131,6 +137,7 @@ public final class PluginStoreViewModel: ObservableObject {
             refreshPermissions(for: installed)
             refreshTriggers(for: installed)
             refreshRuntimeStatuses(for: installed)
+            refreshPluginResources(for: installed)
             loadError = error.localizedDescription
         }
     }
@@ -171,6 +178,7 @@ public final class PluginStoreViewModel: ObservableObject {
             installedPermissions[plugin.id] = nil
             installedTriggers[plugin.id] = nil
             runtimeStatuses[plugin.id] = nil
+            pluginResources[plugin.id] = nil
             await reload()
         } catch {
             loadError = error.localizedDescription
@@ -332,6 +340,12 @@ public final class PluginStoreViewModel: ObservableObject {
         runtimeStatuses = (try? loadRuntimeStatuses(plugins)) ?? [:]
     }
 
+    private func refreshPluginResources(for plugins: [InstalledPlugin]) {
+        pluginResources = Dictionary(uniqueKeysWithValues: plugins.map { plugin in
+            (plugin.id, (try? loadPluginResources(plugin)) ?? [])
+        })
+    }
+
     private func defaultSetupValues(for plugin: InstalledPlugin) -> [String: String] {
         Dictionary(uniqueKeysWithValues: plugin.configurationFields.map { field in
             (field.id, field.defaultValue ?? "")
@@ -404,6 +418,7 @@ public struct PluginStoreContainerView: View {
             installedTriggers: viewModel.installedTriggers,
             savingTriggerID: viewModel.savingTriggerID,
             runtimeStatuses: viewModel.runtimeStatuses,
+            pluginResources: viewModel.pluginResources,
             canConfigure: { plugin in
                 viewModel.canConfigure(plugin)
             },
@@ -540,6 +555,7 @@ public struct PluginSettingsContainerView: View {
             triggers: viewModel.installedTriggers[plugin.id, default: []],
             savingTriggerID: viewModel.savingTriggerID,
             runtimeStatus: viewModel.runtimeStatuses[plugin.id],
+            resources: viewModel.pluginResources[plugin.id, default: []],
             updateSetupValue: { plugin, fieldID, value in
                 viewModel.updateSetupValue(plugin, fieldID: fieldID, value: value)
             },
@@ -591,6 +607,7 @@ public struct PluginStoreView: View {
     private let installedTriggers: [String: [TriggerDefinition]]
     private let savingTriggerID: String?
     private let runtimeStatuses: [String: PluginRuntimeStatus]
+    private let pluginResources: [String: [Resource]]
     private let canConfigure: (InstalledPlugin) -> Bool
     private let updateSetupValue: (InstalledPlugin, String, String) -> Void
     private let updateAccountDisplayName: (InstalledPlugin, String) -> Void
@@ -626,6 +643,7 @@ public struct PluginStoreView: View {
         installedTriggers: [String: [TriggerDefinition]] = [:],
         savingTriggerID: String? = nil,
         runtimeStatuses: [String: PluginRuntimeStatus] = [:],
+        pluginResources: [String: [Resource]] = [:],
         canConfigure: @escaping (InstalledPlugin) -> Bool = { _ in false },
         updateSetupValue: @escaping (InstalledPlugin, String, String) -> Void = { _, _, _ in },
         updateAccountDisplayName: @escaping (InstalledPlugin, String) -> Void = { _, _ in },
@@ -658,6 +676,7 @@ public struct PluginStoreView: View {
         self.installedTriggers = installedTriggers
         self.savingTriggerID = savingTriggerID
         self.runtimeStatuses = runtimeStatuses
+        self.pluginResources = pluginResources
         self.canConfigure = canConfigure
         self.updateSetupValue = updateSetupValue
         self.updateAccountDisplayName = updateAccountDisplayName
@@ -753,6 +772,7 @@ public struct PluginStoreView: View {
             triggers: installedTriggers[plugin.id, default: []],
             savingTriggerID: savingTriggerID,
             runtimeStatus: runtimeStatuses[plugin.id],
+            resources: pluginResources[plugin.id, default: []],
             updateSetupValue: updateSetupValue,
             updateAccountDisplayName: updateAccountDisplayName,
             selectAccount: selectAccount,
@@ -958,6 +978,7 @@ private struct PluginSettingsPanel: View {
     let triggers: [TriggerDefinition]
     let savingTriggerID: String?
     let runtimeStatus: PluginRuntimeStatus?
+    let resources: [Resource]
     let updateSetupValue: (InstalledPlugin, String, String) -> Void
     let updateAccountDisplayName: (InstalledPlugin, String) -> Void
     let selectAccount: (InstalledPlugin, String) -> Void
@@ -1046,6 +1067,7 @@ private struct PluginSettingsPanel: View {
             if let runtimeStatus {
                 PluginRuntimeStatusView(status: runtimeStatus)
             }
+            PluginDeclaredViewsPanel(plugin: plugin, resources: resources)
             if canConfigure {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Integration name")
@@ -1201,6 +1223,244 @@ private struct PluginRuntimeStatusView: View {
         .padding(10)
         .background(status.status.statusColor.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct PluginDeclaredViewsPanel: View {
+    let plugin: InstalledPlugin
+    let resources: [Resource]
+
+    var body: some View {
+        if plugin.views.isEmpty == false {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Views")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                VStack(spacing: 10) {
+                    ForEach(plugin.views) { view in
+                        PluginDeclaredViewCard(
+                            plugin: plugin,
+                            view: view,
+                            resources: resources(for: view)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func resources(for view: PackagedPluginView) -> [Resource] {
+        guard let resourceType = view.resourceType else {
+            return resources
+        }
+        return resources.filter { $0.type == resourceType }
+    }
+}
+
+private struct PluginDeclaredViewCard: View {
+    let plugin: InstalledPlugin
+    let view: PackagedPluginView
+    let resources: [Resource]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(view.title ?? view.type.defaultTitle)
+                    .font(.headline)
+                Spacer(minLength: 12)
+                Text(view.type.badge)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color.statusBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch view.type {
+        case .resourceList:
+            PluginResourceListView(view: view, resources: resources)
+        case .resourceDetail:
+            if let resource = resources.first {
+                PluginResourceDetailView(view: view, resource: resource)
+            } else {
+                Text("No \(view.resourceType ?? "resources") stored yet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        case .overviewCards, .metricGrid:
+            PluginResourceMetricGrid(view: view, resources: resources)
+        case .timeline:
+            PluginResourceTimeline(resources: resources)
+        case .alertList:
+            PluginResourceAlertList(plugin: plugin, resources: resources)
+        }
+    }
+}
+
+private struct PluginResourceListView: View {
+    let view: PackagedPluginView
+    let resources: [Resource]
+
+    var body: some View {
+        if resources.isEmpty {
+            Text("No \(view.resourceType ?? "resources") stored yet.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            VStack(spacing: 8) {
+                ForEach(resources) { resource in
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(resource.name)
+                                .font(.callout.weight(.semibold))
+                            PluginResourceFields(view: view, resource: resource)
+                        }
+                        Spacer(minLength: 12)
+                        if let actionURL = resource.actionURL {
+                            Link("Open", destination: actionURL)
+                                .font(.caption.weight(.semibold))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(Color.statusSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+    }
+}
+
+private struct PluginResourceDetailView: View {
+    let view: PackagedPluginView
+    let resource: Resource
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(resource.name)
+                .font(.callout.weight(.semibold))
+            PluginResourceFields(view: view, resource: resource)
+            if let actionURL = resource.actionURL {
+                Link("Open source", destination: actionURL)
+                    .font(.caption.weight(.semibold))
+            }
+        }
+    }
+}
+
+private struct PluginResourceMetricGrid: View {
+    let view: PackagedPluginView
+    let resources: [Resource]
+
+    var body: some View {
+        if resources.isEmpty {
+            Text("No stored data yet.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
+                ForEach(resources) { resource in
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(resource.name)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                        PluginResourceFields(view: view, resource: resource)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(Color.statusSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+    }
+}
+
+private struct PluginResourceTimeline: View {
+    let resources: [Resource]
+
+    var body: some View {
+        if resources.isEmpty {
+            Text("No timeline resources stored yet.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(resources.prefix(8))) { resource in
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(Color.secondary)
+                            .frame(width: 7, height: 7)
+                        Text(resource.name)
+                            .font(.caption)
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct PluginResourceAlertList: View {
+    let plugin: InstalledPlugin
+    let resources: [Resource]
+
+    var body: some View {
+        let attentionResources = resources.filter { resource in
+            resource.fields.values.contains { value in
+                let lowered = value.lowercased()
+                return lowered.contains("failed") || lowered.contains("down") || lowered.contains("rejected")
+            }
+        }
+        if attentionResources.isEmpty {
+            Text("No \(plugin.name) resources need attention.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            PluginResourceListView(
+                view: PackagedPluginView(id: "alerts", type: .resourceList, resourceType: nil, fields: []),
+                resources: attentionResources
+            )
+        }
+    }
+}
+
+private struct PluginResourceFields: View {
+    let view: PackagedPluginView
+    let resource: Resource
+
+    var body: some View {
+        let fields = resolvedFields
+        if fields.isEmpty == false {
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(fields, id: \.key) { field in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(field.key.fieldLabel)
+                            .foregroundStyle(.secondary)
+                        Text(field.value)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    .font(.caption)
+                }
+            }
+        }
+    }
+
+    private var resolvedFields: [(key: String, value: String)] {
+        let keys = view.fields.isEmpty ? Array(resource.fields.keys).sorted() : view.fields
+        return keys.compactMap { key in
+            guard let value = resource.fields[key], value.isEmpty == false else {
+                return nil
+            }
+            return (key, value)
+        }
     }
 }
 
@@ -1416,6 +1676,37 @@ private extension JobStatus {
         case .queued, .running:
             .blue
         }
+    }
+}
+
+private extension PackagedPluginViewType {
+    var defaultTitle: String {
+        switch self {
+        case .overviewCards:
+            "Overview"
+        case .resourceList:
+            "Resources"
+        case .resourceDetail:
+            "Resource Detail"
+        case .timeline:
+            "Timeline"
+        case .metricGrid:
+            "Metrics"
+        case .alertList:
+            "Alerts"
+        }
+    }
+
+    var badge: String {
+        rawValue.replacingOccurrences(of: "_", with: " ")
+    }
+}
+
+private extension String {
+    var fieldLabel: String {
+        replacingOccurrences(of: #"([a-z0-9])([A-Z])"#, with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
     }
 }
 
