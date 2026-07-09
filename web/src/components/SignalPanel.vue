@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Card, Status, StatusBadge } from '@sil/ui'
 import { useBemm } from 'bemm'
+import { Card, Status, StatusBadge } from '@sil/ui'
 
 const bemm = useBemm('signal-panel', { return: 'string' })
 
@@ -20,3 +20,19 @@ const signals = [
     </ul>
   </Card>
 </template>
+
+<style lang="scss">
+.signal-panel {
+  &__list {
+    display: grid;
+    gap: var(--space-s);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__item {
+    display: flex;
+  }
+}
+</style>

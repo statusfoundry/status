@@ -1,5 +1,5 @@
 import '@sil/ui/styles'
-import './styles/app.scss'
+import './styles/index.scss'
 
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'

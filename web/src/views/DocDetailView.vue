@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { Badge } from '@sil/ui'
 import { useBemm } from 'bemm'
+import SiteLayout from '@/components/SiteLayout.vue'
+import docsData from '@/generated/docs.json'
 
-import docsData from '../generated/docs.json'
+const bemm = useBemm('page', { return: 'string' })
+const articleBemm = useBemm('doc-article', { return: 'string' })
 
-const bemm = useBemm('doc-detail-view', { return: 'string' })
 const route = useRoute()
 
 const document = computed(() => {
@@ -16,28 +17,62 @@ const document = computed(() => {
 </script>
 
 <template>
-  <main :class="bemm()">
-    <template v-if="document">
-      <section :class="bemm('intro')">
-        <Badge variant="outline">Docs</Badge>
-        <h1>{{ document.title }}</h1>
-        <p>{{ document.summary }}</p>
-        <div :class="bemm('links')">
-          <RouterLink to="/docs/">All docs</RouterLink>
-          <a :href="document.sourceUrl">Open on GitHub</a>
-        </div>
-      </section>
+  <SiteLayout>
+    <main :class="bemm()">
+      <template v-if="document">
+        <section :class="bemm('intro')">
+          <div :class="bemm('container')">
+            <p :class="bemm('eyebrow')">Docs</p>
+            <h1 :class="bemm('title')">{{ document.title }}</h1>
+            <p :class="bemm('subtitle')">{{ document.summary }}</p>
+            <div :class="bemm('links')">
+              <RouterLink to="/docs/">All docs</RouterLink>
+              <a :href="document.sourceUrl" target="_blank" rel="noopener">Open on GitHub</a>
+            </div>
+          </div>
+        </section>
 
-      <article :class="bemm('article')">
-        <pre>{{ document.content }}</pre>
-      </article>
-    </template>
+        <section :class="bemm('body')">
+          <div :class="bemm('container')">
+            <article :class="articleBemm()">
+              <pre>{{ document.content }}</pre>
+            </article>
+          </div>
+        </section>
+      </template>
 
-    <section v-else :class="bemm('intro')">
-      <Badge variant="outline">Docs</Badge>
-      <h1>Document not found.</h1>
-      <p>The requested documentation page is not part of the published docs index.</p>
-      <RouterLink to="/docs/">All docs</RouterLink>
-    </section>
-  </main>
+      <template v-else>
+        <section :class="bemm('intro')">
+          <div :class="bemm('container')">
+            <p :class="bemm('eyebrow')">Docs</p>
+            <h1 :class="bemm('title')">Document not found.</h1>
+            <p :class="bemm('subtitle')">The requested documentation page is not part of the published docs index.</p>
+            <div :class="bemm('links')">
+              <RouterLink to="/docs/">All docs</RouterLink>
+            </div>
+          </div>
+        </section>
+      </template>
+    </main>
+  </SiteLayout>
 </template>
+
+<style lang="scss">
+.doc-article {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-l);
+
+  pre {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--color-text-primary);
+    font-family: var(--font-family-monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-relaxed);
+  }
+}
+</style>

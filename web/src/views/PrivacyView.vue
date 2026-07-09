@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Badge, Card } from '@sil/ui'
 import { useBemm } from 'bemm'
+import SiteLayout from '@/components/SiteLayout.vue'
 
-const bemm = useBemm('privacy-view', { return: 'string' })
+const bemm = useBemm('page', { return: 'string' })
 
 const privacy = [
   'Status is local-first for v1; operational data is stored on the device by default.',
@@ -20,27 +20,35 @@ const security = [
 </script>
 
 <template>
-  <main :class="bemm()">
-    <section :class="bemm('intro')">
-      <Badge variant="outline">Privacy and security</Badge>
-      <h1>Local-first operations with explicit permissions.</h1>
-      <p>
-        Status treats integrations as declarative data sources. The app owns credentials, UI, notifications,
-        automation decisions, and audit output.
-      </p>
-    </section>
+  <SiteLayout>
+    <main :class="bemm()">
+      <section :class="bemm('intro')">
+        <div :class="bemm('container')">
+          <p :class="bemm('eyebrow')">Privacy and security</p>
+          <h1 :class="bemm('title')">Local-first operations with explicit permissions.</h1>
+          <p :class="bemm('subtitle')">
+            Status treats integrations as declarative data sources. The app owns credentials, UI, notifications,
+            automation decisions, and audit output.
+          </p>
+        </div>
+      </section>
 
-    <section :class="bemm('grid')">
-      <Card title="Privacy posture">
-        <ul>
-          <li v-for="item in privacy" :key="item">{{ item }}</li>
-        </ul>
-      </Card>
-      <Card title="Registry safety">
-        <ul>
-          <li v-for="item in security" :key="item">{{ item }}</li>
-        </ul>
-      </Card>
-    </section>
-  </main>
+      <section :class="bemm('body')">
+        <div :class="[bemm('container'), bemm('grid')]">
+          <article :class="bemm('card')">
+            <h2>Privacy posture</h2>
+            <ul>
+              <li v-for="item in privacy" :key="item">{{ item }}</li>
+            </ul>
+          </article>
+          <article :class="bemm('card')">
+            <h2>Registry safety</h2>
+            <ul>
+              <li v-for="item in security" :key="item">{{ item }}</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </main>
+  </SiteLayout>
 </template>

@@ -1,0 +1,72 @@
+// Status marketing site tokens — aligned with Lezin editorial patterns.
+
+:root {
+  --color-white: #ffffff;
+  --color-bg: #f8f9fb;
+  --color-background: var(--color-bg);
+  --color-surface: #ffffff;
+  --color-surface-raised: #f1f3f7;
+
+  --color-accent: #155e75;
+  --color-accent-light: #1a7a96;
+  --color-accent-dark: #0f4a5c;
+  --color-accent-tint: #e8f4f8;
+
+  --color-text-primary: #111827;
+  --color-foreground: var(--color-text-primary);
+  --color-text-secondary: #6b7280;
+  --color-text-tertiary: #9ca3af;
+  --color-text-inverse: #ffffff;
+
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
+
+  --color-success: #3e9b5f;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+  --font-size-xs: 11px;
+  --font-size-sm: 13px;
+  --font-size-base: 15px;
+  --font-size-md: 17px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-xxl: 32px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.7;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.12);
+
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+}
+
+html.dark {
+  --color-bg: #0f1117;
+  --color-surface: #1a1d27;
+  --color-surface-raised: #242733;
+  --color-accent-tint: #132a33;
+  --color-text-primary: #e8eaf0;
+  --color-text-secondary: #8e94a6;
+  --color-text-tertiary: #5f6577;
+  --color-text-inverse: #0f1117;
+  --color-border: #2a2d3a;
+  --color-border-light: #1f2230;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.4);
+}

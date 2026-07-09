@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Badge, Card } from '@sil/ui'
 import { useBemm } from 'bemm'
+import SiteLayout from '@/components/SiteLayout.vue'
 
-const bemm = useBemm('changelog-view', { return: 'string' })
+const bemm = useBemm('page', { return: 'string' })
 
 const changes = [
   {
@@ -19,20 +19,29 @@ const changes = [
 </script>
 
 <template>
-  <main :class="bemm()">
-    <section :class="bemm('intro')">
-      <Badge variant="outline">Changelog</Badge>
-      <h1>Release notes for Status.</h1>
-      <p>Public release notes will track app builds, registry changes, plugin updates, and security fixes.</p>
-    </section>
+  <SiteLayout>
+    <main :class="bemm()">
+      <section :class="bemm('intro')">
+        <div :class="bemm('container')">
+          <p :class="bemm('eyebrow')">Changelog</p>
+          <h1 :class="bemm('title')">Release notes for Status.</h1>
+          <p :class="bemm('subtitle')">
+            Public release notes will track app builds, registry changes, plugin updates, and security fixes.
+          </p>
+        </div>
+      </section>
 
-    <section :class="bemm('list')" aria-label="Release notes">
-      <Card v-for="change in changes" :key="change.version" :title="change.version" :class="bemm('item')">
-        <p>{{ change.date }}</p>
-        <ul>
-          <li v-for="item in change.items" :key="item">{{ item }}</li>
-        </ul>
-      </Card>
-    </section>
-  </main>
+      <section :class="bemm('body')">
+        <div :class="[bemm('container'), bemm('list')]">
+          <article v-for="change in changes" :key="change.version" :class="bemm('card')">
+            <h2>{{ change.version }}</h2>
+            <p>{{ change.date }}</p>
+            <ul>
+              <li v-for="item in change.items" :key="item">{{ item }}</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </main>
+  </SiteLayout>
 </template>

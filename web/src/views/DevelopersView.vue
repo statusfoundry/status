@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Badge, Card } from '@sil/ui'
 import { useBemm } from 'bemm'
+import SiteLayout from '@/components/SiteLayout.vue'
 
-const bemm = useBemm('developers-view', { return: 'string' })
+const bemm = useBemm('page', { return: 'string' })
 
 const steps = [
   'Create a declarative plugin package.',
@@ -13,25 +13,33 @@ const steps = [
 </script>
 
 <template>
-  <main :class="bemm()">
-    <section :class="bemm('intro')">
-      <Badge variant="outline">Developers</Badge>
-      <h1>Declarative plugins only.</h1>
-      <p>
-        Plugins describe auth, requests, mappings, events, views, and actions. They do not run arbitrary code,
-        own UI, or access secrets directly.
-      </p>
-    </section>
+  <SiteLayout>
+    <main :class="bemm()">
+      <section :class="bemm('intro')">
+        <div :class="bemm('container')">
+          <p :class="bemm('eyebrow')">Developers</p>
+          <h1 :class="bemm('title')">Declarative plugins only.</h1>
+          <p :class="bemm('subtitle')">
+            Plugins describe auth, requests, mappings, events, views, and actions. They do not run arbitrary code,
+            own UI, or access secrets directly.
+          </p>
+        </div>
+      </section>
 
-    <section :class="bemm('grid')">
-      <Card title="Submission path">
-        <ol>
-          <li v-for="step in steps" :key="step">{{ step }}</li>
-        </ol>
-      </Card>
-      <Card title="V1 restrictions">
-        <p>No public upload form, no self-service publishing, and no custom plugin UI.</p>
-      </Card>
-    </section>
-  </main>
+      <section :class="bemm('body')">
+        <div :class="[bemm('container'), bemm('grid')]">
+          <article :class="bemm('card')">
+            <h2>Submission path</h2>
+            <ol>
+              <li v-for="step in steps" :key="step">{{ step }}</li>
+            </ol>
+          </article>
+          <article :class="bemm('card')">
+            <h2>V1 restrictions</h2>
+            <p>No public upload form, no self-service publishing, and no custom plugin UI.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+  </SiteLayout>
 </template>

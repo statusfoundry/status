@@ -1,0 +1,27 @@
+{
+  "brand": "Status",
+  "header": {
+    "brandAriaLabel": "Status home",
+    "toggleColorMode": "Toggle color mode",
+    "nav": [
+      { "id": "download", "label": "Download", "to": "/download/" },
+      { "id": "plugins", "label": "Plugins", "to": "/plugins/" },
+      { "id": "developers", "label": "Developers", "to": "/developers/" },
+      { "id": "docs", "label": "Docs", "to": "/docs/" }
+    ]
+  },
+  "footer": {
+    "ariaLabel": "Footer",
+    "nav": [
+      { "label": "Download", "to": "/download/" },
+      { "label": "Plugins", "to": "/plugins/" },
+      { "label": "Docs", "to": "/docs/" },
+      { "label": "Privacy", "to": "/privacy/" },
+      { "label": "Changelog", "to": "/changelog/" },
+      { "label": "Registry API", "href": "https://status-registry.hakobs.com/v1/plugins" }
+    ],
+    "copyrightPrefix": "Status. Built by",
+    "developerLabel": "hakobs.com",
+    "developerUrl": "https://hakobs.com"
+  }
+}
