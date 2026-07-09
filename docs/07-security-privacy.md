@@ -261,7 +261,7 @@ private-key-jwt
 
 All auth types share the same model: the plugin declares the fields, the app renders the setup form natively, secrets go to Keychain, and the request engine injects credentials at request time. Plugins never read secrets directly.
 
-Current implementation status: bearer-token, api-key header, basic-auth, JWT API-key, and OAuth token injection/refresh are implemented for installed declarative plugins. The native setup form masks secret input, `PluginSetupConfiguration` writes bearer token bytes, credential bundles, or OAuth token sets to `CredentialStore`, SQLite stores only the `credential_ref`, and `PluginRuntimeService` resolves that reference into the appropriate request header at request time. Basic auth supports the Jira-style email/API-token credential bundle. JWT signing currently covers the App Store Connect ES256 API-key flow. OAuth authorization UI/callback handling is exposed through core PKCE request/token storage primitives and still needs platform shell UI before official OAuth-only plugins ship.
+Current implementation status: bearer-token, api-key header, basic-auth, JWT API-key, and OAuth authorization/token injection/refresh are implemented for installed declarative plugins. The native setup form masks secret input, `PluginSetupConfiguration` writes bearer token bytes, credential bundles, or OAuth token sets to `CredentialStore`, SQLite stores only the `credential_ref`, and `PluginRuntimeService` resolves that reference into the appropriate request header at request time. Basic auth supports the Jira-style email/API-token credential bundle. JWT signing currently covers the App Store Connect ES256 API-key flow. OAuth setup uses app-owned PKCE authorization URLs, validates callback `state`, exchanges authorization codes for token sets through the plugin-declared token endpoint, and stores the resulting token set in Keychain.
 
 ### MVP auth paths per integration
 
@@ -291,11 +291,11 @@ Later phases, for reference: Cloudflare uses an API token (bearer), Stripe uses 
 - Refresh responsibility: the core request engine owns token refresh, transparently, per account. Plugins never see refresh tokens.
 - Keychain storage: access token, refresh token, expiry, and scopes stored per account in Keychain, same rules as all other secrets.
 
-Implementation boundary: core now supports OAuth package metadata, PKCE authorization URL creation, Keychain-backed token-set storage, expired-token refresh, and request header injection. Platform shells still need the browser session and redirect callback UI before the app should list OAuth as the preferred setup path for an official plugin. Until then, GitHub/GitLab/Jira keep their PAT/API-token setup paths.
+Implementation boundary: core and the native shells now support OAuth package metadata, PKCE authorization URL creation, `status://oauth/...` callback delivery, callback `state` validation, authorization-code exchange, Keychain-backed token-set storage, expired-token refresh, and request header injection. GitHub/GitLab/Jira can still keep PAT/API-token setup paths as practical low-friction options, but OAuth-only plugins no longer need a plugin-owned executable flow.
 
 ### Token refresh and failure behavior
 
-- Credentials that expire (JWT API keys, future OAuth tokens) are refreshed by the core request engine, never by plugin logic.
+- Credentials that expire (JWT API keys and OAuth tokens) are refreshed by the core request engine, never by plugin logic.
 - On auth failure (401/403, expired key, revoked token) the request fails closed: no retry storm, no credential guessing, no fallback host.
 - The affected account enters a `needs-reconnect` state. The app surfaces this as a status item on the dashboard and in the account settings, with a direct path to re-enter credentials.
 - Sync for that account pauses until the user reconnects. Other accounts and plugins are unaffected.
@@ -452,7 +452,7 @@ Mitigations:
 - action safety levels;
 - audit log;
 - revocation checks before install, before update, and periodically;
-- OAuth deferred past MVP, removing embedded-client-secret risk from v1;
+- OAuth uses public native client IDs and PKCE; no plugin or app bundle may contain a confidential OAuth client secret;
 - fail-closed auth with a visible reconnect state;
 - limited relay storage;
 - no arbitrary plugin code in v1.

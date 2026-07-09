@@ -70,9 +70,16 @@ Acceptance: the App Store rejection and website down/recovered flows can be trac
 
 ### WP-0.5 Auth flows decision: OAuth on native — Integration Agent + Security Agent
 
+Status: implemented for the native v1 path. OAuth plugins declare provider metadata,
+public app/client IDs, authorization/token endpoints, redirect URI, and scopes.
+Status owns PKCE authorization URL creation, `status://oauth/...` callback handling,
+state validation, authorization-code exchange, Keychain-backed token-set storage,
+expired-token refresh, and request header injection. Plugins never ship client
+secrets and never receive token material directly.
+
 `auth.json` lists `oauth2`, and YouTube/Google integrations are roadmapped, but a declarative plugin cannot ship an OAuth client secret. Write the decision into `docs/07-security-privacy.md` (new section) and `docs/04-plugin-system.md`: who owns OAuth client IDs (the Status app itself per provider? user-supplied client?), PKCE flow, redirect URI scheme, token refresh responsibility, and which auth types are actually v1 (api-key/jwt-api-key/bearer may be enough for MVP — ASC, GitHub PAT, Jira token all work without OAuth).
 
-Acceptance: each roadmapped integration through Phase 7 has a named, feasible auth path; OAuth is either specced or explicitly deferred past MVP with the affected plugins (YouTube) moved accordingly.
+Acceptance: each roadmapped integration through Phase 7 has a named, feasible auth path; OAuth plugin packages can be installed and connected through the native PKCE/callback/token-storage flow without plugin-owned executable code.
 
 ### WP-0.6 Plugin signing and registry security spec — Security Agent
 
