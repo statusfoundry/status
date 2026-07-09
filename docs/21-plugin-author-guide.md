@@ -80,6 +80,16 @@ This command:
 
 Fix every validation error before trying to install the plugin in the app.
 
+## Pull request validation
+
+When a pull request changes files under `plugins/`, `schemas/plugin/`, or `status-plugin-example/`, GitHub Actions runs the **Plugin validation** job automatically. It:
+
+- validates every bundled and example plugin package (`npm run plugins:check`);
+- validates the standalone template when relevant (`npm run plugin-example:check`);
+- re-validates only the plugin directories touched in the PR (`npm run plugins:validate-pr`) and prints each package SHA-256 in the job log.
+
+If you change a bundled plugin, also run `npm run plugins:build` and commit the generated registry artifacts. CI fails when those artifacts are out of date.
+
 ## Adapt the template
 
 Work through the package in this order:

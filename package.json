@@ -14,6 +14,7 @@
     "plugins:build": "node scripts/build-plugin-packages.mjs",
     "plugins:check": "node scripts/build-plugin-packages.mjs --check",
     "plugins:validate-local": "node scripts/build-plugin-packages.mjs --local-plugin",
+    "plugins:validate-pr": "node scripts/validate-changed-plugins.mjs",
     "plugin-example:sync": "node scripts/sync-plugin-example-repo.mjs",
     "plugins:upload-r2": "node scripts/upload-plugin-artifacts-to-r2.mjs",
     "web:build": "vite build web",

@@ -53,6 +53,10 @@
     {
       "label": "Validate standalone template (after sync)",
       "command": "npm run plugin-example:check"
+    },
+    {
+      "label": "Validate plugins changed in a branch",
+      "command": "npm run plugins:validate-pr"
     }
   ],
   "restrictions": [

@@ -7,6 +7,59 @@ on:
       - main
 
 jobs:
+  plugin-validation:
+    name: Plugin validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Detect plugin changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="HEAD~1"
+            HEAD="HEAD"
+          fi
+
+          CHANGED="$(git diff --name-only "$BASE" "$HEAD" || true)"
+          printf '%s\n' "$CHANGED"
+
+          if printf '%s\n' "$CHANGED" | grep -qE '^(plugins/|schemas/plugin/|scripts/(lib/plugin-package-validator|build-plugin-packages|validate-changed-plugins)\.mjs|status-plugin-example/)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node
+        if: steps.changes.outputs.run == 'true'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.changes.outputs.run == 'true'
+        run: npm ci
+
+      - name: Validate bundled and example plugins
+        if: steps.changes.outputs.run == 'true'
+        run: |
+          npm run plugins:check
+          npm run plugin-example:check
+
+      - name: Validate changed plugin directories
+        if: steps.changes.outputs.run == 'true'
+        run: npm run plugins:validate-pr
+        env:
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+
   web-and-registry:
     runs-on: ubuntu-latest
     steps:
