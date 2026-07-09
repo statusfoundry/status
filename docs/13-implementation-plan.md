@@ -262,6 +262,10 @@ Acceptance: GitHub and App Store Connect no longer rely on generic SF Symbol fal
 
 ### WP-3.9 App-scoped rules and notifications — Architecture Agent + Design Agent
 
+Status: Partially implemented in persistence, runtime evaluation, tests, and native notification settings. The SQLite schema now stores rule `scope`, rule `account_id`, notification preference `account_id`, app defaults, plugin defaults, and account-specific event overrides. Runtime notification resolution prefers app event override, app default, plugin event override, plugin default, then package/rule default. Stored rule evaluation resolves the event's configured app/account and only loads app-scoped rules for that matching account, with plugin-scoped rules still available as broad defaults. macOS and iOS settings group notification controls by configured app/account when apps exist.
+
+Remaining: move the rule editor into each app settings window, show plugin-suggested rules per configured app, require permission/audit preview when enabling presets, and limit the global automation screen to explicit cross-app rules.
+
 Move ordinary rules and notification preferences into configured app settings. Keep a global automation surface only for explicit cross-app rules that connect a source app event to a target app action. Plugin presets remain disabled and must be enabled per configured app.
 
 Depends: WP-2.3, WP-3.7.

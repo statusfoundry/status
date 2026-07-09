@@ -437,11 +437,15 @@ public struct AuditLogContainerView: View {
 
 public struct NotificationPreferencePluginGroup: Identifiable, Equatable, Sendable {
     public var id: String
+    public var pluginID: String
+    public var accountID: String?
     public var name: String
     public var events: [NotificationPreferenceEventRow]
 
-    public init(id: String, name: String, events: [NotificationPreferenceEventRow]) {
+    public init(id: String, pluginID: String? = nil, accountID: String? = nil, name: String, events: [NotificationPreferenceEventRow]) {
         self.id = id
+        self.pluginID = pluginID ?? id
+        self.accountID = accountID
         self.name = name
         self.events = events
     }
@@ -468,14 +472,14 @@ public final class NotificationPreferencesViewModel: ObservableObject {
 
     private let loadPluginGroups: () throws -> [NotificationPreferencePluginGroup]
     private let loadPreferences: () throws -> [NotificationPreference]
-    private let setPreference: (String, String?, NotificationMode?) throws -> Void
+    private let setPreference: (String, String?, String?, NotificationMode?) throws -> Void
 
     public init(
         initialPluginGroups: [NotificationPreferencePluginGroup] = [],
         initialPreferences: [NotificationPreference] = [],
         loadPluginGroups: @escaping () throws -> [NotificationPreferencePluginGroup],
         loadPreferences: @escaping () throws -> [NotificationPreference],
-        setPreference: @escaping (String, String?, NotificationMode?) throws -> Void
+        setPreference: @escaping (String, String?, String?, NotificationMode?) throws -> Void
     ) {
         self.pluginGroups = initialPluginGroups
         self.preferences = initialPreferences
@@ -496,23 +500,26 @@ public final class NotificationPreferencesViewModel: ObservableObject {
         }
     }
 
-    public func explicitMode(pluginID: String, eventType: String? = nil) -> NotificationMode? {
+    public func explicitMode(pluginID: String, accountID: String? = nil, eventType: String? = nil) -> NotificationMode? {
         preferences.first { preference in
             preference.pluginID == pluginID &&
+            preference.accountID == accountID &&
             preference.eventType == eventType &&
-            preference.scope == (eventType == nil ? .plugin : .event)
+            preference.scope == (eventType == nil ? (accountID == nil ? .plugin : .app) : .event)
         }?.mode
     }
 
-    public func effectiveMode(pluginID: String, event: NotificationPreferenceEventRow) -> NotificationMode {
-        explicitMode(pluginID: pluginID, eventType: event.type)
+    public func effectiveMode(pluginID: String, accountID: String? = nil, event: NotificationPreferenceEventRow) -> NotificationMode {
+        explicitMode(pluginID: pluginID, accountID: accountID, eventType: event.type)
+            ?? explicitMode(pluginID: pluginID, accountID: accountID)
+            ?? explicitMode(pluginID: pluginID, eventType: event.type)
             ?? explicitMode(pluginID: pluginID)
             ?? event.defaultMode
     }
 
-    public func setMode(_ mode: NotificationMode?, pluginID: String, eventType: String? = nil) {
+    public func setMode(_ mode: NotificationMode?, pluginID: String, accountID: String? = nil, eventType: String? = nil) {
         do {
-            try setPreference(pluginID, eventType, mode)
+            try setPreference(pluginID, accountID, eventType, mode)
             preferences = try loadPreferences()
             loadError = nil
         } catch {
@@ -563,7 +570,7 @@ public struct StatusSettingsView: View {
         notificationPreferencesViewModel: @autoclosure @escaping () -> NotificationPreferencesViewModel = NotificationPreferencesViewModel(
             loadPluginGroups: { [] },
             loadPreferences: { [] },
-            setPreference: { _, _, _ in }
+            setPreference: { _, _, _, _ in }
         ),
         notificationHistoryViewModel: @autoclosure @escaping () -> NotificationHistoryViewModel = NotificationHistoryViewModel(
             loadNotifications: { [] }
@@ -611,7 +618,7 @@ private struct NotificationPreferencesPanel: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Notifications")
                     .font(.headline)
-                Text("Plugin defaults and event overrides. Plugins suggest defaults; Status applies these choices before platform delivery.")
+                Text("App defaults and event overrides. Plugins suggest defaults; Status applies these choices before platform delivery.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -657,11 +664,11 @@ private struct NotificationPreferencePluginCard: View {
                 }
                 Spacer(minLength: 12)
                 NotificationModeMenu(
-                    title: viewModel.explicitMode(pluginID: group.id)?.displayName ?? "Rule defaults",
+                    title: viewModel.explicitMode(pluginID: group.pluginID, accountID: group.accountID)?.displayName ?? "Rule defaults",
                     inheritedTitle: "Use rule defaults",
-                    selectedMode: viewModel.explicitMode(pluginID: group.id),
+                    selectedMode: viewModel.explicitMode(pluginID: group.pluginID, accountID: group.accountID),
                     setMode: { mode in
-                        viewModel.setMode(mode, pluginID: group.id)
+                        viewModel.setMode(mode, pluginID: group.pluginID, accountID: group.accountID)
                     }
                 )
             }
@@ -674,7 +681,8 @@ private struct NotificationPreferencePluginCard: View {
                 VStack(spacing: 8) {
                     ForEach(group.events) { event in
                         NotificationPreferenceEventControl(
-                            pluginID: group.id,
+                            pluginID: group.pluginID,
+                            accountID: group.accountID,
                             event: event,
                             viewModel: viewModel
                         )
@@ -690,6 +698,7 @@ private struct NotificationPreferencePluginCard: View {
 
 private struct NotificationPreferenceEventControl: View {
     let pluginID: String
+    let accountID: String?
     let event: NotificationPreferenceEventRow
     @ObservedObject var viewModel: NotificationPreferencesViewModel
 
@@ -698,18 +707,18 @@ private struct NotificationPreferenceEventControl: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(event.label)
                     .font(.callout.weight(.semibold))
-                Text("\(event.type) - effective \(viewModel.effectiveMode(pluginID: pluginID, event: event).displayName)")
+                Text("\(event.type) - effective \(viewModel.effectiveMode(pluginID: pluginID, accountID: accountID, event: event).displayName)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
             Spacer(minLength: 12)
             NotificationModeMenu(
-                title: viewModel.explicitMode(pluginID: pluginID, eventType: event.type)?.displayName ?? "Inherit",
-                inheritedTitle: "Inherit plugin/default",
-                selectedMode: viewModel.explicitMode(pluginID: pluginID, eventType: event.type),
+                title: viewModel.explicitMode(pluginID: pluginID, accountID: accountID, eventType: event.type)?.displayName ?? "Inherit",
+                inheritedTitle: accountID == nil ? "Inherit plugin/default" : "Inherit app/default",
+                selectedMode: viewModel.explicitMode(pluginID: pluginID, accountID: accountID, eventType: event.type),
                 setMode: { mode in
-                    viewModel.setMode(mode, pluginID: pluginID, eventType: event.type)
+                    viewModel.setMode(mode, pluginID: pluginID, accountID: accountID, eventType: event.type)
                 }
             )
         }

@@ -486,8 +486,8 @@ private struct MacRootView: View {
             try notificationPreferencePluginGroups()
         } loadPreferences: {
             try LocalStatusStore.openApplicationSupportStore().notificationPreferences()
-        } setPreference: { pluginID, eventType, mode in
-            try setNotificationPreference(pluginID: pluginID, eventType: eventType, mode: mode)
+        } setPreference: { pluginID, accountID, eventType, mode in
+            try setNotificationPreference(pluginID: pluginID, accountID: accountID, eventType: eventType, mode: mode)
         }
     }
 
@@ -540,7 +540,7 @@ private struct MacRootView: View {
     private func notificationPreferencePluginGroups() throws -> [NotificationPreferencePluginGroup] {
         try bootstrapBundledPlugins()
         let store = try LocalStatusStore.openApplicationSupportStore()
-        return try store.installedPlugins().map { plugin in
+        return try store.installedPlugins().flatMap { plugin in
             let definition = try store.installedPluginDefinition(pluginID: plugin.id)
             let events = (definition?.events ?? [])
                 .sorted { lhs, rhs in lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending }
@@ -551,19 +551,40 @@ private struct MacRootView: View {
                         defaultMode: event.notificationDefault
                     )
                 }
-            return NotificationPreferencePluginGroup(id: plugin.id, name: plugin.name, events: events)
+            let accounts = try store.accountConfigurations(pluginID: plugin.id)
+            if accounts.isEmpty {
+                return [
+                    NotificationPreferencePluginGroup(id: plugin.id, pluginID: plugin.id, name: plugin.name, events: events)
+                ]
+            }
+            return accounts.map { account in
+                NotificationPreferencePluginGroup(
+                    id: account.id,
+                    pluginID: plugin.id,
+                    accountID: account.id,
+                    name: account.accountName,
+                    events: events
+                )
+            }
         }
     }
 
-    private func setNotificationPreference(pluginID: String, eventType: String?, mode: NotificationMode?) throws {
+    private func setNotificationPreference(pluginID: String, accountID: String?, eventType: String?, mode: NotificationMode?) throws {
         let store = try LocalStatusStore.openApplicationSupportStore()
-        let scope: NotificationPreferenceScope = eventType == nil ? .plugin : .event
+        let scope: NotificationPreferenceScope = if eventType != nil {
+            .event
+        } else if accountID != nil {
+            .app
+        } else {
+            .plugin
+        }
         if let mode {
             try store.upsertNotificationPreference(
                 NotificationPreference(
-                    id: notificationPreferenceID(pluginID: pluginID, eventType: eventType),
+                    id: notificationPreferenceID(pluginID: pluginID, accountID: accountID, eventType: eventType),
                     scope: scope,
                     pluginID: pluginID,
+                    accountID: accountID,
                     eventType: eventType,
                     mode: mode,
                     createdAt: Date(),
@@ -571,12 +592,12 @@ private struct MacRootView: View {
                 )
             )
         } else {
-            try store.deleteNotificationPreference(pluginID: pluginID, scope: scope, eventType: eventType)
+            try store.deleteNotificationPreference(pluginID: pluginID, scope: scope, eventType: eventType, accountID: accountID)
         }
     }
 
-    private func notificationPreferenceID(pluginID: String, eventType: String?) -> String {
-        let suffix = ([pluginID, eventType].compactMap { $0 }.joined(separator: "_"))
+    private func notificationPreferenceID(pluginID: String, accountID: String?, eventType: String?) -> String {
+        let suffix = ([pluginID, accountID, eventType].compactMap { $0 }.joined(separator: "_"))
             .replacingOccurrences(of: #"[^a-zA-Z0-9_]+"#, with: "_", options: .regularExpression)
             .lowercased()
         return "ntp_\(suffix)"

@@ -43,10 +43,18 @@ public struct RuleActionDefinition: Codable, Equatable, Sendable {
     }
 }
 
+public enum RuleScope: String, Codable, Equatable, Sendable {
+    case plugin
+    case app
+    case crossApp = "cross_app"
+}
+
 public struct Rule: Identifiable, Codable, Equatable, Sendable {
     public var id: String
     public var name: String
     public var enabled: Bool
+    public var scope: RuleScope
+    public var accountID: String?
     public var provider: String?
     public var eventType: String
     public var conditions: [RuleCondition]
@@ -56,6 +64,8 @@ public struct Rule: Identifiable, Codable, Equatable, Sendable {
         id: String,
         name: String,
         enabled: Bool,
+        scope: RuleScope = .plugin,
+        accountID: String? = nil,
         provider: String? = nil,
         eventType: String,
         conditions: [RuleCondition],
@@ -64,6 +74,8 @@ public struct Rule: Identifiable, Codable, Equatable, Sendable {
         self.id = id
         self.name = name
         self.enabled = enabled
+        self.scope = scope
+        self.accountID = accountID
         self.provider = provider
         self.eventType = eventType
         self.conditions = conditions

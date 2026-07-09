@@ -80,18 +80,19 @@ import StatusCore
             updatedAt: Date(timeIntervalSince1970: 1_783_433_520)
         )
     ]
-    var saved: [(pluginID: String, eventType: String?, mode: NotificationMode?)] = []
+    var saved: [(pluginID: String, accountID: String?, eventType: String?, mode: NotificationMode?)] = []
     let viewModel = NotificationPreferencesViewModel(
         loadPluginGroups: { [group] },
         loadPreferences: { preferences },
-        setPreference: { pluginID, eventType, mode in
-            saved.append((pluginID, eventType, mode))
+        setPreference: { pluginID, accountID, eventType, mode in
+            saved.append((pluginID, accountID, eventType, mode))
             if let mode {
                 preferences.append(
                     NotificationPreference(
                         id: "ntp_event",
                         scope: .event,
                         pluginID: pluginID,
+                        accountID: accountID,
                         eventType: eventType,
                         mode: mode,
                         createdAt: Date(timeIntervalSince1970: 1_783_433_520),
@@ -114,6 +115,7 @@ import StatusCore
 
     #expect(saved.count == 1)
     #expect(saved[0].pluginID == "github")
+    #expect(saved[0].accountID == nil)
     #expect(saved[0].eventType == workflowEvent.type)
     #expect(saved[0].mode == .immediate)
     #expect(viewModel.effectiveMode(pluginID: "github", event: workflowEvent) == .immediate)

@@ -65,7 +65,8 @@ public final class AutomationPipeline {
     }
 
     public func processStoredRules(for event: Event) async throws -> AutomationPipelineResult {
-        try await process(event: event, rules: store.rules(eventType: event.type))
+        let accountID = try store.eventAccountID(event)
+        return try await process(event: event, rules: store.rules(eventType: event.type, accountID: accountID))
     }
 
     private func recordDispatchFailure(_ failure: ActionEffectDispatchFailure) throws {

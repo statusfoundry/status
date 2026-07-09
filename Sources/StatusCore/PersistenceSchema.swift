@@ -1,7 +1,7 @@
 import Foundation
 
 public enum StatusDatabaseMigrator {
-    public static let currentUserVersion = 5
+    public static let currentUserVersion = 6
 
     public static func migrate(_ database: SQLiteDatabase) throws {
         try database.executeBatch("""
@@ -35,6 +35,39 @@ public enum StatusDatabaseMigrator {
                 column: "accent_color",
                 definition: "TEXT"
             )
+        }
+        if numericUserVersion > 0 && numericUserVersion < 6 {
+            try addColumnIfMissing(
+                database,
+                table: "rules",
+                column: "scope",
+                definition: "TEXT NOT NULL DEFAULT 'plugin'"
+            )
+            try addColumnIfMissing(
+                database,
+                table: "rules",
+                column: "account_id",
+                definition: "TEXT"
+            )
+            try addColumnIfMissing(
+                database,
+                table: "notification_preferences",
+                column: "account_id",
+                definition: "TEXT"
+            )
+            try database.executeBatch("""
+            DROP INDEX IF EXISTS idx_notification_preferences_event;
+            CREATE INDEX IF NOT EXISTS idx_rules_account ON rules (account_id, enabled);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_preferences_plugin_event
+              ON notification_preferences (plugin_id, event_type)
+              WHERE scope = 'event' AND account_id IS NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_preferences_app
+              ON notification_preferences (account_id)
+              WHERE scope = 'app';
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_preferences_account_event
+              ON notification_preferences (account_id, event_type)
+              WHERE scope = 'event' AND account_id IS NOT NULL;
+            """)
         }
         try database.executeBatch("PRAGMA user_version = \(currentUserVersion);")
     }
@@ -240,6 +273,8 @@ public enum StatusDatabaseMigrator {
       id              TEXT PRIMARY KEY,
       name            TEXT NOT NULL,
       enabled         INTEGER NOT NULL DEFAULT 1,
+      scope           TEXT NOT NULL DEFAULT 'plugin',
+      account_id      TEXT,
       provider        TEXT,
       event_type      TEXT NOT NULL,
       conditions_json TEXT NOT NULL,
@@ -248,6 +283,7 @@ public enum StatusDatabaseMigrator {
       updated_at      TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_rules_event_type ON rules (event_type);
+    CREATE INDEX IF NOT EXISTS idx_rules_account ON rules (account_id, enabled);
 
     CREATE TABLE IF NOT EXISTS action_runs (
       id          TEXT PRIMARY KEY,
@@ -307,6 +343,7 @@ public enum StatusDatabaseMigrator {
       id         TEXT PRIMARY KEY,
       scope      TEXT NOT NULL,
       plugin_id  TEXT NOT NULL,
+      account_id TEXT,
       event_type TEXT,
       mode       TEXT NOT NULL,
       created_at TEXT NOT NULL,
@@ -315,8 +352,14 @@ public enum StatusDatabaseMigrator {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_preferences_plugin
       ON notification_preferences (plugin_id)
       WHERE scope = 'plugin';
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_preferences_event
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_preferences_plugin_event
       ON notification_preferences (plugin_id, event_type)
-      WHERE scope = 'event';
+      WHERE scope = 'event' AND account_id IS NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_preferences_app
+      ON notification_preferences (account_id)
+      WHERE scope = 'app';
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_preferences_account_event
+      ON notification_preferences (account_id, event_type)
+      WHERE scope = 'event' AND account_id IS NOT NULL;
     """
 }

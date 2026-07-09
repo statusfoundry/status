@@ -68,6 +68,7 @@ public struct NotificationRecord: Identifiable, Codable, Equatable, Sendable {
 
 public enum NotificationPreferenceScope: String, Codable, Equatable, Sendable {
     case plugin
+    case app
     case event
 }
 
@@ -75,6 +76,7 @@ public struct NotificationPreference: Identifiable, Codable, Equatable, Sendable
     public var id: String
     public var scope: NotificationPreferenceScope
     public var pluginID: String
+    public var accountID: String?
     public var eventType: String?
     public var mode: NotificationMode
     public var createdAt: Date
@@ -84,6 +86,7 @@ public struct NotificationPreference: Identifiable, Codable, Equatable, Sendable
         id: String,
         scope: NotificationPreferenceScope,
         pluginID: String,
+        accountID: String? = nil,
         eventType: String? = nil,
         mode: NotificationMode,
         createdAt: Date,
@@ -92,6 +95,7 @@ public struct NotificationPreference: Identifiable, Codable, Equatable, Sendable
         self.id = id
         self.scope = scope
         self.pluginID = pluginID
+        self.accountID = accountID
         self.eventType = eventType
         self.mode = mode
         self.createdAt = createdAt

@@ -190,7 +190,7 @@ import Testing
         .map { try $0.requiredText("name") }
     let userVersion = try database.query("PRAGMA user_version").first?["user_version"]
 
-    #expect(columns == ["id", "scope", "plugin_id", "event_type", "mode", "created_at", "updated_at"])
+    #expect(columns == ["id", "scope", "plugin_id", "account_id", "event_type", "mode", "created_at", "updated_at"])
     #expect(userVersion == .integer(Int64(StatusDatabaseMigrator.currentUserVersion)))
 }
 
@@ -439,6 +439,68 @@ import Testing
     #expect(try store.effectiveNotificationMode(for: otherEvent, defaultMode: .immediate) == .digest)
 }
 
+@Test func appNotificationPreferencesOverridePluginDefaults() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    try insertResourceFixture(database, resourceID: "res_app")
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let event = Event(
+        id: "evt_review_rejected",
+        provider: "com.status.appstoreconnect",
+        type: "app.review.rejected",
+        resourceID: "res_app",
+        resourceName: "Example App",
+        severity: .critical,
+        title: "App rejected",
+        summary: "Example App needs a reviewer reply.",
+        timestamp: now,
+        fingerprint: "appstoreconnect:app.review.rejected:res_app:REJECTED"
+    )
+    let pluginPreference = NotificationPreference(
+        id: "ntp_asc",
+        scope: .plugin,
+        pluginID: "com.status.appstoreconnect",
+        mode: .digest,
+        createdAt: now,
+        updatedAt: now
+    )
+    let appPreference = NotificationPreference(
+        id: "ntp_asc_acc_fixture",
+        scope: .app,
+        pluginID: "com.status.appstoreconnect",
+        accountID: "acc_fixture",
+        mode: .dashboardOnly,
+        createdAt: now,
+        updatedAt: now
+    )
+    let appEventPreference = NotificationPreference(
+        id: "ntp_asc_acc_fixture_review",
+        scope: .event,
+        pluginID: "com.status.appstoreconnect",
+        accountID: "acc_fixture",
+        eventType: "app.review.rejected",
+        mode: .disabled,
+        createdAt: now,
+        updatedAt: now
+    )
+
+    try store.upsertNotificationPreference(pluginPreference)
+    try store.upsertNotificationPreference(appPreference)
+    #expect(try store.effectiveNotificationMode(for: event, defaultMode: .immediate) == .dashboardOnly)
+
+    try store.upsertNotificationPreference(appEventPreference)
+    #expect(try store.effectiveNotificationMode(for: event, defaultMode: .immediate) == .disabled)
+
+    try store.deleteNotificationPreference(
+        pluginID: "com.status.appstoreconnect",
+        scope: .event,
+        eventType: "app.review.rejected",
+        accountID: "acc_fixture"
+    )
+    #expect(try store.effectiveNotificationMode(for: event, defaultMode: .immediate) == .dashboardOnly)
+}
+
 @Test func notificationPreferencesCanBeDeletedByScope() throws {
     let database = try temporaryDatabase()
     try StatusDatabaseMigrator.migrate(database)
@@ -499,6 +561,40 @@ import Testing
     #expect(try store.rules() == [rule])
     #expect(try store.rules(eventType: "github.workflow.failed") == [rule])
     #expect(try store.rules(eventType: "app.review.rejected").isEmpty)
+}
+
+@Test func appScopedRulesOnlyLoadForMatchingAccount() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let appRule = Rule(
+        id: "rul_app_review",
+        name: "Notify this app review failure",
+        enabled: true,
+        scope: .app,
+        accountID: "acc_fixture",
+        provider: "com.status.appstoreconnect",
+        eventType: "app.review.rejected",
+        conditions: [],
+        actions: [RuleActionDefinition(action: "notification.show")]
+    )
+    let pluginRule = Rule(
+        id: "rul_plugin_review",
+        name: "Notify any app review failure",
+        enabled: true,
+        provider: "com.status.appstoreconnect",
+        eventType: "app.review.rejected",
+        conditions: [],
+        actions: [RuleActionDefinition(action: "notification.show")]
+    )
+
+    try store.upsertRule(appRule, updatedAt: now)
+    try store.upsertRule(pluginRule, updatedAt: now)
+
+    #expect(try store.rules(eventType: "app.review.rejected", accountID: "acc_fixture") == [appRule, pluginRule])
+    #expect(try store.rules(eventType: "app.review.rejected", accountID: "acc_other") == [pluginRule])
+    #expect(try store.rules(eventType: "app.review.rejected", accountID: nil) == [pluginRule])
 }
 
 @Test func resourceStateSnapshotRoundTripsThroughSQLite() throws {

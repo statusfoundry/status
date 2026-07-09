@@ -470,11 +470,12 @@ public final class StatusPersistenceStore {
         try database.execute(
             """
             INSERT INTO notification_preferences
-            (id, scope, plugin_id, event_type, mode, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (id, scope, plugin_id, account_id, event_type, mode, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
               scope = excluded.scope,
               plugin_id = excluded.plugin_id,
+              account_id = excluded.account_id,
               event_type = excluded.event_type,
               mode = excluded.mode,
               updated_at = excluded.updated_at
@@ -483,6 +484,7 @@ public final class StatusPersistenceStore {
                 .text(preference.id),
                 .text(preference.scope.rawValue),
                 .text(preference.pluginID),
+                preference.accountID.map { .text($0) } ?? .null,
                 preference.eventType.map { .text($0) } ?? .null,
                 .text(preference.mode.rawValue),
                 .text(ISO8601.string(from: preference.createdAt)),
@@ -520,23 +522,55 @@ public final class StatusPersistenceStore {
         return try rows.map(notificationPreference(from:))
     }
 
-    public func deleteNotificationPreference(pluginID: String, scope: NotificationPreferenceScope, eventType: String? = nil) throws {
+    public func deleteNotificationPreference(pluginID: String, scope: NotificationPreferenceScope, eventType: String? = nil, accountID: String? = nil) throws {
         switch scope {
         case .plugin:
             try database.execute(
                 "DELETE FROM notification_preferences WHERE plugin_id = ? AND scope = 'plugin'",
                 bindings: [.text(pluginID)]
             )
+        case .app:
+            guard let accountID else { return }
+            try database.execute(
+                "DELETE FROM notification_preferences WHERE plugin_id = ? AND account_id = ? AND scope = 'app'",
+                bindings: [.text(pluginID), .text(accountID)]
+            )
         case .event:
             guard let eventType else { return }
-            try database.execute(
-                "DELETE FROM notification_preferences WHERE plugin_id = ? AND scope = 'event' AND event_type = ?",
-                bindings: [.text(pluginID), .text(eventType)]
-            )
+            if let accountID {
+                try database.execute(
+                    "DELETE FROM notification_preferences WHERE plugin_id = ? AND account_id = ? AND scope = 'event' AND event_type = ?",
+                    bindings: [.text(pluginID), .text(accountID), .text(eventType)]
+                )
+            } else {
+                try database.execute(
+                    "DELETE FROM notification_preferences WHERE plugin_id = ? AND account_id IS NULL AND scope = 'event' AND event_type = ?",
+                    bindings: [.text(pluginID), .text(eventType)]
+                )
+            }
         }
     }
 
     public func effectiveNotificationMode(for event: Event, defaultMode: NotificationMode) throws -> NotificationMode {
+        let accountID = try eventAccountID(event)
+        if let accountID,
+           let appEventPreference = try notificationPreference(
+            pluginID: event.provider,
+            accountID: accountID,
+            scope: .event,
+            eventType: event.type
+        ) {
+            return appEventPreference.mode
+        }
+        if let accountID,
+           let appPreference = try notificationPreference(
+            pluginID: event.provider,
+            accountID: accountID,
+            scope: .app,
+            eventType: nil
+        ) {
+            return appPreference.mode
+        }
         if let eventPreference = try notificationPreference(
             pluginID: event.provider,
             scope: .event,
@@ -554,17 +588,29 @@ public final class StatusPersistenceStore {
         return defaultMode
     }
 
+    public func eventAccountID(_ event: Event) throws -> String? {
+        guard let row = try database.query(
+            "SELECT account_id FROM resources WHERE id = ?",
+            bindings: [.text(event.resourceID)]
+        ).first else {
+            return nil
+        }
+        return row.optionalText("account_id")
+    }
+
     public func upsertRule(_ rule: Rule, updatedAt: Date) throws {
         try database.execute(
             """
             INSERT OR REPLACE INTO rules
-            (id, name, enabled, provider, event_type, conditions_json, actions_json, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM rules WHERE id = ?), ?), ?)
+            (id, name, enabled, scope, account_id, provider, event_type, conditions_json, actions_json, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM rules WHERE id = ?), ?), ?)
             """,
             bindings: [
                 .text(rule.id),
                 .text(rule.name),
                 .integer(rule.enabled ? 1 : 0),
+                .text(rule.scope.rawValue),
+                rule.accountID.map { .text($0) } ?? .null,
                 rule.provider.map { .text($0) } ?? .null,
                 .text(rule.eventType),
                 .text(try jsonString(rule.conditions)),
@@ -592,6 +638,17 @@ public final class StatusPersistenceStore {
             "SELECT * FROM rules WHERE event_type = ? ORDER BY id",
             bindings: [.text(eventType)]
         ).map(rule(from:))
+    }
+
+    public func rules(eventType: String, accountID: String?) throws -> [Rule] {
+        var sql = "SELECT * FROM rules WHERE event_type = ? AND (scope != 'app'"
+        var bindings: [SQLiteValue] = [.text(eventType)]
+        if let accountID {
+            sql += " OR account_id = ?"
+            bindings.append(.text(accountID))
+        }
+        sql += ") ORDER BY id"
+        return try database.query(sql, bindings: bindings).map(rule(from:))
     }
 
     public func auditEntry(id: String) throws -> AuditEntry? {
@@ -1746,6 +1803,7 @@ public final class StatusPersistenceStore {
 
     private func notificationPreference(
         pluginID: String,
+        accountID: String? = nil,
         scope: NotificationPreferenceScope,
         eventType: String?
     ) throws -> NotificationPreference? {
@@ -1759,15 +1817,34 @@ public final class StatusPersistenceStore {
                 """,
                 bindings: [.text(pluginID)]
             ).first
-        case .event:
-            guard let eventType else { return nil }
+        case .app:
+            guard let accountID else { return nil }
             row = try database.query(
                 """
                 SELECT * FROM notification_preferences
-                WHERE plugin_id = ? AND scope = 'event' AND event_type = ?
+                WHERE plugin_id = ? AND account_id = ? AND scope = 'app'
                 """,
-                bindings: [.text(pluginID), .text(eventType)]
+                bindings: [.text(pluginID), .text(accountID)]
             ).first
+        case .event:
+            guard let eventType else { return nil }
+            if let accountID {
+                row = try database.query(
+                    """
+                    SELECT * FROM notification_preferences
+                    WHERE plugin_id = ? AND account_id = ? AND scope = 'event' AND event_type = ?
+                    """,
+                    bindings: [.text(pluginID), .text(accountID), .text(eventType)]
+                ).first
+            } else {
+                row = try database.query(
+                    """
+                    SELECT * FROM notification_preferences
+                    WHERE plugin_id = ? AND account_id IS NULL AND scope = 'event' AND event_type = ?
+                    """,
+                    bindings: [.text(pluginID), .text(eventType)]
+                ).first
+            }
         }
         guard let row else { return nil }
         return try notificationPreference(from: row)
@@ -1778,6 +1855,7 @@ public final class StatusPersistenceStore {
             id: row.requiredText("id"),
             scope: NotificationPreferenceScope(rawValue: row.requiredText("scope")) ?? .plugin,
             pluginID: row.requiredText("plugin_id"),
+            accountID: row.optionalText("account_id"),
             eventType: row.optionalText("event_type"),
             mode: NotificationMode(rawValue: row.requiredText("mode")) ?? .immediate,
             createdAt: ISO8601.date(from: row.requiredText("created_at")),
@@ -1792,6 +1870,8 @@ public final class StatusPersistenceStore {
             id: try row.requiredText("id"),
             name: try row.requiredText("name"),
             enabled: row.optionalInteger("enabled") != 0,
+            scope: RuleScope(rawValue: row.optionalText("scope") ?? "plugin") ?? .plugin,
+            accountID: row.optionalText("account_id"),
             provider: row.optionalText("provider"),
             eventType: try row.requiredText("event_type"),
             conditions: conditions,

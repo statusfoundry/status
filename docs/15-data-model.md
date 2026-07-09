@@ -125,8 +125,8 @@ SQLiteDatabase
 → small statement/binding/query wrapper
 
 StatusDatabaseMigrator
-→ applies schema v0
-→ sets PRAGMA user_version = 4
+→ applies the current schema
+→ sets PRAGMA user_version = 6
 
 StatusPersistenceStore
 → first round-trip store for events, status items, audit entries,
@@ -471,13 +471,15 @@ CREATE INDEX idx_jobs_trigger ON jobs (trigger_id, created_at);
 
 Automation definitions. The when/if/then structure from `docs/05-events-automation.md` is stored as JSON because it is evaluated, not queried.
 
-Product direction: rules should become app-scoped by default. The schema v0 table below is the current implemented shape. The next rules migration should add `scope TEXT NOT NULL DEFAULT 'app'` and `account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE`, then reserve `scope = cross_app` for explicit cross-app automations where the JSON payload names both the source app/account and target app/action.
+Rules can be plugin-scoped, app-scoped, or explicit cross-app automations. Ordinary plugin preset rules are stored disabled, then enabled for a configured app by setting `scope = app` and `account_id`. `scope = cross_app` is reserved for automations where the JSON payload names both the source app/account and target app/action.
 
 ```sql
 CREATE TABLE rules (
   id                TEXT PRIMARY KEY,           -- rul_
   name              TEXT NOT NULL,
   enabled           INTEGER NOT NULL DEFAULT 1,
+  scope             TEXT NOT NULL DEFAULT 'plugin', -- plugin | app | cross_app
+  account_id        TEXT REFERENCES accounts(id) ON DELETE CASCADE,
   when_json         TEXT NOT NULL,              -- { "eventType": ..., "provider": ... }
   if_json           TEXT,                       -- conditions array; NULL = no conditions
   then_json         TEXT NOT NULL,              -- actions array
@@ -489,6 +491,7 @@ CREATE TABLE rules (
 );
 
 CREATE INDEX idx_rules_enabled ON rules (enabled);
+CREATE INDEX idx_rules_account ON rules (account_id, enabled);
 ```
 
 ### action_runs
@@ -536,13 +539,22 @@ Current implementation stores the columns above and the native settings UI can r
 
 ### notification_preferences
 
-Notification preferences are owned by the core app, not plugins. The schema v0 table below is the current implemented shape. Product direction: notification preferences should become app-scoped by default through an `account_id` column. Event-level preferences override app-level preferences. Plugin-level defaults from package metadata are only defaults used when no configured app preference exists. If no preference exists, the rule action's notification mode is used.
+Notification preferences are owned by the core app, not plugins. They support plugin defaults, configured app defaults, and event overrides. Package event defaults are only defaults used when no user preference exists.
+
+Resolution order for a stored event:
+
+1. configured app event override: `scope = event`, matching `account_id`, matching `event_type`;
+2. configured app default: `scope = app`, matching `account_id`;
+3. plugin event override: `scope = event`, matching `plugin_id`, matching `event_type`, `account_id IS NULL`;
+4. plugin default: `scope = plugin`, matching `plugin_id`, `account_id IS NULL`;
+5. package event default or rule action mode.
 
 ```sql
 CREATE TABLE notification_preferences (
   id         TEXT PRIMARY KEY,                  -- ntp_
-  scope      TEXT NOT NULL,                     -- plugin | event
+  scope      TEXT NOT NULL,                     -- plugin | app | event
   plugin_id  TEXT NOT NULL,                     -- plugin/provider id
+  account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE,
   event_type TEXT,                              -- required when scope = event
   mode       TEXT NOT NULL,                     -- immediate | digest | dashboardOnly | silentAutomation | disabled
   created_at TEXT NOT NULL,
@@ -553,9 +565,17 @@ CREATE UNIQUE INDEX idx_notification_preferences_plugin
   ON notification_preferences (plugin_id)
   WHERE scope = 'plugin';
 
-CREATE UNIQUE INDEX idx_notification_preferences_event
+CREATE UNIQUE INDEX idx_notification_preferences_plugin_event
   ON notification_preferences (plugin_id, event_type)
-  WHERE scope = 'event';
+  WHERE scope = 'event' AND account_id IS NULL;
+
+CREATE UNIQUE INDEX idx_notification_preferences_app
+  ON notification_preferences (account_id)
+  WHERE scope = 'app';
+
+CREATE UNIQUE INDEX idx_notification_preferences_account_event
+  ON notification_preferences (account_id, event_type)
+  WHERE scope = 'event' AND account_id IS NOT NULL;
 ```
 
 ### audit_entries
