@@ -57,6 +57,11 @@ const documents = [
     slug: "handoff-checklist",
     sourcePath: "docs/20-handoff-checklist.md",
     summary: "Operational runbook for agents and maintainers continuing implementation without product questions."
+  },
+  {
+    slug: "plugin-author-guide",
+    sourcePath: "docs/21-plugin-author-guide.md",
+    summary: "How to copy the example template, validate a plugin locally, test in Developer Mode, and submit for registry review."
   }
 ];
 

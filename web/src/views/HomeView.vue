@@ -121,7 +121,7 @@ const pipeline = [
             Browse plugins
           </RouterLink>
           <RouterLink :class="bemm('btn-outline')" to="/developers/">
-            <Icon :name="Icons.UI_FILE_EDIT" size="small" aria-hidden="true" />
+            <Icon :name="Icons.UI_CODE_CHEVRONS_OPEN" size="small" aria-hidden="true" />
             Build a plugin
           </RouterLink>
         </div>

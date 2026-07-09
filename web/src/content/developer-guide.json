@@ -1,0 +1,66 @@
+{
+  "template": {
+    "title": "Example template",
+    "summary": "Start from Mock Operations in the main repository. A standalone status-plugin-example repo is planned for fork-friendly authoring.",
+    "monorepoPath": "plugins/examples/mock-operations",
+    "monorepoUrl": "https://github.com/statusfoundry/status/tree/main/plugins/examples/mock-operations",
+    "futureRepo": "status-plugin-example"
+  },
+  "packageFiles": [
+    { "file": "manifest.json", "purpose": "Plugin ID, version, permissions, domains, platforms" },
+    { "file": "setup.schema.json", "purpose": "Native setup fields for account/app configuration" },
+    { "file": "requests.json", "purpose": "Declarative HTTP requests" },
+    { "file": "mappings.json", "purpose": "Provider payload → resources, events, metrics" },
+    { "file": "fixtures/", "purpose": "Recorded responses for mapping tests and fixture preview" },
+    { "file": "triggers.json", "purpose": "Manual refresh and cron schedules" },
+    { "file": "events.json", "purpose": "Emitted event declarations" },
+    { "file": "views.json", "purpose": "App-owned dashboard and detail descriptors" },
+    { "file": "rules.presets.json", "purpose": "Suggested rules, installed disabled" },
+    { "file": "actions.json", "purpose": "Optional controlled write actions" }
+  ],
+  "workflow": [
+    {
+      "title": "Copy the template",
+      "body": "Duplicate plugins/examples/mock-operations, rename the folder, and replace example.com with your provider API and fixtures."
+    },
+    {
+      "title": "Validate locally",
+      "body": "Run npm run plugins:validate-local -- path/to/your-plugin from the repository root. Fix schema and cross-file errors before installing."
+    },
+    {
+      "title": "Test in Developer Mode",
+      "body": "Build StatusMac, enable Developer Mode, use Install Local, configure the plugin, run a manual trigger, and preview fixture mappings."
+    },
+    {
+      "title": "Open a pull request",
+      "body": "Include fixtures, declared domains, permissions, and validation evidence. Status reviews, signs, and publishes approved packages to the registry."
+    }
+  ],
+  "commands": [
+    {
+      "label": "Install dependencies",
+      "command": "npm ci"
+    },
+    {
+      "label": "Validate your plugin folder",
+      "command": "npm run plugins:validate-local -- path/to/your-plugin"
+    },
+    {
+      "label": "Validate the example template",
+      "command": "npm run plugins:validate-local -- plugins/examples/mock-operations"
+    }
+  ],
+  "restrictions": [
+    "No arbitrary native or JavaScript code",
+    "No plugin-owned UI",
+    "No undeclared network domains",
+    "No public self-service registry upload in v1",
+    "Write actions and elevated permissions require explicit justification"
+  ],
+  "relatedDocs": [
+    { "slug": "plugin-author-guide", "label": "Full author guide" },
+    { "slug": "plugin-system", "label": "Plugin system reference" },
+    { "slug": "testing", "label": "Fixtures and CI expectations" },
+    { "slug": "cloudflare-platform", "label": "Registry review and hosting" }
+  ]
+}
