@@ -1450,11 +1450,11 @@ private struct InstalledPluginSection: View {
     let requestRemoval: (InstalledPlugin) -> Void
 
     var body: some View {
-        PluginSection(title: "Configured apps") {
+        PluginSection(title: "Installed Plugins") {
             if plugins.isEmpty {
                 EmptyPluginState(
-                    title: "No apps configured",
-                    detail: "Create an app from a bundled, local, or registry plugin to start collecting status events."
+                    title: "No plugins installed",
+                    detail: "Install a bundled, local, or registry plugin, then create one or more apps from it."
                 )
             } else {
                 VStack(spacing: 10) {
@@ -1484,7 +1484,7 @@ private struct AvailablePluginSection: View {
     let install: (RegistryPluginSummary) -> Void
 
     var body: some View {
-        PluginSection(title: "Plugins") {
+        PluginSection(title: "Available Plugins") {
             if plugins.isEmpty {
                 EmptyPluginState(
                     title: "Registry unavailable",
