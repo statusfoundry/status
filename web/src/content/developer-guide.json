@@ -17,7 +17,8 @@
     { "file": "events.json", "purpose": "Emitted event declarations" },
     { "file": "views.json", "purpose": "App-owned dashboard and detail descriptors" },
     { "file": "rules.presets.json", "purpose": "Suggested rules, installed disabled" },
-    { "file": "actions.json", "purpose": "Optional controlled write actions" }
+    { "file": "actions.json", "purpose": "Optional controlled write actions" },
+    { "file": "README.md", "purpose": "Plugin documentation published on the website at /plugins/{id}/" }
   ],
   "workflow": [
     {

@@ -30,7 +30,7 @@ jobs:
           CHANGED="$(git diff --name-only "$BASE" "$HEAD" || true)"
           printf '%s\n' "$CHANGED"
 
-          if printf '%s\n' "$CHANGED" | grep -qE '^(plugins/|schemas/plugin/|scripts/(lib/plugin-package-validator|build-plugin-packages|validate-changed-plugins)\.mjs|status-plugin-example/)'; then
+          if printf '%s\n' "$CHANGED" | grep -qE '^(plugins/|schemas/plugin/|scripts/(lib/plugin-package-validator|build-plugin-packages|build-web-plugins|validate-changed-plugins)\.mjs|status-plugin-example/|web/src/views/Plugin)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -52,6 +52,7 @@ jobs:
         run: |
           npm run plugins:check
           npm run plugin-example:check
+          npm run plugins:docs:check
 
       - name: Validate changed plugin directories
         if: steps.changes.outputs.run == 'true'

@@ -1,0 +1,145 @@
+{
+  "generatedAt": "2026-07-09T00:00:00Z",
+  "plugins": [
+    {
+      "id": "com.status.appstoreconnect",
+      "name": "App Store Connect",
+      "summary": "Track app review, builds, and release status.",
+      "description": "Read-only App Store Connect status events for apps, review state, build processing, and release readiness.",
+      "category": "developer",
+      "author": "Status Foundry",
+      "version": "0.1.0",
+      "trustLevel": "official",
+      "permissions": [
+        "network",
+        "keychain",
+        "private-key",
+        "background-refresh"
+      ],
+      "domains": [
+        "api.appstoreconnect.apple.com"
+      ],
+      "platforms": [
+        "macOS",
+        "iOS"
+      ],
+      "sourcePath": "plugins/bundled/appstoreconnect/README.md",
+      "sourceUrl": "https://github.com/statusfoundry/status/blob/main/plugins/bundled/appstoreconnect/README.md",
+      "websitePath": "/plugins/com.status.appstoreconnect/",
+      "readmeTitle": "App Store Connect",
+      "readme": "# App Store Connect\n\nRead-only App Store Connect status events for apps, review state, build processing, and release readiness.\n\n## Why install this plugin\n\nInstall App Store Connect when you ship iOS or macOS apps and need review rejections and release readiness changes to reach you through Status — not buried in App Store Connect email or tabs. Status turns app version state into events you can route to inbox, digest, or immediate notifications.\n\n## What you configure\n\nCreate one configured app per App Store Connect app:\n\n- **App ID** — the App Store Connect app identifier to monitor\n\nAuth uses App Store Connect API key material (`issuerId`, `keyId`, `.p8` private key) stored in Keychain.\n\n## What it exposes\n\n### Resources\n\n- **app** — the configured App Store Connect app and its version/review context\n\n### Events\n\n| Event | Meaning | Default notification |\n| --- | --- | --- |\n| `app.review.rejected` | An App Store version moved into a rejected review state | Immediate |\n| `app.version.ready_for_sale` | An App Store version is ready for sale | Digest |\n\n### Views\n\n- **Apps** — overview of configured apps and version state\n- **App detail** — version and review fields for the selected app\n\n### Checks\n\n- **Check app review status** — cron schedule every 20 minutes\n- **Refresh apps** — manual refresh of app list and version state\n\n## Suggested automations\n\nSuggested rules ship disabled. Enable presets if you want review rejection events in the inbox or as immediate notifications.\n\n## Actions\n\nRead-only in v1. Status does not submit builds, edit metadata, or reply to App Review automatically.\n\n## Permissions and domains\n\n- `network` — call App Store Connect HTTPS APIs\n- `keychain` — store API key references and secrets\n- `private-key` — use the App Store Connect `.p8` signing key\n- `background-refresh` — run scheduled review checks\n- **Domains:** `api.appstoreconnect.apple.com`\n\n## What it does not do\n\n- Does not submit builds or change App Store metadata\n- Does not reply to App Review on your behalf\n- Does not replace App Store Connect for deep release management\n\n## Setup\n\n1. Install **App Store Connect** from the Status plugin store.\n2. Create a configured app and enter the App Store Connect app ID.\n3. Add API key credentials with access to the app.\n4. Grant network, keychain, private-key, and background refresh permissions.\n5. Run **Refresh apps**, then enable **Check app review status** for scheduled polling.",
+      "published": true
+    },
+    {
+      "id": "com.status.github",
+      "name": "GitHub",
+      "summary": "Track workflow failures, pull requests, and issue activity.",
+      "description": "Read-only GitHub repository events for workflow failures, pull requests, and issue activity.",
+      "category": "developer",
+      "author": "Status Foundry",
+      "version": "0.1.0",
+      "trustLevel": "official",
+      "permissions": [
+        "network",
+        "keychain",
+        "background-refresh"
+      ],
+      "domains": [
+        "api.github.com"
+      ],
+      "platforms": [
+        "macOS",
+        "iOS"
+      ],
+      "sourcePath": "plugins/bundled/github/README.md",
+      "sourceUrl": "https://github.com/statusfoundry/status/blob/main/plugins/bundled/github/README.md",
+      "websitePath": "/plugins/com.status.github/",
+      "readmeTitle": "GitHub",
+      "readme": "# GitHub\n\nRead-only GitHub repository events for workflow failures, pull requests, and issue activity.\n\n## Why install this plugin\n\nInstall GitHub when you need a calm operational signal above your repositories — especially failing workflows and fresh pull request activity — without living inside the GitHub UI. Status normalizes repository state into events, inbox items, and native views so you can see what changed and open the provider when action is needed.\n\n## What you configure\n\nCreate one configured app per repository you want to watch:\n\n- **Owner** — GitHub user or organization name\n- **Repository** — repository name\n\nStatus stores a GitHub personal access token in Keychain when you complete auth setup. The plugin only calls declared `api.github.com` endpoints.\n\n## What it exposes\n\n### Resources\n\n- **repository** — the tracked repository and its latest activity context\n\n### Events\n\n| Event | Meaning | Default notification |\n| --- | --- | --- |\n| `github.workflow.failed` | A GitHub Actions workflow run completed with a failure | Dashboard only |\n| `github.pull_request.opened` | A pull request was opened on the tracked repository | Digest |\n\n### Views\n\n- **Repositories** — resource list of tracked repositories\n- **Recent Repository Activity** — timeline of recent repository activity\n\n### Checks\n\n- **Check workflow runs** — cron schedule every 15 minutes\n- **Refresh repository activity** — manual refresh on demand\n\n## Suggested automations\n\n- **Notify on failed workflows** — adds workflow failures to the Status inbox and can show a local notification when you enable the preset\n\nAll suggested rules install disabled.\n\n## Actions\n\nRead-only in v1. No merge, close, or branch mutation actions.\n\n## Permissions and domains\n\n- `network` — poll GitHub HTTPS APIs\n- `keychain` — store the GitHub token securely\n- `background-refresh` — run scheduled workflow checks\n- **Domains:** `api.github.com`\n\n## What it does not do\n\n- Does not replace the GitHub dashboard or Actions UI\n- Does not merge pull requests, close issues, or modify branches\n- Does not receive webhooks in the current package (polling only)\n\n## Setup\n\n1. Install **GitHub** from the Status plugin store.\n2. Create a configured app and enter owner and repository.\n3. Add a GitHub token with read access to the repository.\n4. Grant network and background refresh permissions.\n5. Run **Refresh repository activity**, then enable **Check workflow runs** if you want scheduled polling.",
+      "published": true
+    },
+    {
+      "id": "com.status.gitlab",
+      "name": "GitLab",
+      "summary": "Track GitLab pipelines, merge requests, issues, and project activity.",
+      "description": "Read-only GitLab project events for failed pipelines, merge requests, issues, and project activity.",
+      "category": "developer",
+      "author": "Status Foundry",
+      "version": "0.1.0",
+      "trustLevel": "official",
+      "permissions": [
+        "network",
+        "keychain",
+        "background-refresh"
+      ],
+      "domains": [
+        "gitlab.com"
+      ],
+      "platforms": [
+        "macOS",
+        "iOS"
+      ],
+      "sourcePath": "plugins/bundled/gitlab/README.md",
+      "sourceUrl": "https://github.com/statusfoundry/status/blob/main/plugins/bundled/gitlab/README.md",
+      "websitePath": "/plugins/com.status.gitlab/",
+      "readmeTitle": "GitLab",
+      "readme": "# GitLab\n\nRead-only GitLab project events for failed pipelines, merge requests, issues, and project activity.\n\n## Why install this plugin\n\nInstall GitLab when you track delivery work in GitLab projects and want failed pipelines, new merge requests, and new issues to surface in Status alongside your other operational signals. The plugin links back to GitLab pages for deep work while Status owns notifications and inbox routing.\n\n## What you configure\n\nCreate one configured app per GitLab project:\n\n- **Project ID or URL-encoded path** — numeric project ID (for example `278964`) or encoded namespace path (for example `group%2Fproject`)\n\nStatus stores a GitLab `PRIVATE-TOKEN` in Keychain through the shared plugin auth flow.\n\n## What it exposes\n\n### Resources\n\n- **project** — the tracked GitLab project and its latest pipeline/activity context\n\n### Events\n\n| Event | Meaning | Default notification |\n| --- | --- | --- |\n| `gitlab.pipeline.failed` | A project pipeline completed with a failed status | Dashboard only |\n| `gitlab.merge_request.opened` | A merge request was opened on the tracked project | Digest |\n| `gitlab.issue.opened` | An issue was opened on the tracked project | Digest |\n\n### Views\n\n- **Projects** — resource list of tracked GitLab projects\n- **Recent Project Activity** — timeline of recent project events\n\n### Checks\n\n- **Check pipelines** — cron schedule every 15 minutes\n- **Refresh project** — manual project refresh\n- **Refresh project activity** — manual activity refresh\n\n## Suggested automations\n\nSuggested rules ship disabled. Enable presets after install if you want inbox or notification routing for failed pipelines.\n\n## Actions\n\nRead-only in v1. No pipeline retry, merge, or issue mutation actions.\n\n## Permissions and domains\n\n- `network` — call GitLab HTTPS APIs\n- `keychain` — store the private token securely\n- `background-refresh` — run scheduled pipeline checks\n- **Domains:** `gitlab.com`\n\n## What it does not do\n\n- Does not replace GitLab's project dashboard\n- Does not retry pipelines, merge requests, or modify issues automatically\n- Does not support self-managed GitLab domains in this package yet\n\n## Setup\n\n1. Install **GitLab** from the Status plugin store.\n2. Create a configured app and enter the project ID or encoded path.\n3. Add a GitLab personal access token with read access to the project.\n4. Grant network and background refresh permissions.\n5. Run **Refresh project**, then enable **Check pipelines** for scheduled polling.",
+      "published": true
+    },
+    {
+      "id": "com.status.example.mockops",
+      "name": "Mock Operations",
+      "summary": "Example declarative plugin package for operational status data.",
+      "description": "Example declarative plugin package for operational status data.",
+      "category": "example",
+      "author": "Status Foundry",
+      "version": "0.1.0",
+      "trustLevel": "local-dev",
+      "permissions": [
+        "network",
+        "background-refresh",
+        "local-notification-suggestion",
+        "write-actions"
+      ],
+      "domains": [
+        "example.com"
+      ],
+      "platforms": [
+        "macOS",
+        "iOS"
+      ],
+      "sourcePath": "plugins/examples/mock-operations/README.md",
+      "sourceUrl": "https://github.com/statusfoundry/status/blob/main/plugins/examples/mock-operations/README.md",
+      "websitePath": "/plugins/com.status.example.mockops/",
+      "readmeTitle": "Mock Operations",
+      "readme": "# Mock Operations\n\nExample declarative plugin package for operational status data.\n\n## Why install this plugin\n\nInstall Mock Operations only for **development and authoring** — not for production monitoring. It demonstrates every v1 package file so plugin authors can validate schemas, preview fixture mappings in Developer Mode, and copy the structure for a real provider integration.\n\n## What you configure\n\nExample setup fields for a fictional service:\n\n- Native setup schema with provider configuration placeholders\n- Recorded fixtures instead of live API dependencies during tests\n\n## What it exposes\n\n### Resources\n\n- **service** — example operational service records from fixture data\n\n### Events\n\n| Event | Meaning | Default notification |\n| --- | --- | --- |\n| `mock.service.degraded` | Example service entered a degraded state | Dashboard only |\n| `mock.service.recovered` | Example service recovered | Digest |\n| `mock.error_rate.high` | Example error rate crossed a threshold | Dashboard only |\n\n### Views\n\n- Overview cards, resource lists, timelines, and alert list descriptors declared in `views.json`\n\n### Checks\n\n- Manual and cron triggers declared in `triggers.json` for fixture-driven refresh flows\n\n## Suggested automations\n\n- Example presets in `rules.presets.json` install disabled\n- Demonstrates inbox and notification actions without enabling them by default\n\n## Actions\n\nIncludes example write-action declarations for author education. Actions require explicit `write-actions` permission and user approval in Status.\n\n## Permissions and domains\n\n- `network` — example HTTPS requests to `example.com`\n- `background-refresh` — example scheduled triggers\n- `local-notification-suggestion` — example notification presets\n- `write-actions` — example controlled write declarations\n- **Domains:** `example.com`\n\n## What it does not do\n\n- Does not connect to a real production API in the template form\n- Is not published to the registry as a trusted integration\n- Must be adapted before use with a real provider\n\n## Setup\n\n### Validate in the monorepo\n\n```sh\nnpm run plugins:validate-local -- plugins/examples/mock-operations\n```\n\n### Test in the app\n\n1. Build and open StatusMac.\n2. Enable Developer Mode.\n3. Use **Install Local** and select this folder.\n4. Configure the plugin and run a manual trigger.\n5. Use **Preview Fixture** to inspect mapped output.\n\n### Fork-friendly template\n\nA standalone copy lives at `status-plugin-example/` in the Status repository. Regenerate it with `npm run plugin-example:sync`.\n\n## Submit for review\n\nv1 has no public upload form. Open a pull request with fixtures and validation evidence when adapting this template for a real provider.",
+      "published": false
+    },
+    {
+      "id": "com.status.website",
+      "name": "Website Uptime",
+      "summary": "Track website health and response status.",
+      "description": "Declarative uptime checks for sites and endpoints the user chooses to track.",
+      "category": "monitoring",
+      "author": "Status Foundry",
+      "version": "0.1.0",
+      "trustLevel": "official",
+      "permissions": [
+        "network",
+        "user-configured-domains",
+        "background-refresh"
+      ],
+      "domains": [],
+      "platforms": [
+        "macOS",
+        "iOS"
+      ],
+      "sourcePath": "plugins/bundled/website/README.md",
+      "sourceUrl": "https://github.com/statusfoundry/status/blob/main/plugins/bundled/website/README.md",
+      "websitePath": "/plugins/com.status.website/",
+      "readmeTitle": "Website Uptime",
+      "readme": "# Website Uptime\n\nDeclarative uptime checks for sites and endpoints the user chooses to track.\n\n## Why install this plugin\n\nInstall Website Uptime when you want simple, local-first availability monitoring for hosts you care about — status pages, APIs, marketing sites, or internal endpoints — without standing up a separate uptime SaaS. Status emits clear down/recovered events and can notify you immediately when a site stops responding.\n\n## What you configure\n\nCreate one configured app per host:\n\n- **Host** — hostname only, without `https://` or a path (for example `status-registry.hakobs.com`)\n\nNo third-party API token is required. Checks run from your Mac or iOS device through declared HTTPS requests.\n\n## What it exposes\n\n### Resources\n\n- **website** — the tracked host and its latest health check result\n\n### Events\n\n| Event | Meaning | Default notification |\n| --- | --- | --- |\n| `website.down` | The tracked site did not return a healthy response | Immediate |\n| `website.recovered` | The tracked site returned to a healthy response | Digest |\n\nDown events can open a downtime incident closed by recovery events.\n\n### Views\n\n- **Websites** — list of tracked hosts with latest status fields\n- **Website detail** — latest check result and response context\n\n### Checks\n\n- **Check website uptime** — cron schedule every 5 minutes\n- **Refresh website status** — manual check on demand\n\n## Suggested automations\n\nSuggested rules ship disabled. Enable presets if you want downtime routed to inbox or immediate notifications.\n\n## Actions\n\nRead-only in v1. The plugin checks endpoints; it does not modify DNS, hosting, or site content.\n\n## Permissions and domains\n\n- `network` — perform HTTPS health checks\n- `background-refresh` — run scheduled uptime polling\n- `user-configured-domains` — check hosts you enter during setup (no fixed provider domain list)\n\n## What it does not do\n\n- Does not replace full synthetic monitoring with multi-region probes\n- Does not edit hosting, DNS, or TLS configuration\n- Does not run from Status cloud infrastructure in v1 (checks originate on your device)\n\n## Setup\n\n1. Install **Website Uptime** from the Status plugin store.\n2. Create a configured app and enter the host to monitor.\n3. Grant network and background refresh permissions.\n4. Run **Refresh website status**, then enable **Check website uptime** for scheduled polling.",
+      "published": true
+    }
+  ]
+}

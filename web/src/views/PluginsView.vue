@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { useBemm } from 'bemm'
 import SiteLayout from '@/components/SiteLayout.vue'
+import pluginsData from '@/generated/plugins.json'
 import registryData from '@/generated/registry.json'
 
 const bemm = useBemm('page', { return: 'string' })
 const directoryBemm = useBemm('plugins-directory', { return: 'string' })
 
 type RegistryPlugin = (typeof registryData.plugins)[number]
+type PluginDoc = (typeof pluginsData.plugins)[number]
 
 const plugins = registryData.plugins
+const templatePlugins = pluginsData.plugins.filter((plugin) => plugin.published === false)
 const registryChecks = [
   'Local hash verification',
   'Signature material verification',
@@ -33,6 +36,11 @@ function permissionLabel(plugin: RegistryPlugin) {
 
 function domainLabel(plugin: RegistryPlugin) {
   return plugin.domains.length ? plugin.domains.join(', ') : 'User-defined targets'
+}
+
+function templateTrustLabel(plugin: PluginDoc) {
+  if (plugin.trustLevel === 'local-dev') return 'Template'
+  return 'Docs'
 }
 </script>
 
@@ -91,7 +99,23 @@ function domainLabel(plugin: RegistryPlugin) {
                 </div>
               </dl>
               <RouterLink :class="directoryBemm('link')" :to="`/plugins/${plugin.id}/`">
-                View distribution details
+                Read plugin docs
+              </RouterLink>
+            </article>
+          </div>
+
+          <div v-if="templatePlugins.length" :class="directoryBemm()" aria-label="Plugin templates">
+            <h2 :class="directoryBemm('section-title')">Templates and examples</h2>
+            <article v-for="plugin in templatePlugins" :key="plugin.id" :class="directoryBemm('item')">
+              <div :class="directoryBemm('head')">
+                <div>
+                  <h3>{{ plugin.name }}</h3>
+                  <p>{{ plugin.summary }}</p>
+                </div>
+                <span :class="directoryBemm('badge')">{{ templateTrustLabel(plugin) }}</span>
+              </div>
+              <RouterLink :class="directoryBemm('link')" :to="plugin.websitePath">
+                Read plugin docs
               </RouterLink>
             </article>
           </div>
@@ -106,6 +130,12 @@ function domainLabel(plugin: RegistryPlugin) {
   display: grid;
   gap: var(--space-m);
   margin-top: var(--space-l);
+
+  &__section-title {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
 
   &__item {
     background: var(--color-surface);

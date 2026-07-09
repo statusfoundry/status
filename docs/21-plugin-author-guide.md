@@ -32,6 +32,8 @@ mock-operations/
 
 Copy that folder, rename it, and replace the example provider with your real HTTPS API and recorded fixtures.
 
+Every plugin must ship a `README.md` beside `manifest.json`. Use `plugins/README.template.md` as the starting point. The website publishes that README at `/plugins/{plugin-id}/` when you run `npm run plugins:docs:build`.
+
 ### Standalone template repository
 
 Fork the minimal template without cloning the full Status monorepo:
