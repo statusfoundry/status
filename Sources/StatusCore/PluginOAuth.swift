@@ -97,6 +97,7 @@ public enum PluginOAuthError: Error, Equatable, LocalizedError, Sendable {
     case missingRefreshToken(String)
     case authorizationCallbackMissingCode
     case authorizationStateMismatch
+    case authorizationRedirectMismatch(expected: String, actual: String)
     case authorizationDenied(String)
     case tokenExchangeFailed(statusCode: Int)
     case tokenRefreshFailed(statusCode: Int)
@@ -116,6 +117,8 @@ public enum PluginOAuthError: Error, Equatable, LocalizedError, Sendable {
             "OAuth callback did not include an authorization code."
         case .authorizationStateMismatch:
             "OAuth callback state did not match the active connection request."
+        case .authorizationRedirectMismatch(let expected, let actual):
+            "OAuth callback redirect did not match. Expected \(expected), got \(actual)."
         case .authorizationDenied(let message):
             "OAuth authorization was denied: \(message)"
         case .tokenExchangeFailed(let statusCode):
@@ -179,6 +182,7 @@ public enum PluginOAuth {
         guard let clientID = auth.applicationId?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty else {
             throw PluginOAuthError.missingApplicationID(pluginID)
         }
+        try validateCallbackRedirect(callbackURL, redirectURI: config.redirectURI)
         let callback = try callbackParameters(callbackURL, expectedState: request.state)
         let body = formURLEncoded([
             "grant_type": "authorization_code",
@@ -233,6 +237,33 @@ public enum PluginOAuth {
             throw PluginOAuthError.authorizationCallbackMissingCode
         }
         return (code, expectedState)
+    }
+
+    private static func validateCallbackRedirect(_ callbackURL: URL, redirectURI: String) throws {
+        guard let expectedURL = URL(string: redirectURI),
+              let expected = URLComponents(url: expectedURL, resolvingAgainstBaseURL: false),
+              let actual = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+              expected.scheme == actual.scheme,
+              (expected.host ?? "") == (actual.host ?? ""),
+              normalizedPath(expected.path) == normalizedPath(actual.path) else {
+            throw PluginOAuthError.authorizationRedirectMismatch(
+                expected: normalizedRedirectDescription(redirectURI),
+                actual: normalizedRedirectDescription(callbackURL.absoluteString)
+            )
+        }
+    }
+
+    private static func normalizedPath(_ path: String) -> String {
+        path == "/" ? "" : path
+    }
+
+    private static func normalizedRedirectDescription(_ value: String) -> String {
+        guard var components = URLComponents(string: value) else {
+            return value
+        }
+        components.query = nil
+        components.fragment = nil
+        return components.string ?? value
     }
 
     private static func tokenSet(from data: Data, now: Date) throws -> PluginOAuthTokenSet {

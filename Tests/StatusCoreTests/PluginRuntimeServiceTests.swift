@@ -1819,6 +1819,38 @@ import Testing
     #expect(tokenSet.expiresAt == now.addingTimeInterval(3_600))
 }
 
+@Test func pluginOAuthRejectsCallbackRedirectMismatchBeforeTokenExchange() async throws {
+    let auth = PackagedPluginAuth(
+        type: .oauth2,
+        provider: "github",
+        applicationId: "status-foundry.github",
+        oauth2: PackagedPluginOAuth2(
+            authorizationURL: try #require(URL(string: "https://github.com/login/oauth/authorize")),
+            tokenURL: try #require(URL(string: "https://github.com/login/oauth/access_token")),
+            redirectURI: "status://oauth/github",
+            scopes: ["repo"]
+        )
+    )
+    let request = try PluginOAuth.authorizationRequest(
+        pluginID: "com.status.oauthgithub",
+        auth: auth,
+        state: "state-123",
+        codeVerifier: "verifier-123"
+    )
+    let callback = try #require(URL(string: "status://oauth/gitlab?code=code-456&state=state-123"))
+    let tokenURL = try #require(URL(string: "https://github.com/login/oauth/access_token"))
+
+    await #expect(throws: PluginOAuthError.authorizationRedirectMismatch(expected: "status://oauth/github", actual: "status://oauth/gitlab")) {
+        _ = try await PluginOAuth.tokenSet(
+            pluginID: "com.status.oauthgithub",
+            auth: auth,
+            request: request,
+            callbackURL: callback,
+            transport: RuntimeFailingOAuthTransport(tokenURL: tokenURL)
+        )
+    }
+}
+
 @Test func pluginRuntimeServiceRefreshesExpiredOAuthTokenBeforeRequest() async throws {
     let database = try temporaryRuntimeDatabase()
     let store = StatusPersistenceStore(database: database)
@@ -2323,6 +2355,15 @@ private struct RuntimeOAuthCodeExchangeTransport: PluginRequestHTTPTransport {
             statusCode: 200,
             url: tokenURL
         )
+    }
+}
+
+private struct RuntimeFailingOAuthTransport: PluginRequestHTTPTransport {
+    var tokenURL: URL
+
+    func response(for request: PluginHTTPRequest) async throws -> PluginHTTPResponse {
+        Issue.record("OAuth token exchange should not run for redirect mismatch.")
+        return PluginHTTPResponse(data: Data("{}".utf8), statusCode: 500, url: tokenURL)
     }
 }
 
