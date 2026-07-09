@@ -125,7 +125,7 @@ jwt-api-key
 private-key-jwt
 ```
 
-OAuth plugins declare public provider metadata only: `provider`, `applicationId`, and an `oauth2` block with `authorizationUrl`, `tokenUrl`, `redirectUri`, optional `scopes`, and optional extra authorization parameters. The manifest must request `oauth` and `keychain`, and the hosts used by `authorizationUrl` and `tokenUrl` must be listed in `domains` because Status performs those network calls on the plugin's behalf. Status owns the native authorization-code + PKCE flow, validates callback `state` and the declared callback redirect scheme/host/path, token storage, refresh behavior, request header injection, and audit output. Plugins never receive access tokens or refresh tokens directly.
+OAuth plugins declare public provider metadata only: `provider`, `applicationId`, and an `oauth2` block with `authorizationUrl`, `tokenUrl`, `redirectUri`, optional `scopes`, and optional extra authorization parameters. The manifest must request `oauth` and `keychain`, `redirectUri` must use `status://oauth/{provider-slug}`, and the hosts used by `authorizationUrl` and `tokenUrl` must be listed in `domains` because Status performs those network calls on the plugin's behalf. Status owns the native authorization-code + PKCE flow, validates callback `state` and the declared callback redirect scheme/host/path, token storage, refresh behavior, request header injection, and audit output. Plugins never receive access tokens or refresh tokens directly.
 
 The plugin defines the auth shape. The app renders the setup form and stores secrets in Keychain.
 

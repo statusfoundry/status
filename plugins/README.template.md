@@ -13,7 +13,7 @@ Publisher metadata lives in `manifest.json`:
 
 Register the publisher in `plugins/publishers.json` so the website can link to `/publishers/your-publisher-slug/`.
 
-Provider application IDs for OAuth belong in `auth.json` as `provider` and `applicationId` (public client IDs only). Declare the OAuth authorization and token endpoint hosts in `manifest.json` `domains`.
+Provider application IDs for OAuth belong in `auth.json` as `provider` and `applicationId` (public client IDs only). OAuth `redirectUri` must use `status://oauth/{provider-slug}`. Declare the OAuth authorization and token endpoint hosts in `manifest.json` `domains`.
 
 ## Why install this plugin
 

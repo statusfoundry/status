@@ -437,6 +437,12 @@ function validateDeclaredHost(manifest, host, sourceName, fieldName) {
   }
 }
 
+function validateOAuthRedirectURI(value, sourceName) {
+  if (typeof value !== "string" || /^status:\/\/oauth\/[a-z][a-z0-9-]*$/.test(value) === false) {
+    fail(`${sourceName}: auth.oauth2.redirectUri must match status://oauth/{provider-slug}`);
+  }
+}
+
 function validateAuth(authFile, manifest, sourceName) {
   if (!authFile) {
     return;
@@ -458,6 +464,7 @@ function validateAuth(authFile, manifest, sourceName) {
     fail(`${sourceName}: oauth2 auth requires oauth2 endpoint configuration`);
   }
   if (authFile.type === "oauth2") {
+    validateOAuthRedirectURI(authFile.oauth2.redirectUri, sourceName);
     validateDeclaredHost(
       manifest,
       hostFromURL(authFile.oauth2.authorizationUrl, sourceName, "auth.oauth2.authorizationUrl"),

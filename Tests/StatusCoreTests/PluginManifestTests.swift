@@ -122,6 +122,28 @@ import Testing
     }
 }
 
+@Test func oauthRedirectURIMustUseAppOwnedCallback() throws {
+    var manifest = appStoreConnectManifest()
+    manifest.permissions.append(.oauth)
+    manifest.domains = ["api.appstoreconnect.apple.com", "github.com"]
+    let auth = PackagedPluginAuth(
+        type: .oauth2,
+        provider: "github",
+        applicationId: "status-foundry.github",
+        oauth2: PackagedPluginOAuth2(
+            authorizationURL: try #require(URL(string: "https://github.com/login/oauth/authorize")),
+            tokenURL: try #require(URL(string: "https://github.com/login/oauth/access_token")),
+            redirectURI: "https://example.com/oauth/callback"
+        )
+    )
+
+    #expect(throws: PluginValidationError.oauthInvalidRedirectURI("https://example.com/oauth/callback")) {
+        try PluginManifestValidator.validate(
+            PluginValidationInput(manifest: manifest, authDefinitions: [auth])
+        )
+    }
+}
+
 @Test func pluginManifestRequiresIconAndAccentColor() {
     var manifest = appStoreConnectManifest()
     manifest.icon = nil
