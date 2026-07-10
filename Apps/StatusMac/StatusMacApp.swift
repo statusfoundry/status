@@ -381,7 +381,7 @@ private struct MacRootView: View {
         } detail: {
             switch selection ?? .overview {
             case .overview:
-                detailWithIntegrationTabs {
+                detailWithAppTabs {
                     DashboardContainerView(
                         viewModel: makeDashboardViewModel(),
                         reloadToken: dashboardReloadToken,
@@ -395,12 +395,12 @@ private struct MacRootView: View {
                 }
                     .navigationTitle("Overview")
             case .alerts:
-                detailWithIntegrationTabs {
+                detailWithAppTabs {
                     AlertsContainerView(viewModel: makeAlertsViewModel())
                 }
                     .navigationTitle("Alerts")
             case .integrations:
-                detailWithIntegrationTabs {
+                detailWithAppTabs {
                     PluginStoreContainerView(
                         viewModel: makePluginStoreViewModel(platform: .macOS),
                         openSettings: { plugin in
@@ -422,7 +422,7 @@ private struct MacRootView: View {
                 }
                     .navigationTitle("Plugins")
             case .app(let pluginID, let accountID):
-                detailWithIntegrationTabs {
+                detailWithAppTabs {
                     MacPluginAppDetail(
                         pluginID: pluginID,
                         accountID: accountID,
@@ -445,17 +445,17 @@ private struct MacRootView: View {
                 }
                     .navigationTitle("App")
             case .rules:
-                detailWithIntegrationTabs {
+                detailWithAppTabs {
                     RulesContainerView(viewModel: makeRulesViewModel())
                 }
                     .navigationTitle("Cross-App Rules")
             case .audit:
-                detailWithIntegrationTabs {
+                detailWithAppTabs {
                     AuditLogContainerView(viewModel: makeAuditLogViewModel())
                 }
                     .navigationTitle("Audit Log")
             case .settings:
-                detailWithIntegrationTabs {
+                detailWithAppTabs {
                     StatusSettingsView(
                         registryURL: registryBaseURL,
                         databasePath: applicationDatabasePath(),
@@ -510,34 +510,56 @@ private struct MacRootView: View {
     }
 
     @ViewBuilder
-    private func detailWithIntegrationTabs<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func detailWithAppTabs<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(spacing: 0) {
             if columnVisibility == .detailOnly && sidebarApps.isEmpty == false {
-                HStack(spacing: 8) {
-                    ForEach(sidebarApps) { app in
-                        Button {
-                            selection = .app(pluginID: app.pluginID, accountID: app.accountID)
-                        } label: {
-                            IntegrationIcon(
-                                provider: app.pluginID,
-                                icon: app.iconPath,
-                                iconAsset: app.iconAsset,
-                                accentColor: app.accentColor,
-                                size: 28
-                            )
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(sidebarApps) { app in
+                            collapsedAppTab(for: app)
                         }
-                        .buttonStyle(.plain)
-                        .help(app.name)
-                        .accessibilityLabel(Text(app.name))
                     }
-                    Spacer(minLength: 0)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
                 .background(.bar)
             }
             content()
         }
+    }
+
+    private func collapsedAppTab(for app: SidebarApp) -> some View {
+        let isSelected = selection == .app(pluginID: app.pluginID, accountID: app.accountID)
+
+        return Button {
+            selection = .app(pluginID: app.pluginID, accountID: app.accountID)
+        } label: {
+            IntegrationIcon(
+                provider: app.pluginID,
+                icon: app.iconPath,
+                iconAsset: app.iconAsset,
+                accentColor: app.accentColor,
+                size: 28
+            )
+            .frame(width: 38, height: 34)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.accentColor.opacity(0.16))
+                }
+            }
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.accentColor.opacity(0.52), lineWidth: 1)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .help(app.name)
+        .accessibilityLabel(Text(app.name))
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     private func makeDashboardViewModel() -> DashboardViewModel {
