@@ -131,7 +131,7 @@ If Xcode project generation is easier, use XcodeGen and document the command. If
 - Prefer commands that can run locally and in CI.
 - If a command fails because tooling is missing, document the missing prerequisite.
 - CI runs `npm ci` and `npm run check`.
-- Manual Cloudflare deploy workflow requires `CLOUDFLARE_API_TOKEN` in GitHub repository secrets.
+- Cloudflare deployment runs as a gated `CI` job after successful checks on `main`; the manual `Deploy Cloudflare` workflow remains available as a fallback. Both require `CLOUDFLARE_API_TOKEN` in GitHub repository secrets.
 
 ## Current completed baseline
 
@@ -145,7 +145,7 @@ If Xcode project generation is easier, use XcodeGen and document the command. If
 - [x] Registry Worker serves plugin metadata, details, versions, revocations, package artifacts, and compatibility filters.
 - [x] Cloudflare Pages website has home, download/beta, plugins, plugin details, developers, docs, privacy/security, and changelog routes.
 - [x] GitHub Actions CI covers Node checks, Swift tests, Xcode project generation, and macOS/iOS builds.
-- [x] Cloudflare deploy workflow is present and manual.
+- [x] Cloudflare deployment is gated by CI success on `main`, with a manually dispatchable fallback workflow.
 
 ## First-pass checklist
 

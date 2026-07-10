@@ -153,7 +153,9 @@ Cloudflare Worker previews or local registry testing, set `STATUS_REGISTRY_URL`
 in the run scheme/environment, or set the same key in app defaults. The value
 must be an `http` or `https` URL with a host.
 
-Deployment commands:
+Cloudflare deployment runs from the GitHub `CI` workflow after all checks pass
+on a push to `main`. The `Deploy Cloudflare` workflow remains available as a
+manual fallback from GitHub Actions. Local deployment commands:
 
 ```sh
 npm run registry:deploy

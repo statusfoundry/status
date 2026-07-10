@@ -231,7 +231,7 @@ Current implementation status:
 
 - The registry Worker implements `GET /v1/plugins`, `GET /v1/plugins/{pluginId}`, `GET /v1/plugins/{pluginId}/versions`, `GET /v1/plugins/{pluginId}/versions/{version}`, `GET /v1/registry`, `GET /v1/revocations`, and `/health`.
 - The initial static registry metadata includes official App Store Connect, GitHub, and Website Uptime plugin listings.
-- Plugin package and manifest artifacts are uploaded to the `status-plugins` R2 bucket by `npm run plugins:upload-r2` during the manual Cloudflare deployment workflow. The Worker serves `/plugins/...` from R2 first and falls back to checked-in embedded artifacts for local tests and dry-run development.
+- Plugin package and manifest artifacts are uploaded to the `status-plugins` R2 bucket by `npm run plugins:upload-r2` during GitHub deployment. The main path is the gated `deploy-cloudflare` job inside CI after successful checks on `main`; the separate `Deploy Cloudflare` workflow remains available as a manual fallback. The Worker serves `/plugins/...` from R2 first and falls back to checked-in embedded artifacts for local tests and dry-run development.
 - Platform and minimum core-version filtering are supported for list/detail version responses.
 - Public direct upload is intentionally not implemented; third-party plugins remain review-based as described above.
 
