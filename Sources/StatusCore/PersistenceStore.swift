@@ -1773,10 +1773,15 @@ public final class StatusPersistenceStore {
             return []
         }
         let resources = try resources(pluginID: pluginID, accountID: accountID, limit: 10)
-        return selectedFields.compactMap { field in
+        return selectedFields.map { field in
             guard let resource = resources.first(where: { dashboardTileValue(field: field, resource: $0)?.isEmpty == false }),
                   let value = dashboardTileValue(field: field, resource: resource) else {
-                return nil
+                return DashboardTileItem(
+                    id: field,
+                    label: displayLabel(for: field),
+                    value: "Waiting for data",
+                    kind: .text
+                )
             }
             return DashboardTileItem(
                 id: field,
