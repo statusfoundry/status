@@ -41,6 +41,12 @@ private struct IOSRootView: View {
                             settingsViewModel: {
                                 makePluginStoreViewModel(platform: .iOS)
                             },
+                            notificationPreferencesViewModel: {
+                                makeNotificationPreferencesViewModel()
+                            },
+                            notificationPreferenceGroups: { plugin, accountID in
+                                (try? notificationPreferenceGroups(plugin: plugin, accountID: accountID)) ?? []
+                            },
                             runPlugin: { pluginID, accountID, accountName in
                                 let result = try await runConfiguredPluginCheck(
                                     pluginID: pluginID,
@@ -381,6 +387,52 @@ private struct IOSRootView: View {
         }
     }
 
+    private func notificationPreferenceGroups(plugin: InstalledPlugin, accountID: String?) throws -> [NotificationPreferencePluginGroup] {
+        try bootstrapBundledPlugins()
+        let store = try LocalStatusStore.openApplicationSupportStore()
+        let definition = try store.installedPluginDefinition(pluginID: plugin.id)
+        let events = notificationPreferenceEvents(from: definition)
+        if let accountID {
+            let account = try store.accountConfiguration(accountID: accountID)
+            return [
+                NotificationPreferencePluginGroup(
+                    id: accountID,
+                    pluginID: plugin.id,
+                    accountID: accountID,
+                    name: account?.accountName ?? plugin.name,
+                    events: events
+                )
+            ]
+        }
+        let accounts = try store.accountConfigurations(pluginID: plugin.id)
+        if accounts.isEmpty {
+            return [
+                NotificationPreferencePluginGroup(id: plugin.id, pluginID: plugin.id, name: plugin.name, events: events)
+            ]
+        }
+        return accounts.map { account in
+            NotificationPreferencePluginGroup(
+                id: account.id,
+                pluginID: plugin.id,
+                accountID: account.id,
+                name: account.accountName,
+                events: events
+            )
+        }
+    }
+
+    private func notificationPreferenceEvents(from definition: PluginPackageDefinition?) -> [NotificationPreferenceEventRow] {
+        (definition?.events ?? [])
+            .sorted { lhs, rhs in lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending }
+            .map { event in
+                NotificationPreferenceEventRow(
+                    type: event.type,
+                    label: event.label,
+                    defaultMode: event.notificationDefault
+                )
+            }
+    }
+
     private func setNotificationPreference(pluginID: String, accountID: String?, eventType: String?, mode: NotificationMode?) throws {
         let store = try LocalStatusStore.openApplicationSupportStore()
         let scope: NotificationPreferenceScope = if eventType != nil {
@@ -616,6 +668,8 @@ private struct IOSPluginAppDetail: View {
     let pluginID: String
     let accountID: String?
     let settingsViewModel: () -> PluginStoreViewModel
+    let notificationPreferencesViewModel: () -> NotificationPreferencesViewModel
+    let notificationPreferenceGroups: (InstalledPlugin, String?) -> [NotificationPreferencePluginGroup]
     let runPlugin: (String, String, String) async throws -> String
 
     @State private var plugin: InstalledPlugin?
@@ -631,7 +685,9 @@ private struct IOSPluginAppDetail: View {
 
     var body: some View {
         Group {
-            if let plugin {
+            if let loadError {
+                ContentUnavailableView("App unavailable", systemImage: "puzzlepiece.extension", description: Text(loadError))
+            } else if let plugin {
                 PluginAppDetailView(
                     plugin: plugin,
                     app: app,
@@ -646,8 +702,6 @@ private struct IOSPluginAppDetail: View {
                 .overlay(alignment: .bottom) {
                     statusOverlay
                 }
-            } else if let loadError {
-                ContentUnavailableView("App unavailable", systemImage: "puzzlepiece.extension", description: Text(loadError))
             } else {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -657,6 +711,9 @@ private struct IOSPluginAppDetail: View {
             load()
         }
         .onReceive(NotificationCenter.default.publisher(for: .statusConfiguredAppsDidChange)) { _ in
+            load()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .statusAppDataDidChange)) { _ in
             load()
         }
         .refreshable {
@@ -670,8 +727,14 @@ private struct IOSPluginAppDetail: View {
                     initialAccountID: accountID,
                     onAppsChanged: {
                         NotificationCenter.default.post(name: .statusConfiguredAppsDidChange, object: nil)
-                    }
+                    },
+                    notificationPreferencesViewModel: notificationPreferencesViewModel(),
+                    notificationPreferenceGroups: notificationPreferenceGroups
                 )
+                .onDisappear {
+                    load()
+                    NotificationCenter.default.post(name: .statusAppDataDidChange, object: nil)
+                }
                 .navigationTitle("App Settings")
                 #if os(iOS)
                 .toolbar {
@@ -731,7 +794,7 @@ private struct IOSPluginAppDetail: View {
         guard missingRunPermissions.isEmpty == false else {
             return nil
         }
-        return "Grant \(permissionList(missingRunPermissions)) permission in App Settings before running this app."
+        return "Grant \(permissionList(missingRunPermissions)) permission in App Settings before refreshing this app."
     }
 
     private func load() {
@@ -744,7 +807,13 @@ private struct IOSPluginAppDetail: View {
             resources = try store.resources(pluginID: pluginID, accountID: accountID)
             runtimeStatus = try recentRuntimeStatus(store: store, pluginID: pluginID, accountID: accountID)
             missingRunPermissions = try missingRuntimePermissions(store: store, plugin: loadedPlugin, app: loadedApp)
-            loadError = loadedPlugin == nil ? "This plugin is not installed on this device." : nil
+            if loadedPlugin == nil {
+                loadError = "This plugin is not installed on this device."
+            } else if accountID != nil, loadedApp == nil {
+                loadError = "This app is no longer configured on this device."
+            } else {
+                loadError = nil
+            }
         } catch {
             plugin = nil
             app = nil
