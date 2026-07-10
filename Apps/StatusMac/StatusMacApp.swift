@@ -494,6 +494,7 @@ private struct MacRootView: View {
                 }
             }
             .navigationTitle("Status")
+            .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 320)
         } detail: {
             switch selection ?? .overview {
             case .overview:
