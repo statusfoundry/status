@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const distRoot = path.join(root, "workers", "registry", "dist", "plugins");
 const bucket = process.env.STATUS_PLUGIN_BUCKET ?? "status-plugins";
+const accountID = process.env.CLOUDFLARE_ACCOUNT_ID;
 
 async function filesIn(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -44,9 +45,13 @@ const files = await filesIn(distRoot);
 for (const file of files) {
   const relativeKey = path.relative(path.join(root, "workers", "registry", "dist"), file).split(path.sep).join("/");
   const target = `${bucket}/${relativeKey}`;
+  const args = ["wrangler", "r2", "object", "put", target, "--remote", "--file", file, "--content-type", contentType(file)];
+  if (accountID) {
+    args.push("--account-id", accountID);
+  }
   const result = spawnSync(
     "npx",
-    ["wrangler", "r2", "object", "put", target, "--file", file, "--content-type", contentType(file)],
+    args,
     { stdio: "inherit", cwd: root }
   );
   if (result.status !== 0) {

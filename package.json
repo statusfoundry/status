@@ -24,7 +24,7 @@
     "registry:test": "node --test workers/registry/src/*.test.js",
     "registry:check": "WRANGLER_WRITE_LOGS=false wrangler deploy --config workers/registry/wrangler.toml --dry-run",
     "registry:deploy": "WRANGLER_WRITE_LOGS=false wrangler deploy --config workers/registry/wrangler.toml",
-    "pages:deploy": "wrangler pages deploy web/dist --project-name status"
+    "pages:deploy": "wrangler pages deploy web/dist --project-name status --branch main"
   },
   "dependencies": {
     "@sil/ui": "^2.6.0",
