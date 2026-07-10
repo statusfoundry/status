@@ -1253,7 +1253,9 @@ private struct MacPluginAppDetail: View {
 
     var body: some View {
         Group {
-            if let plugin {
+            if let loadError {
+                ContentUnavailableView("App unavailable", systemImage: "puzzlepiece.extension", description: Text(loadError))
+            } else if let plugin {
                 PluginAppDetailView(
                     plugin: plugin,
                     app: app,
@@ -1266,8 +1268,6 @@ private struct MacPluginAppDetail: View {
                 .overlay(alignment: .bottom) {
                     statusOverlay
                 }
-            } else if let loadError {
-                ContentUnavailableView("App unavailable", systemImage: "puzzlepiece.extension", description: Text(loadError))
             } else {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1277,6 +1277,9 @@ private struct MacPluginAppDetail: View {
             load()
         }
         .onReceive(NotificationCenter.default.publisher(for: .statusConfiguredAppsDidChange)) { _ in
+            load()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .statusAppDataDidChange)) { _ in
             load()
         }
         .refreshable {
@@ -1342,7 +1345,13 @@ private struct MacPluginAppDetail: View {
             resources = try store.resources(pluginID: pluginID, accountID: accountID)
             runtimeStatus = try recentRuntimeStatus(store: store, pluginID: pluginID, accountID: accountID)
             missingRunPermissions = try missingRuntimePermissions(store: store, plugin: loadedPlugin, app: loadedApp)
-            loadError = loadedPlugin == nil ? "This plugin is not installed on this device." : nil
+            if loadedPlugin == nil {
+                loadError = "This plugin is not installed on this device."
+            } else if accountID != nil, loadedApp == nil {
+                loadError = "This app is no longer configured on this device."
+            } else {
+                loadError = nil
+            }
         } catch {
             plugin = nil
             app = nil
