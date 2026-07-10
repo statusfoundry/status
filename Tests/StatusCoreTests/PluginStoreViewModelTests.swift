@@ -424,6 +424,39 @@ import Testing
     #expect(viewModel.pluginResources == [plugin.id: [resource]])
 }
 
+@Test func pluginSettingsResourceScopeFiltersToSelectedApp() {
+    let work = Resource(
+        id: "res_work",
+        accountID: "acc_work",
+        pluginID: "com.status.github",
+        type: "repository",
+        name: "statusfoundry/status"
+    )
+    let personal = Resource(
+        id: "res_personal",
+        accountID: "acc_personal",
+        pluginID: "com.status.github",
+        type: "repository",
+        name: "sil/status"
+    )
+
+    #expect(PluginSettingsResourceScope.resources([work, personal], selectedAccountID: "acc_work") == [work])
+    #expect(PluginSettingsResourceScope.resources([work, personal], selectedAccountID: "acc_personal") == [personal])
+}
+
+@Test func pluginSettingsResourceScopeHidesResourcesForUnsavedApp() {
+    let resource = Resource(
+        id: "res_work",
+        accountID: "acc_work",
+        pluginID: "com.status.github",
+        type: "repository",
+        name: "statusfoundry/status"
+    )
+
+    #expect(PluginSettingsResourceScope.resources([resource], selectedAccountID: nil).isEmpty)
+    #expect(PluginSettingsResourceScope.resources([resource], selectedAccountID: "__new__:com.status.github").isEmpty)
+}
+
 @MainActor
 @Test func pluginStoreViewModelLoadsSuggestedAndAppScopedRules() async throws {
     let plugin = InstalledPlugin(

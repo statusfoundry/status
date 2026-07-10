@@ -56,6 +56,10 @@ private extension Array {
     }
 }
 
+enum PluginStoreAccountSelection {
+    static let newAccountPrefix = "__new__:"
+}
+
 public struct PluginRuntimeStatus: Equatable, Sendable {
     public var pluginID: String
     public var status: JobStatus
@@ -69,6 +73,16 @@ public struct PluginRuntimeStatus: Equatable, Sendable {
         self.detail = detail
         self.timestamp = timestamp
         self.emittedEventCount = emittedEventCount
+    }
+}
+
+struct PluginSettingsResourceScope {
+    static func resources(_ resources: [Resource], selectedAccountID: String?) -> [Resource] {
+        guard let selectedAccountID,
+              selectedAccountID.hasPrefix(PluginStoreAccountSelection.newAccountPrefix) == false else {
+            return []
+        }
+        return resources.filter { $0.accountID == selectedAccountID }
     }
 }
 
@@ -982,7 +996,7 @@ public final class PluginStoreViewModel: ObservableObject {
         "\(Self.newAccountPrefix)\(plugin.id)"
     }
 
-    private static let newAccountPrefix = "__new__:"
+    static let newAccountPrefix = PluginStoreAccountSelection.newAccountPrefix
 }
 
 private enum PluginRulePreviewError: Error, LocalizedError {
@@ -2031,6 +2045,10 @@ public struct PluginStoreView: View {
     @ViewBuilder
     private func pluginSettingsView(for plugin: InstalledPlugin) -> some View {
         let selectedAccountID = selectedAccountIDs[plugin.id]
+        let selectedResources = PluginSettingsResourceScope.resources(
+            pluginResources[plugin.id, default: []],
+            selectedAccountID: selectedAccountID
+        )
         PluginSettingsPanel(
             plugin: plugin,
             canConfigure: canConfigure(plugin),
@@ -2047,7 +2065,7 @@ public struct PluginStoreView: View {
             triggers: installedTriggers[plugin.id, default: []],
             savingTriggerID: savingTriggerID,
             runtimeStatus: runtimeStatuses[plugin.id],
-            resources: pluginResources[plugin.id, default: []],
+            resources: selectedResources,
             rulePresets: rulePresets[plugin.id, default: []],
             appRules: appRules[plugin.id, default: []],
             actions: pluginActions[plugin.id, default: []],
