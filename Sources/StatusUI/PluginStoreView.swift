@@ -1084,11 +1084,13 @@ public struct PluginStoreContainerView: View {
             setPermissionGrant: { plugin, permission, granted in
                 Task {
                     await viewModel.setPermission(permission, granted: granted, for: plugin)
+                    onAppsChanged?()
                 }
             },
             setTriggerEnabled: { plugin, trigger, enabled in
                 Task {
                     await viewModel.setTrigger(trigger, enabled: enabled, for: plugin)
+                    onAppsChanged?()
                 }
             },
             setRulePresetEnabled: { plugin, preset, enabled in
@@ -1121,6 +1123,7 @@ public struct PluginStoreContainerView: View {
             setDashboardTileField: { plugin, field, enabled in
                 Task {
                     await viewModel.setDashboardTileField(field, enabled: enabled, for: plugin)
+                    onAppsChanged?()
                 }
             },
             openSettings: openSettings,
@@ -1372,10 +1375,16 @@ public struct PluginSettingsContainerView: View {
             previewError: nil,
             previewFixture: nil,
             setPermissionGrant: { plugin, permission, granted in
-                Task { await viewModel.setPermission(permission, granted: granted, for: plugin) }
+                Task {
+                    await viewModel.setPermission(permission, granted: granted, for: plugin)
+                    onAppsChanged?()
+                }
             },
             setTriggerEnabled: { plugin, trigger, enabled in
-                Task { await viewModel.setTrigger(trigger, enabled: enabled, for: plugin) }
+                Task {
+                    await viewModel.setTrigger(trigger, enabled: enabled, for: plugin)
+                    onAppsChanged?()
+                }
             },
             setRulePresetEnabled: { plugin, preset, enabled in
                 Task { await viewModel.setRulePreset(preset, enabled: enabled, for: plugin) }
@@ -1399,7 +1408,10 @@ public struct PluginSettingsContainerView: View {
                 Task { await viewModel.deleteAppRule(rule, for: plugin) }
             },
             setDashboardTileField: { plugin, field, enabled in
-                Task { await viewModel.setDashboardTileField(field, enabled: enabled, for: plugin) }
+                Task {
+                    await viewModel.setDashboardTileField(field, enabled: enabled, for: plugin)
+                    onAppsChanged?()
+                }
             },
             previewRuleActions: { plugin, eventType, actions in
                 try await viewModel.previewProviderActionRequests(for: plugin, eventType: eventType, actions: actions)

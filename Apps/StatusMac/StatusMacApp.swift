@@ -1140,6 +1140,9 @@ private struct MacPluginAppDetail: View {
         .task(id: "\(pluginID):\(accountID ?? "__setup__")") {
             load()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .statusConfiguredAppsDidChange)) { _ in
+            load()
+        }
         .refreshable {
             load()
         }
