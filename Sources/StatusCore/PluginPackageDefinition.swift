@@ -3,6 +3,7 @@ import Foundation
 public struct PluginPackageDefinition: Equatable, Sendable {
     public var auth: PackagedPluginAuth?
     public var setup: PackagedPluginSetup?
+    public var readmeMarkdown: String?
     public var iconAsset: PackagedPluginIconAsset?
     public var triggers: [PackagedPluginTrigger]
     public var requests: PackagedPluginRequests
@@ -16,6 +17,7 @@ public struct PluginPackageDefinition: Equatable, Sendable {
     public init(
         auth: PackagedPluginAuth? = nil,
         setup: PackagedPluginSetup? = nil,
+        readmeMarkdown: String? = nil,
         iconAsset: PackagedPluginIconAsset? = nil,
         triggers: [PackagedPluginTrigger] = [],
         requests: PackagedPluginRequests = PackagedPluginRequests(),
@@ -28,6 +30,7 @@ public struct PluginPackageDefinition: Equatable, Sendable {
     ) {
         self.auth = auth
         self.setup = setup
+        self.readmeMarkdown = readmeMarkdown
         self.iconAsset = iconAsset
         self.triggers = triggers
         self.requests = requests
@@ -49,6 +52,13 @@ public struct PluginPackageDefinition: Equatable, Sendable {
 
         let setup = try archive.file(named: "setup.schema.json").map { data in
             try decoder.decode(PackagedPluginSetup.self, from: data)
+        }
+
+        let readmeMarkdown = try archive.file(named: "README.md").map { data in
+            guard let markdown = String(data: data, encoding: .utf8) else {
+                throw PluginPackageDefinitionError.invalidReadmeAsset("README.md")
+            }
+            return markdown
         }
 
         let iconAsset = try archive.file(named: "icon.svg").map { data in
@@ -87,7 +97,7 @@ public struct PluginPackageDefinition: Equatable, Sendable {
 
         try validateActionRequests(actions, requests: requests)
 
-        return PluginPackageDefinition(auth: auth, setup: setup, iconAsset: iconAsset, triggers: triggers, requests: requests, events: events, actions: actions, mappings: mappings, views: views, dashboardTile: dashboardTile, rulePresets: presets)
+        return PluginPackageDefinition(auth: auth, setup: setup, readmeMarkdown: readmeMarkdown, iconAsset: iconAsset, triggers: triggers, requests: requests, events: events, actions: actions, mappings: mappings, views: views, dashboardTile: dashboardTile, rulePresets: presets)
     }
 
     private static func validateActionRequests(_ actions: [PackagedPluginAction], requests: PackagedPluginRequests) throws {
@@ -113,15 +123,90 @@ public struct PackagedPluginIconAsset: Codable, Equatable, Hashable, Sendable {
             throw PluginPackageDefinitionError.invalidIconAsset(path)
         }
 
-        let trimmed = svgText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.hasPrefix("<svg"),
-              svgText.range(of: #"<script[\s>]"#, options: [.regularExpression, .caseInsensitive]) == nil,
-              svgText.range(of: #"\son[a-z][a-z0-9_-]*\s*="#, options: [.regularExpression, .caseInsensitive]) == nil,
-              svgText.range(of: #"<foreignObject[\s>]"#, options: [.regularExpression, .caseInsensitive]) == nil else {
+        guard PluginSVGValidator.isSafe(svgText) else {
             throw PluginPackageDefinitionError.invalidIconAsset(path)
         }
         self.path = path
         self.svgText = svgText
+    }
+}
+
+private enum PluginSVGValidator {
+    private static let maxElementCount = 128
+    private static let maxAttributeCount = 512
+    private static let maxReferenceCount = 64
+    private static let maxPathDataBytes = 16 * 1024
+
+    static func isSafe(_ svgText: String) -> Bool {
+        let trimmed = svgText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("<svg") else {
+            return false
+        }
+        let disallowedPatterns = [
+            #"<(?:script|foreignObject|iframe|object|embed|audio|video|canvas|image|animate|animateMotion|animateTransform|set|mpath|feImage)\b"#,
+            #"<!DOCTYPE|<!ENTITY|<\?xml-stylesheet|<html\b|<body\b"#,
+            #"\son[a-z][a-z0-9_-]*\s*="#,
+            #"<style\b"#,
+            #"\sstyle\s*="#,
+            #"\b(?:href|xlink:href)\s*=\s*(['"])\s*(?!#)[^'"]+\1"#,
+            #"\b(?:src|poster|data|from|to)\s*=\s*(['"])\s*(?:https?:|data:|javascript:|mailto:|ftp:|//)[^'"]*\1"#
+        ]
+        for pattern in disallowedPatterns where svgText.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil {
+            return false
+        }
+
+        let tagPattern = try? NSRegularExpression(pattern: #"<([A-Za-z][A-Za-z0-9:_-]*)(\s[^<>]*?)?>"#, options: [])
+        let attributePattern = try? NSRegularExpression(pattern: #"([A-Za-z_:][A-Za-z0-9:._-]*)\s*=\s*(['"])(.*?)\2"#, options: [])
+        let idPattern = try? NSRegularExpression(pattern: #"\bid\s*=\s*(['"])(.*?)\1"#, options: [.caseInsensitive])
+        let hrefPattern = try? NSRegularExpression(pattern: #"\b(?:href|xlink:href)\s*=\s*(['"])(.*?)\1"#, options: [.caseInsensitive])
+        let urlPattern = try? NSRegularExpression(pattern: #"url\(\s*(['"]?)(.*?)\1\s*\)"#, options: [.caseInsensitive])
+        let pathPattern = try? NSRegularExpression(pattern: #"\bd\s*=\s*(['"])(.*?)\1"#, options: [.caseInsensitive])
+        guard let tagPattern, let attributePattern, let idPattern, let hrefPattern, let urlPattern, let pathPattern else {
+            return false
+        }
+
+        let range = NSRange(svgText.startIndex..., in: svgText)
+        let tags = tagPattern.matches(in: svgText, options: [], range: range)
+        guard tags.count <= maxElementCount else {
+            return false
+        }
+
+        let ids = Set(idPattern.matches(in: svgText, options: [], range: range).compactMap {
+            Range($0.range(at: 2), in: svgText).map { String(svgText[$0]).trimmingCharacters(in: .whitespacesAndNewlines) }
+        }.filter { $0.isEmpty == false })
+
+        var references: [String] = []
+        for regex in [hrefPattern, urlPattern] {
+            for match in regex.matches(in: svgText, options: [], range: range) {
+                guard let referenceRange = Range(match.range(at: 2), in: svgText) else {
+                    return false
+                }
+                let reference = String(svgText[referenceRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard reference.hasPrefix("#"), reference.count > 1 else {
+                    return false
+                }
+                references.append(String(reference.dropFirst()))
+            }
+        }
+        guard references.count <= maxReferenceCount else {
+            return false
+        }
+        guard references.allSatisfy(ids.contains) else {
+            return false
+        }
+
+        let attributes = attributePattern.matches(in: svgText, options: [], range: range)
+        guard attributes.count <= maxAttributeCount else {
+            return false
+        }
+
+        let pathBytes = pathPattern.matches(in: svgText, options: [], range: range).reduce(0) { partialResult, match in
+            guard let valueRange = Range(match.range(at: 2), in: svgText) else {
+                return partialResult
+            }
+            return partialResult + String(svgText[valueRange]).lengthOfBytes(using: .utf8)
+        }
+        return pathBytes <= maxPathDataBytes
     }
 }
 
@@ -1219,6 +1304,7 @@ public enum PluginPackageDefinitionError: Error, Equatable, LocalizedError, Send
     case truncatedZipEntry
     case invalidZipEntryName
     case invalidIconAsset(String)
+    case invalidReadmeAsset(String)
     case missingActionRequest(actionID: String, requestID: String)
 
     public var errorDescription: String? {
@@ -1233,6 +1319,8 @@ public enum PluginPackageDefinitionError: Error, Equatable, LocalizedError, Send
             "Plugin package contains an invalid file name."
         case .invalidIconAsset(let path):
             "Plugin package icon asset must be a UTF-8 SVG file: \(path)"
+        case .invalidReadmeAsset(let path):
+            "Plugin package README must be a UTF-8 Markdown file: \(path)"
         case .missingActionRequest(let actionID, let requestID):
             "Plugin action \(actionID) references missing request \(requestID)."
         }

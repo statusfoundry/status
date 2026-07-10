@@ -8,6 +8,7 @@
       "description": "Read-only App Store Connect status events for apps, review state, build processing, and release readiness.",
       "category": "developer",
       "icon": "sf:app.badge",
+      "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"App Store Connect\">\n  <defs>\n    <linearGradient id=\"status-appstoreconnect-bg\" x1=\"10\" y1=\"58\" x2=\"56\" y2=\"8\" gradientUnits=\"userSpaceOnUse\">\n      <stop offset=\"0\" stop-color=\"#0A64FF\"/>\n      <stop offset=\"1\" stop-color=\"#69D2FF\"/>\n    </linearGradient>\n  </defs>\n  <rect width=\"64\" height=\"64\" rx=\"14\" fill=\"url(#status-appstoreconnect-bg)\"/>\n  <path d=\"M21.5 43.5h21\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"6\" stroke-linecap=\"round\"/>\n  <path d=\"M28.5 43.5 39.8 24\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"6\" stroke-linecap=\"round\"/>\n  <path d=\"M35.5 43.5 24.2 24\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"6\" stroke-linecap=\"round\"/>\n  <path d=\"M32 20.5v-2\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"5\" stroke-linecap=\"round\"/>\n  <circle cx=\"47.5\" cy=\"18.5\" r=\"5.5\" fill=\"#FFFFFF\" opacity=\".92\"/>\n</svg>",
       "accentColor": "#2F80ED",
       "author": {
         "name": "Status Foundry",
@@ -37,8 +38,8 @@
           ],
           "packageUrl": "https://status-registry.hakobs.com/plugins/com.status.appstoreconnect/0.1.0/com.status.appstoreconnect-0.1.0.statusplugin.zip",
           "manifestUrl": "https://status-registry.hakobs.com/plugins/com.status.appstoreconnect/0.1.0/manifest.json",
-          "sha256": "2104d7057df83175a3de370a0bcaaf90ffe05ccd83b20dd66b0bdfdd324cc3b0",
-          "signature": "wHlxtfeEhun4hA5TSt8Y6CWGIntKdzeVYCA6Kwp8+s1+71xNLZFVzmYOHO05geMXiThJYIW0C/NTNsasYOEHCQ==",
+          "sha256": "60dd289baddfbdabb4b7450765181822e0ad18fba8d83d3bb2ef4ff9e5f07e93",
+          "signature": "4d0RvzpInN5zs5y66Wn9ST9GWw6jIwgYJdBtggP6SLhPmh5X3iroOZqpdRxx7SsRJZTS7GOSSLYCg6F1IWKZBQ==",
           "signedBy": "status-foundry-dev",
           "releasedAt": "2026-07-07T12:00:00Z"
         }
@@ -51,6 +52,7 @@
       "description": "Read-only GitHub repository events for workflow failures, pull requests, and issue activity.",
       "category": "developer",
       "icon": "sf:chevron.left.forwardslash.chevron.right",
+      "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"GitHub\">\n  <rect width=\"64\" height=\"64\" rx=\"14\" fill=\"#181A20\"/>\n  <path fill=\"#FFFFFF\" d=\"M32 11.2c-11.8 0-21.4 9.6-21.4 21.4 0 9.4 6.1 17.4 14.6 20.3 1.1.2 1.5-.5 1.5-1v-3.7c-5.9 1.3-7.2-2.5-7.2-2.5-1-2.4-2.4-3.1-2.4-3.1-2-1.4.1-1.4.1-1.4 2.2.2 3.4 2.3 3.4 2.3 2 3.4 5.2 2.4 6.4 1.8.2-1.4.8-2.4 1.4-2.9-4.7-.5-9.7-2.4-9.7-10.6 0-2.3.8-4.3 2.2-5.8-.2-.5-1-2.7.2-5.7 0 0 1.9-.6 6 2.2 1.7-.5 3.5-.7 5.3-.7s3.6.2 5.3.7c4.1-2.8 6-2.2 6-2.2 1.2 3 .4 5.2.2 5.7 1.4 1.5 2.2 3.5 2.2 5.8 0 8.2-5 10-9.7 10.6.8.7 1.5 2 1.5 4v5.9c0 .6.4 1.2 1.5 1 8.5-2.8 14.6-10.8 14.6-20.3 0-11.8-9.6-21.4-21.4-21.4Z\"/>\n</svg>",
       "accentColor": "#4B5563",
       "author": {
         "name": "Status Foundry",
@@ -79,8 +81,8 @@
           ],
           "packageUrl": "https://status-registry.hakobs.com/plugins/com.status.github/0.1.0/com.status.github-0.1.0.statusplugin.zip",
           "manifestUrl": "https://status-registry.hakobs.com/plugins/com.status.github/0.1.0/manifest.json",
-          "sha256": "1ba60c87aed3957a37c38a9dea60eae61c9d5f4ee2faffd95a351514c4237c19",
-          "signature": "KFcz9YHEQny2nsOddynMQprrWfgq347BSNmqoSNcPu2sllBEjh6BjmWZOpNPcUTfS7yxo047gm1/Uo4+8GeEBA==",
+          "sha256": "4678a7c24c0d02d1198f820ff429fc4b5b73b1e9cad9c54c3e6177a6e0458ef8",
+          "signature": "zc+aDkC1mq2ytA/fE6abg8vZgsiYZLeRn6CGkGBYfGBjVtXDRejwUVrmDx2eNhXzpJVvfzMGEOe1ZcAwZlHqBA==",
           "signedBy": "status-foundry-dev",
           "releasedAt": "2026-07-07T12:00:00Z"
         }
@@ -93,6 +95,7 @@
       "description": "Read-only GitLab project events for failed pipelines, merge requests, issues, and project activity.",
       "category": "developer",
       "icon": "sf:shippingbox",
+      "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"GitLab\">\n  <defs>\n    <linearGradient id=\"gitlab-bg\" x1=\"12\" y1=\"58\" x2=\"52\" y2=\"6\" gradientUnits=\"userSpaceOnUse\">\n      <stop offset=\"0\" stop-color=\"#E24329\"/>\n      <stop offset=\"1\" stop-color=\"#FC6D26\"/>\n    </linearGradient>\n  </defs>\n  <rect width=\"64\" height=\"64\" rx=\"14\" fill=\"url(#gitlab-bg)\"/>\n  <path fill=\"#FFFFFF\" d=\"m32 15 5.3 13.5h-10.6L32 15Zm-11.2 14.7 6.4 17.5L32 23.4l4.8 23.8 6.4-17.5-4.2-1.2H25l-4.2 1.2Zm-2.8 1.3 8.9 16.8L15.2 31l2.8-.1Zm30 0 2.8.1-11.7 16.8L48 31Z\"/>\n</svg>",
       "accentColor": "#FC6D26",
       "author": {
         "name": "Status Foundry",
@@ -121,8 +124,8 @@
           ],
           "packageUrl": "https://status-registry.hakobs.com/plugins/com.status.gitlab/0.1.0/com.status.gitlab-0.1.0.statusplugin.zip",
           "manifestUrl": "https://status-registry.hakobs.com/plugins/com.status.gitlab/0.1.0/manifest.json",
-          "sha256": "5ad8d7012c96b362adca1cd165e58432151322f805c8765b7cff9bae928e4866",
-          "signature": "ijpvjDQyI5PURIYcy0mK+E8S0h/a3VTsLfzLYUySV1kLnyU25Tha6On7w3J5MKrTcLMjA5k63GJOm2ufpqENBg==",
+          "sha256": "d69eb339d210d19317f29757ee2fba6ac6cd847eca38dcd61f4776de085e83ff",
+          "signature": "wzicu5/40F9KcoDb3T7cMYwTQCIniIVVvdb155PPOStJFPkJWQJCTD5x1mdiiIaxFeM/5mH1giNEDecD2yQeCg==",
           "signedBy": "status-foundry-dev",
           "releasedAt": "2026-07-09T12:00:00Z"
         }
@@ -135,6 +138,7 @@
       "description": "Read-only Google Play Console status for Android app reviews, ratings, and release-facing signals.",
       "category": "developer",
       "icon": "sf:play.square.stack",
+      "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"Google Play\">\n  <rect width=\"64\" height=\"64\" rx=\"14\" fill=\"#0F172A\"/>\n  <path fill=\"#34A853\" d=\"M19 16.5 36.2 33 19 49.5V16.5Z\"/>\n  <path fill=\"#4285F4\" d=\"m36.2 33 7.7-7.4 6.1 3.5c2.7 1.5 2.7 4.3 0 5.8l-6.1 3.5-7.7-7.4Z\"/>\n  <path fill=\"#FBBC04\" d=\"m19 16.5 24.9 14.1-7.7 2.4L19 16.5Z\"/>\n  <path fill=\"#EA4335\" d=\"m19 49.5 17.2-16.5 7.7 2.4L19 49.5Z\"/>\n</svg>",
       "accentColor": "#34A853",
       "author": {
         "name": "Status Foundry",
@@ -166,8 +170,8 @@
           ],
           "packageUrl": "https://status-registry.hakobs.com/plugins/com.status.googleplay/0.1.0/com.status.googleplay-0.1.0.statusplugin.zip",
           "manifestUrl": "https://status-registry.hakobs.com/plugins/com.status.googleplay/0.1.0/manifest.json",
-          "sha256": "76f7cd84f07b7b6eea5b0a4006c4f43532454e81184a3e64a1720a0390a85bb3",
-          "signature": "/vOp7Mj2l0rG91j33v+9NsXmgRh0bA53TlUKlWS0kZgMtsad3vzyMmhKHV0JMbHkFlqmYTSkAGy/VebySsncBw==",
+          "sha256": "a5dba9ee21246689d14e183a7b67ef86a1e3f5b45b335d71c3b43e007e447e2a",
+          "signature": "lG7WjANsFWE3BL4btKlczFOYSzeKAnzNYzFKdobyJCaY3R38zf3yCtVje0uArn5b+BlXVIKVnMWF0vDBnBa1CQ==",
           "signedBy": "status-foundry-dev",
           "releasedAt": "2026-07-09T12:00:00Z"
         }
@@ -180,6 +184,7 @@
       "description": "Read Jira project issues and create controlled follow-up issues from Status rules.",
       "category": "developer",
       "icon": "sf:checklist",
+      "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"Jira\">\n  <defs>\n    <linearGradient id=\"jira-bg\" x1=\"10\" y1=\"54\" x2=\"54\" y2=\"10\" gradientUnits=\"userSpaceOnUse\">\n      <stop offset=\"0\" stop-color=\"#0052CC\"/>\n      <stop offset=\"1\" stop-color=\"#2684FF\"/>\n    </linearGradient>\n  </defs>\n  <rect width=\"64\" height=\"64\" rx=\"14\" fill=\"url(#jira-bg)\"/>\n  <path fill=\"#FFFFFF\" d=\"M18 21.5h17.6a9.6 9.6 0 0 0 9.6 9.6v11.4a9.6 9.6 0 0 0-9.6-9.6H18V21.5Zm10.2 10.8h7.4A9.6 9.6 0 0 0 45.2 42v6.5a3.5 3.5 0 0 1-3.5 3.5H28.2v-19.7Z\"/>\n</svg>",
       "accentColor": "#0C66E4",
       "author": {
         "name": "Status Foundry",
@@ -208,8 +213,8 @@
           ],
           "packageUrl": "https://status-registry.hakobs.com/plugins/com.status.jira/0.1.0/com.status.jira-0.1.0.statusplugin.zip",
           "manifestUrl": "https://status-registry.hakobs.com/plugins/com.status.jira/0.1.0/manifest.json",
-          "sha256": "a05a10e9705183d471551b54724c359a77c1093c3d59da53de4ada1aa1e3a330",
-          "signature": "ZrkR8YUIAeAw5glulL8OoeGeYE74TJcPWGxBHcy/uFT9cDlptOcZT9HtZ0q9clECfmeBp8DhyeCL+F6rWm0RDg==",
+          "sha256": "e7c278df78966f8d2456ee5039af5ede3a1b36a5e27de6e4bc66b7d469c99d36",
+          "signature": "F0hVosD4tfuwBN2+z3ZepHB7gCCCsSO3Hd+zDPDpkapPePxasZ1ISTnb2qkS6bKIv5VlpgbPZeoMhRrEKrI8DQ==",
           "signedBy": "status-foundry-dev",
           "releasedAt": "2026-07-09T12:00:00Z"
         }
@@ -222,6 +227,7 @@
       "description": "Declarative uptime checks for sites and endpoints the user chooses to track.",
       "category": "monitoring",
       "icon": "sf:globe",
+      "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"Website\">\n  <rect width=\"64\" height=\"64\" rx=\"14\" fill=\"#0F766E\"/>\n  <circle cx=\"32\" cy=\"32\" r=\"18\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"4\"/>\n  <path d=\"M14 32h36\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"4\" stroke-linecap=\"round\"/>\n  <path d=\"M32 14c5.5 5.2 8.5 11.4 8.5 18S37.5 44.8 32 50c-5.5-5.2-8.5-11.4-8.5-18S26.5 19.2 32 14Z\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"4\" stroke-linejoin=\"round\"/>\n</svg>",
       "accentColor": "#16A34A",
       "author": {
         "name": "Status Foundry",
@@ -248,8 +254,8 @@
           ],
           "packageUrl": "https://status-registry.hakobs.com/plugins/com.status.website/0.1.0/com.status.website-0.1.0.statusplugin.zip",
           "manifestUrl": "https://status-registry.hakobs.com/plugins/com.status.website/0.1.0/manifest.json",
-          "sha256": "79488de10c1610af29bd012bd6b731c822903c3f5f4a8a2d08d07f366e5dcb8c",
-          "signature": "xvaNuYbtlYxE/z8akqhZ0SMiHYY9nkvJ7wZKsz9BunWv94eJr9LZ9WLFc0tFyWnFwGoZTNuUrIYWHGHJ25DPDg==",
+          "sha256": "ef3767cc6527ced291f50e29e23ff7adf30d2e7ccdc8cd84b4d573f56fa7b1b5",
+          "signature": "7uyLneXHiGV8iMtkJDknSOs8hm5atKmrNG8qVqmb/Pc+CyanhzLVxN8FHlE4fOWT/jT+AWeCwMF6L2dpeZbeBg==",
           "signedBy": "status-foundry-dev",
           "releasedAt": "2026-07-07T12:00:00Z"
         }
@@ -262,6 +268,7 @@
       "description": "Read-only YouTube channel status for creator accounts, latest uploads, subscriber counts, and channel-level signals.",
       "category": "content",
       "icon": "sf:play.rectangle",
+      "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"YouTube\">\n  <rect width=\"64\" height=\"64\" rx=\"14\" fill=\"#FF0033\"/>\n  <path fill=\"#FFFFFF\" d=\"M49.3 23.3c-.6-2.2-2.4-4-4.7-4.6-4.1-1.1-20-1.1-24.1 0-2.3.6-4.1 2.4-4.7 4.6-1.1 4-1.1 12.4 0 16.4.6 2.2 2.4 4 4.7 4.6 4.1 1.1 20 1.1 24.1 0 2.3-.6 4.1-2.4 4.7-4.6 1.1-4 1.1-12.4 0-16.4ZM27.8 39.6V24.4L40.9 32l-13.1 7.6Z\"/>\n</svg>",
       "accentColor": "#FF0033",
       "author": {
         "name": "Status Foundry",
@@ -293,8 +300,8 @@
           ],
           "packageUrl": "https://status-registry.hakobs.com/plugins/com.status.youtube/0.1.0/com.status.youtube-0.1.0.statusplugin.zip",
           "manifestUrl": "https://status-registry.hakobs.com/plugins/com.status.youtube/0.1.0/manifest.json",
-          "sha256": "6b8e895a4ec3a6fcfcea201373ddf050a04f2df7da11c96bdfbb0c115e59ad10",
-          "signature": "COfg8yCepAJ4di9X0ke2U/uV2E1ekrVP5naFr3VDLnX9wh2y+gIidcEMKZa7ufUrt9dkegrVpMZWawrYOZ0NDA==",
+          "sha256": "c2e0e3e8986231548fe1c1fdba5973080b96a1918c054c424702c7e083168aaf",
+          "signature": "LkzvZgJeGJqBfFi8c1V1uhqZH1CS3nXnM9gRFUlzs04jZrZCcV5OgttWH9a1BxCckvxc9Ipht3hAGZBDXYBmDw==",
           "signedBy": "status-foundry-dev",
           "releasedAt": "2026-07-09T12:00:00Z"
         }

@@ -16,6 +16,7 @@ import Testing
     #expect(transport.requestedPaths == ["/v1/plugins?platform=macOS&coreVersion=0.1.0"])
     #expect(plugins.map(\.id) == ["com.status.github"])
     #expect(plugins.first?.permissions == [.network])
+    #expect(plugins.first?.iconSvg?.contains("<svg") == true)
 }
 
 @Test func registryClientParsesPluginDetailVersionsAndRevocations() async throws {
@@ -68,6 +69,9 @@ private let pluginListJSON = """
       "summary": "Track workflow failures.",
       "description": "Read-only GitHub events.",
       "category": "developer",
+      "icon": "sf:chevron.left.slash.chevron.right",
+      "iconSvg": "<svg xmlns=\\"http://www.w3.org/2000/svg\\"></svg>",
+      "accentColor": "#181A20",
       "author": {
         "name": "Status Foundry",
         "publisherId": "status-foundry",
@@ -92,6 +96,9 @@ private let pluginDetailJSON = """
   "summary": "Track workflow failures.",
   "description": "Read-only GitHub events.",
   "category": "developer",
+  "icon": "sf:chevron.left.slash.chevron.right",
+  "iconSvg": "<svg xmlns=\\"http://www.w3.org/2000/svg\\"></svg>",
+  "accentColor": "#181A20",
   "author": {
     "name": "Status Foundry",
     "publisherId": "status-foundry",

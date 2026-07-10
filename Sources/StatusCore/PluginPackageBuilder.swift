@@ -8,7 +8,7 @@ public enum PluginPackageBuilderError: Error, Equatable, LocalizedError, Sendabl
     public var errorDescription: String? {
         switch self {
         case .noJSONFiles(let path):
-            "Plugin folder contains no JSON package files: \(path)"
+            "Plugin folder contains no supported package files: \(path)"
         case .invalidFileName(let name):
             "Plugin package file name is invalid: \(name)"
         case .fileTooLarge(let name):
@@ -25,7 +25,7 @@ public enum PluginPackageBuilder {
             options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
         )
             .filter { url in
-                url.pathExtension == "json" || url.lastPathComponent == "icon.svg"
+                url.pathExtension == "json" || url.lastPathComponent == "icon.svg" || url.lastPathComponent == "README.md"
             }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
 
@@ -45,7 +45,7 @@ public enum PluginPackageBuilder {
         var offset: UInt32 = 0
 
         for file in files.sorted(by: { $0.name < $1.name }) {
-            guard file.name.range(of: #"^[A-Za-z0-9._-]+\.json$"#, options: .regularExpression) != nil || file.name == "icon.svg" else {
+            guard file.name.range(of: #"^[A-Za-z0-9._-]+\.json$"#, options: .regularExpression) != nil || file.name == "icon.svg" || file.name == "README.md" else {
                 throw PluginPackageBuilderError.invalidFileName(file.name)
             }
             guard file.data.count <= Int(UInt32.max) else {

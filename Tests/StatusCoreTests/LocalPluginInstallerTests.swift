@@ -88,6 +88,15 @@ import Testing
     #expect(output.metrics.map(\.pointValue) == [7.5, 0.2])
 }
 
+@Test func pluginPackageBuilderIncludesReadmeWhenPresent() throws {
+    let pluginDirectory = repositoryRoot()
+        .appendingPathComponent("plugins/examples/mock-operations", isDirectory: true)
+    let packageData = try PluginPackageBuilder.packageData(fromDirectory: pluginDirectory)
+    let definition = try PluginPackageDefinition.decode(from: packageData)
+
+    #expect(definition.readmeMarkdown?.contains("# Mock Operations") == true)
+}
+
 @Test func pluginDeveloperPreviewMapsFixtureWithoutPersistingOutput() throws {
     let database = try temporaryLocalPluginDatabase()
     let store = StatusPersistenceStore(database: database)

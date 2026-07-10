@@ -11,6 +11,7 @@ import {
   validatePluginPackage,
 } from "./lib/plugin-package-validator.mjs";
 import { loadPublishers, resolveAuthor } from "./lib/publishers.mjs";
+import { validatePluginSVG } from "./lib/plugin-svg-validator.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginsRoot = path.join(root, "plugins", "bundled");
@@ -30,6 +31,17 @@ MC4CAQAwBQYDK2VwBCIEIHMXJtFn66hGp93MMMQcTOgQqxOXHNsvw0iUwxMTdhaZ
 
 async function readJSON(filePath) {
   return JSON.parse(await readFile(filePath, "utf8"));
+}
+
+async function readOptionalText(filePath) {
+  try {
+    return await readFile(filePath, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function directoryNames(directoryPath) {
@@ -79,6 +91,8 @@ async function build() {
     const pluginDirectory = path.join(pluginsRoot, directoryName);
     const manifest = await readJSON(path.join(pluginDirectory, "manifest.json"));
     const metadata = await readJSON(path.join(pluginDirectory, "registry.json"));
+    const iconText = await readOptionalText(path.join(pluginDirectory, "icon.svg"));
+    const iconSvg = iconText ? validatePluginSVG(iconText, `${directoryName}: icon.svg`) : null;
     validateManifest(manifest, directoryName, publishers);
     await validatePluginPackage(pluginDirectory, manifest, directoryName);
     const author = resolveAuthor(manifest.author, publishers);
@@ -106,6 +120,7 @@ async function build() {
       description: manifest.description,
       category: manifest.category,
       icon: manifest.icon,
+      iconSvg,
       accentColor: manifest.accentColor,
       author,
       trustLevel: metadata.trustLevel,

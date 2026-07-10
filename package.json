@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 4000 web",
     "build": "npm run web:build",
-    "check": "npm run plugins:check && npm run plugin-example:check && npm run plugins:docs:check && npm run docs:check && npm run typecheck && npm run web:build && npm run registry:test && npm run registry:check",
+    "check": "npm run plugins:check && npm run plugins:test && npm run plugin-example:check && npm run plugins:docs:check && npm run docs:check && npm run typecheck && npm run web:build && npm run registry:test && npm run registry:check",
     "plugin-example:check": "node status-plugin-example/scripts/validate.mjs",
     "typecheck": "vue-tsc --noEmit",
     "docs:build": "node scripts/build-web-docs.mjs && node scripts/build-web-plugins.mjs",
@@ -15,6 +15,7 @@
     "plugins:docs:check": "node scripts/build-web-plugins.mjs --check",
     "plugins:build": "node scripts/build-plugin-packages.mjs",
     "plugins:check": "node scripts/build-plugin-packages.mjs --check",
+    "plugins:test": "node --test scripts/**/*.test.mjs",
     "plugins:validate-local": "node scripts/build-plugin-packages.mjs --local-plugin",
     "plugins:validate-pr": "node scripts/validate-changed-plugins.mjs",
     "plugin-example:sync": "node scripts/sync-plugin-example-repo.mjs",

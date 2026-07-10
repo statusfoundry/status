@@ -3,6 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadPublishers, validateAuthor } from "./publishers.mjs";
+import { validatePluginSVG } from "./plugin-svg-validator.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -27,7 +28,15 @@ const allowedViewTypes = new Set([
   "metric_grid",
   "alert_list"
 ]);
-const officialIconRequiredPluginIDs = new Set(["com.status.github", "com.status.appstoreconnect"]);
+const officialIconRequiredPluginIDs = new Set([
+  "com.status.appstoreconnect",
+  "com.status.github",
+  "com.status.gitlab",
+  "com.status.googleplay",
+  "com.status.jira",
+  "com.status.website",
+  "com.status.youtube"
+]);
 
 const crcTable = new Uint32Array(256);
 for (let index = 0; index < crcTable.length; index += 1) {
@@ -377,15 +386,10 @@ async function validateIconAsset(pluginDirectory, manifest, sourceName) {
     throw error;
   }
 
-  const trimmed = iconData.trim();
-  if (trimmed.startsWith("<svg") === false) {
-    fail(`${sourceName}: icon.svg must be an SVG document`);
-  }
-  if (Buffer.byteLength(iconData, "utf8") > 32 * 1024) {
-    fail(`${sourceName}: icon.svg must be 32 KiB or smaller`);
-  }
-  if (/<script[\s>]/i.test(iconData) || /\son[a-z]+\s*=/i.test(iconData) || /<foreignObject[\s>]/i.test(iconData)) {
-    fail(`${sourceName}: icon.svg must not contain script, event handlers, or foreignObject`);
+  try {
+    validatePluginSVG(iconData, `${sourceName}: icon.svg`);
+  } catch (error) {
+    fail(error.message);
   }
 }
 
@@ -533,7 +537,7 @@ export async function validatePluginPackage(pluginDirectory, manifest, sourceNam
 
 export async function pluginFiles(pluginDirectory) {
   const names = (await readdir(pluginDirectory))
-    .filter((name) => name.endsWith(".json") || name === "icon.svg")
+    .filter((name) => name.endsWith(".json") || name === "icon.svg" || name === "README.md")
     .sort();
   return Promise.all(names.map(async (name) => ({
     name,

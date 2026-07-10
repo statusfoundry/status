@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDocPathMap } from './lib/doc-path-map.mjs';
 import { loadPublishers, resolveAuthor } from './lib/publishers.mjs';
+import { validatePluginSVG } from './lib/plugin-svg-validator.mjs';
 import { renderMarkdown } from './lib/render-markdown.mjs';
 
 const docPathMap = buildDocPathMap();
@@ -132,11 +133,7 @@ async function loadPluginDoc(pluginDirectory, publishers, { requireReadme }) {
   let iconSvg = null;
   try {
     const iconPath = path.join(pluginDirectory, 'icon.svg');
-    const iconData = await readFile(iconPath, 'utf8');
-    const trimmed = iconData.trim();
-    if (trimmed.startsWith('<svg') && !/<script[\s>]/i.test(iconData) && !/\son[a-z]+\s*=/i.test(iconData) && !/<foreignObject[\s>]/i.test(iconData)) {
-      iconSvg = trimmed;
-    }
+    iconSvg = validatePluginSVG(await readFile(iconPath, 'utf8'), `${path.relative(root, pluginDirectory)}: icon.svg`);
   } catch (error) {
     if (error?.code !== 'ENOENT') {
       throw error;

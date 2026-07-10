@@ -1,0 +1,47 @@
+{
+  "generatedNote": "Bundled provider icons are maintained as repository-local SVG assets. Status renders and sizes them in app-owned UI; the package manifest SF Symbol remains the fallback when an SVG is unavailable or invalid.",
+  "sources": [
+    {
+      "pluginId": "com.status.appstoreconnect",
+      "sourceType": "official-brand-guidelines",
+      "sourceUrl": "https://developer.apple.com/app-store/marketing/guidelines/",
+      "licenseNote": "Apple brand and marketing assets remain subject to Apple's published guidelines and trademark rules."
+    },
+    {
+      "pluginId": "com.status.github",
+      "sourceType": "official-brand-guidelines",
+      "sourceUrl": "https://github.com/logos",
+      "licenseNote": "GitHub logos remain subject to GitHub's logo policy and trademark rules."
+    },
+    {
+      "pluginId": "com.status.gitlab",
+      "sourceType": "official-brand-guidelines",
+      "sourceUrl": "https://about.gitlab.com/press/press-kit/",
+      "licenseNote": "GitLab brand assets remain subject to GitLab's brand and trademark guidance."
+    },
+    {
+      "pluginId": "com.status.googleplay",
+      "sourceType": "official-brand-guidelines",
+      "sourceUrl": "https://partnermarketinghub.withgoogle.com/brands/google-play/",
+      "licenseNote": "Google Play brand assets remain subject to Google's brand resource guidance."
+    },
+    {
+      "pluginId": "com.status.jira",
+      "sourceType": "official-brand-guidelines",
+      "sourceUrl": "https://www.atlassian.com/company/news/press-kit",
+      "licenseNote": "Jira and Atlassian brand assets remain subject to Atlassian's brand and trademark guidance."
+    },
+    {
+      "pluginId": "com.status.website",
+      "sourceType": "status-authored-generic",
+      "sourceUrl": "https://github.com/statusfoundry/status",
+      "licenseNote": "Generic globe icon authored in-repo for the first-party website monitor plugin."
+    },
+    {
+      "pluginId": "com.status.youtube",
+      "sourceType": "official-brand-guidelines",
+      "sourceUrl": "https://www.youtube.com/about/brand-resources/",
+      "licenseNote": "YouTube brand assets remain subject to YouTube's published brand resource terms."
+    }
+  ]
+}

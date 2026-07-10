@@ -1061,17 +1061,29 @@ import Testing
     </svg>
     """
     let packageData = runtimeStoredZip(files: [
+        ("README.md", Data("# Example\n".utf8)),
         ("icon.svg", Data(svg.utf8))
     ])
 
     let definition = try PluginPackageDefinition.decode(from: packageData)
 
+    #expect(definition.readmeMarkdown == "# Example\n")
     #expect(definition.iconAsset == PackagedPluginIconAsset(path: "icon.svg", svgText: svg))
 }
 
 @Test func pluginPackageDefinitionRejectsActiveIconAsset() throws {
     let packageData = runtimeStoredZip(files: [
         ("icon.svg", Data(#"<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>"#.utf8))
+    ])
+
+    #expect(throws: PluginPackageDefinitionError.invalidIconAsset("icon.svg")) {
+        _ = try PluginPackageDefinition.decode(from: packageData)
+    }
+}
+
+@Test func pluginPackageDefinitionRejectsRemoteReferencedIconAsset() throws {
+    let packageData = runtimeStoredZip(files: [
+        ("icon.svg", Data(#"<svg xmlns="http://www.w3.org/2000/svg"><use href="https://example.com/icon.svg#mark"/></svg>"#.utf8))
     ])
 
     #expect(throws: PluginPackageDefinitionError.invalidIconAsset("icon.svg")) {
