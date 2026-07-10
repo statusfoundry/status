@@ -1644,6 +1644,7 @@ import Testing
         id: "job_older",
         pluginID: "com.status.github",
         triggerID: "trg_github",
+        accountID: "acc_work",
         status: .success,
         queuedAt: now,
         startedAt: now.addingTimeInterval(1),
@@ -1653,6 +1654,7 @@ import Testing
         id: "job_newest",
         pluginID: "com.status.github",
         triggerID: "trg_github",
+        accountID: "acc_personal",
         status: .failed,
         queuedAt: now.addingTimeInterval(10),
         startedAt: now.addingTimeInterval(11),
@@ -1672,6 +1674,7 @@ import Testing
     try store.upsertJob(other)
 
     #expect(try store.recentJobs(pluginID: "com.status.github").map(\.id) == ["job_newest", "job_older"])
+    #expect(try store.recentJobs(pluginID: "com.status.github", accountID: "acc_work").map(\.id) == ["job_older"])
     #expect(try store.recentJobs(limit: 2).map(\.id) == ["job_other", "job_newest"])
 }
 

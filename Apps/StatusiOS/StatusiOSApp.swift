@@ -716,7 +716,7 @@ private struct IOSPluginAppDetail: View {
             plugin = loadedPlugin
             app = try accountID.flatMap { try store.accountConfiguration(accountID: $0) }
             resources = try store.resources(pluginID: pluginID, accountID: accountID)
-            runtimeStatus = try recentRuntimeStatus(store: store, pluginID: pluginID)
+            runtimeStatus = try recentRuntimeStatus(store: store, pluginID: pluginID, accountID: accountID)
             loadError = loadedPlugin == nil ? "This plugin is not installed on this device." : nil
         } catch {
             plugin = nil
@@ -740,17 +740,37 @@ private struct IOSPluginAppDetail: View {
         isRunning = false
     }
 
-    private func recentRuntimeStatus(store: StatusPersistenceStore, pluginID: String) throws -> PluginRuntimeStatus? {
-        guard let job = try store.recentJobs(pluginID: pluginID, limit: 1).first else {
+    private func recentRuntimeStatus(store: StatusPersistenceStore, pluginID: String, accountID: String?) throws -> PluginRuntimeStatus? {
+        guard let job = try store.recentJobs(pluginID: pluginID, accountID: accountID, limit: 1).first else {
             return nil
         }
         return PluginRuntimeStatus(
             pluginID: job.pluginID,
             status: job.status,
-            detail: job.error ?? "Job \(job.id) completed from \(job.triggerID).",
+            detail: runtimeStatusDetail(for: job),
             timestamp: job.finishedAt ?? job.startedAt ?? job.queuedAt,
             emittedEventCount: job.emittedEventIDs.count
         )
+    }
+
+    private func runtimeStatusDetail(for job: JobRecord) -> String {
+        if let error = job.error, error.isEmpty == false {
+            return error
+        }
+        switch job.status {
+        case .queued:
+            return "Job \(job.id) is waiting to run from \(job.triggerID)."
+        case .running:
+            return "Job \(job.id) is running from \(job.triggerID)."
+        case .success:
+            return "Job \(job.id) completed from \(job.triggerID)."
+        case .failed:
+            return "Job \(job.id) failed from \(job.triggerID)."
+        case .cancelled:
+            return "Job \(job.id) was cancelled from \(job.triggerID)."
+        case .skipped:
+            return "Job \(job.id) was skipped from \(job.triggerID)."
+        }
     }
 }
 

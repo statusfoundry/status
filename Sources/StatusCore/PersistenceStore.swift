@@ -1071,16 +1071,22 @@ public final class StatusPersistenceStore {
         .first
     }
 
-    public func recentJobs(pluginID: String? = nil, limit: Int = 20) throws -> [JobRecord] {
-        let rows: [[String: SQLiteValue]]
+    public func recentJobs(pluginID: String? = nil, accountID: String? = nil, limit: Int = 20) throws -> [JobRecord] {
+        var sql = "SELECT * FROM jobs"
+        var clauses: [String] = []
+        var bindings: [SQLiteValue] = []
         if let pluginID {
-            rows = try database.query(
-                "SELECT * FROM jobs WHERE plugin_id = ?",
-                bindings: [.text(pluginID)]
-            )
-        } else {
-            rows = try database.query("SELECT * FROM jobs")
+            clauses.append("plugin_id = ?")
+            bindings.append(.text(pluginID))
         }
+        if let accountID {
+            clauses.append("account_id = ?")
+            bindings.append(.text(accountID))
+        }
+        if clauses.isEmpty == false {
+            sql += " WHERE \(clauses.joined(separator: " AND "))"
+        }
+        let rows = try database.query(sql, bindings: bindings)
         return try rows
             .map(job(from:))
             .sorted { lhs, rhs in
