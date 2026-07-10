@@ -2412,15 +2412,20 @@ private struct PluginSettingsPanel: View {
     @State private var confirmsAppRemoval = false
 
     var body: some View {
+        let headerText = PluginSettingsHeaderText(
+            pluginName: plugin.name,
+            pluginVersion: plugin.installedVersion,
+            appName: selectedAccount?.accountName
+        )
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
                 IntegrationIcon(provider: plugin.id, icon: plugin.iconPath, iconAsset: plugin.iconAsset, accentColor: plugin.accentColor, size: 32)
                     .padding(.top, 4)
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(plugin.name)
+                        Text(headerText.title)
                             .font(.headline)
-                        Text(plugin.installedVersion)
+                        Text(headerText.metadata)
                             .font(.caption.monospaced())
                             .foregroundStyle(.secondary)
                     }
@@ -2797,6 +2802,21 @@ private struct PluginSettingsPanel: View {
     private var requestIDs: [String] {
         Array(Set(triggers.compactMap(\.requestID))).sorted { lhs, rhs in
             lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
+        }
+    }
+}
+
+struct PluginSettingsHeaderText: Equatable, Sendable {
+    var title: String
+    var metadata: String
+
+    init(pluginName: String, pluginVersion: String, appName: String?) {
+        if let appName, appName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            self.title = appName
+            self.metadata = "\(pluginName) \(pluginVersion)"
+        } else {
+            self.title = pluginName
+            self.metadata = pluginVersion
         }
     }
 }

@@ -17,6 +17,28 @@ import Testing
     #expect(appStoreConnect.brand == .appStoreConnect)
 }
 
+@Test func pluginSettingsHeaderPrefersConfiguredAppName() {
+    let header = PluginSettingsHeaderText(
+        pluginName: "GitHub",
+        pluginVersion: "0.1.0",
+        appName: "Status Foundry GitHub"
+    )
+
+    #expect(header.title == "Status Foundry GitHub")
+    #expect(header.metadata == "GitHub 0.1.0")
+}
+
+@Test func pluginSettingsHeaderFallsBackToPluginName() {
+    let header = PluginSettingsHeaderText(
+        pluginName: "GitHub",
+        pluginVersion: "0.1.0",
+        appName: " "
+    )
+
+    #expect(header.title == "GitHub")
+    #expect(header.metadata == "0.1.0")
+}
+
 @Test func pluginStoreCatalogDetectsAvailableUpdates() throws {
     let installed = InstalledPlugin(
         id: "com.status.github",
