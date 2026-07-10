@@ -2264,7 +2264,7 @@ private struct PluginSettingsPanel: View {
                             }
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(isRunning)
+                        .disabled(isRunning || settingsRunUnavailableReason != nil)
                     }
                     if let previewFixture {
                         Button {
@@ -2281,6 +2281,9 @@ private struct PluginSettingsPanel: View {
                         .disabled(isPreviewing)
                     }
                 }
+            }
+            if let settingsRunUnavailableReason {
+                SettingsRunUnavailableView(reason: settingsRunUnavailableReason)
             }
             if permissions.isEmpty == false {
                 VStack(alignment: .leading, spacing: 8) {
@@ -2529,6 +2532,50 @@ private struct PluginSettingsPanel: View {
         "\(plugin.id):\(permission.permission.rawValue)"
     }
 
+    private var selectedAccount: PluginAccountConfiguration? {
+        guard let selectedPersistedAccountID else {
+            return nil
+        }
+        return accounts.first { $0.id == selectedPersistedAccountID }
+    }
+
+    private var settingsRunUnavailableReason: String? {
+        guard canRun else {
+            return nil
+        }
+        guard selectedPersistedAccountID != nil else {
+            return "Save an app before running this plugin."
+        }
+        let missing = missingRuntimePermissions
+        guard missing.isEmpty == false else {
+            return nil
+        }
+        return "Grant \(permissionList(missing)) permission before running this app."
+    }
+
+    private var missingRuntimePermissions: [PluginPermission] {
+        let declared = Set(permissions.map(\.permission))
+        let granted = Set(permissions.filter(\.granted).map(\.permission))
+        var required: [PluginPermission] = []
+        if declared.contains(.network) {
+            required.append(.network)
+        }
+        if selectedAccount?.credentialRef != nil, declared.contains(.keychain) {
+            required.append(.keychain)
+        }
+        if let selectedAccount,
+           selectedAccount.credentialRef != nil,
+           declared.contains(.privateKey),
+           selectedAccount.authType == AuthKind.jwtAPIKey.rawValue || selectedAccount.authType == AuthKind.privateKeyJWT.rawValue {
+            required.append(.privateKey)
+        }
+        return required.filter { granted.contains($0) == false }
+    }
+
+    private func permissionList(_ permissions: [PluginPermission]) -> String {
+        permissions.map(\.label).joined(separator: ", ")
+    }
+
     private var availableDashboardTileFields: [String] {
         let recommendedFields = recommendedDashboardTileFields
         let viewFields = plugin.views.flatMap(\.fields)
@@ -2629,6 +2676,33 @@ private struct PluginRequestTestPanel: View {
 
     private func key(for requestID: String) -> String {
         "\(plugin.id):\(selectedAccountID ?? "__new__:"):\(requestID)"
+    }
+}
+
+private struct SettingsRunUnavailableView: View {
+    let reason: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .frame(width: 12)
+                .padding(.top, 3)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Run unavailable")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+                Text(reason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .background(Color.orange.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
