@@ -971,6 +971,7 @@ private enum PluginRulePreviewError: Error, LocalizedError {
 public struct PluginStoreContainerView: View {
     @StateObject private var viewModel: PluginStoreViewModel
     private let openSettings: ((InstalledPlugin) -> Void)?
+    private let onAppsChanged: (() -> Void)?
     private let installLocalPlugin: (() async throws -> String)?
     private let previewPluginFixture: ((InstalledPlugin, String?) async throws -> String)?
     @State private var isInstallingLocalPlugin = false
@@ -983,11 +984,13 @@ public struct PluginStoreContainerView: View {
     public init(
         viewModel: @autoclosure @escaping () -> PluginStoreViewModel,
         openSettings: ((InstalledPlugin) -> Void)? = nil,
+        onAppsChanged: (() -> Void)? = nil,
         installLocalPlugin: (() async throws -> String)? = nil,
         previewPluginFixture: ((InstalledPlugin, String?) async throws -> String)? = nil
     ) {
         _viewModel = StateObject(wrappedValue: viewModel())
         self.openSettings = openSettings
+        self.onAppsChanged = onAppsChanged
         self.installLocalPlugin = installLocalPlugin
         self.previewPluginFixture = previewPluginFixture
     }
@@ -1043,11 +1046,13 @@ public struct PluginStoreContainerView: View {
             saveSetup: { plugin in
                 Task {
                     await viewModel.saveSetup(plugin)
+                    onAppsChanged?()
                 }
             },
             removeSelectedAccount: { plugin in
                 Task {
                     await viewModel.removeSelectedAccount(for: plugin)
+                    onAppsChanged?()
                 }
             },
             beginOAuthConnection: { plugin in
@@ -1219,16 +1224,19 @@ public struct PluginSettingsContainerView: View {
     @StateObject private var viewModel: PluginStoreViewModel
     private let pluginID: String
     private let initialAccountID: String?
+    private let onAppsChanged: (() -> Void)?
     @State private var appliedInitialAccountSelection = false
 
     public init(
         viewModel: @autoclosure @escaping () -> PluginStoreViewModel,
         pluginID: String,
-        initialAccountID: String? = nil
+        initialAccountID: String? = nil,
+        onAppsChanged: (() -> Void)? = nil
     ) {
         _viewModel = StateObject(wrappedValue: viewModel())
         self.pluginID = pluginID
         self.initialAccountID = initialAccountID
+        self.onAppsChanged = onAppsChanged
     }
 
     public var body: some View {
@@ -1335,10 +1343,16 @@ public struct PluginSettingsContainerView: View {
                 viewModel.addAccount(for: plugin)
             },
             saveSetup: { plugin in
-                Task { await viewModel.saveSetup(plugin) }
+                Task {
+                    await viewModel.saveSetup(plugin)
+                    onAppsChanged?()
+                }
             },
             removeSelectedAccount: { plugin in
-                Task { await viewModel.removeSelectedAccount(for: plugin) }
+                Task {
+                    await viewModel.removeSelectedAccount(for: plugin)
+                    onAppsChanged?()
+                }
             },
             beginOAuthConnection: { plugin in
                 viewModel.beginOAuthConnection(plugin)

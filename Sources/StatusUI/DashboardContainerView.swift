@@ -29,13 +29,16 @@ public final class DashboardViewModel: ObservableObject {
 
 public struct DashboardContainerView: View {
     @StateObject private var viewModel: DashboardViewModel
+    private let reloadToken: Int
     private let openApp: ((IntegrationSummary) -> Void)?
 
     public init(
         viewModel: @autoclosure @escaping () -> DashboardViewModel,
+        reloadToken: Int = 0,
         openApp: ((IntegrationSummary) -> Void)? = nil
     ) {
         _viewModel = StateObject(wrappedValue: viewModel())
+        self.reloadToken = reloadToken
         self.openApp = openApp
     }
 
@@ -52,7 +55,7 @@ public struct DashboardContainerView: View {
                         .padding()
                 }
             }
-            .task {
+            .task(id: reloadToken) {
                 viewModel.reload()
             }
             .refreshable {

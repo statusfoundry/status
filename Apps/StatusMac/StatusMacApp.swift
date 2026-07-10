@@ -5,6 +5,10 @@ import SwiftUI
 import UniformTypeIdentifiers
 @preconcurrency import UserNotifications
 
+private extension Notification.Name {
+    static let statusConfiguredAppsDidChange = Notification.Name("statusConfiguredAppsDidChange")
+}
+
 @main
 struct StatusMacApp: App {
     var body: some Scene {
@@ -36,7 +40,10 @@ private struct MacPluginSettingsWindow: View {
         PluginSettingsContainerView(
             viewModel: makePluginStoreViewModel(platform: .macOS),
             pluginID: route.pluginID,
-            initialAccountID: route.accountID
+            initialAccountID: route.accountID,
+            onAppsChanged: {
+                NotificationCenter.default.post(name: .statusConfiguredAppsDidChange, object: nil)
+            }
         )
         .frame(minWidth: 640, minHeight: 520)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -323,6 +330,7 @@ private struct MacRootView: View {
     @State private var selection: MacSection? = .overview
     @State private var sidebarApps: [SidebarApp] = []
     @State private var sidebarPluginError: String?
+    @State private var dashboardReloadToken = 0
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -380,6 +388,7 @@ private struct MacRootView: View {
                 detailWithIntegrationTabs {
                     DashboardContainerView(
                         viewModel: makeDashboardViewModel(),
+                        reloadToken: dashboardReloadToken,
                         openApp: { app in
                             selection = .app(
                                 pluginID: app.provider,
@@ -403,6 +412,9 @@ private struct MacRootView: View {
                                 id: "integration-settings",
                                 value: MacPluginSettingsRoute(pluginID: plugin.id).rawValue
                             )
+                        },
+                        onAppsChanged: {
+                            handleConfiguredAppsChanged()
                         },
                         installLocalPlugin: {
                             try await installLocalPluginFolder()
@@ -463,6 +475,14 @@ private struct MacRootView: View {
             loadSidebarPlugins()
             await runBackgroundPluginLoop()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .statusConfiguredAppsDidChange)) { _ in
+            handleConfiguredAppsChanged()
+        }
+    }
+
+    private func handleConfiguredAppsChanged() {
+        loadSidebarPlugins()
+        dashboardReloadToken += 1
     }
 
     private func loadSidebarPlugins() {
