@@ -10,11 +10,13 @@ struct StatusMacApp: App {
     var body: some Scene {
         WindowGroup {
             MacRootView()
+                .frame(minWidth: 980, minHeight: 680)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .background(MacWindowConfigurator())
                 .onOpenURL { url in
                     StatusOAuthCallbackRouter.publish(url)
                 }
         }
-        .windowStyle(.titleBar)
 
         WindowGroup("App Settings", id: "integration-settings", for: String.self) { $settingsRoute in
             if let settingsRoute {
@@ -24,7 +26,6 @@ struct StatusMacApp: App {
                     }
             }
         }
-        .windowStyle(.titleBar)
     }
 }
 
@@ -38,6 +39,8 @@ private struct MacPluginSettingsWindow: View {
             initialAccountID: route.accountID
         )
         .frame(minWidth: 640, minHeight: 520)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .background(MacWindowConfigurator())
         .navigationTitle("App Settings")
     }
 
@@ -264,6 +267,31 @@ private struct MacPluginSettingsWindow: View {
     }
 }
 
+private struct MacWindowConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            configure(window: view.window)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            configure(window: nsView.window)
+        }
+    }
+
+    private func configure(window: NSWindow?) {
+        guard let window else { return }
+        window.isOpaque = true
+        window.backgroundColor = .windowBackgroundColor
+        window.titlebarAppearsTransparent = false
+        window.contentView?.wantsLayer = true
+        window.contentView?.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+    }
+}
+
 private struct MacPluginSettingsRoute: Equatable {
     var pluginID: String
     var accountID: String?
@@ -433,6 +461,7 @@ private struct MacRootView: View {
                     .navigationTitle("Settings")
             }
         }
+        .background(Color(nsColor: .windowBackgroundColor))
         .task {
             loadSidebarPlugins()
             await runBackgroundPluginLoop()
@@ -447,18 +476,6 @@ private struct MacRootView: View {
                 .filter(\.enabled)
                 .flatMap { plugin in
                     let accounts = try store.accountConfigurations(pluginID: plugin.id)
-                    if accounts.isEmpty {
-                        return [
-                            SidebarApp(
-                                pluginID: plugin.id,
-                                accountID: nil,
-                                name: plugin.name,
-                                iconPath: plugin.iconPath,
-                                iconAsset: plugin.iconAsset,
-                                accentColor: plugin.accentColor
-                            )
-                        ]
-                    }
                     return accounts.map { account in
                         SidebarApp(
                             pluginID: plugin.id,

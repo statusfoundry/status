@@ -243,12 +243,6 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
         var jobs: [JobRecord] = []
         for var trigger in try store.triggers() where isDueCronTrigger(trigger, at: now) {
             guard try hasGrantedPermission(pluginID: trigger.pluginID, permission: .backgroundRefresh) else {
-                try insertSkippedTriggerAudit(
-                    trigger,
-                    reason: "background_refresh_permission",
-                    detail: "Status skipped \(trigger.label) because \(trigger.pluginID) does not have background refresh permission.",
-                    at: now
-                )
                 continue
             }
             guard let requestID = trigger.requestID else {
@@ -262,12 +256,6 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
             }
             let accountIDs = try configuredAccountIDs(for: trigger)
             guard accountIDs.isEmpty == false else {
-                try insertSkippedTriggerAudit(
-                    trigger,
-                    reason: "account_missing",
-                    detail: "Status skipped \(trigger.label) because no configured account is available for \(trigger.pluginID).",
-                    at: now
-                )
                 continue
             }
             for accountID in accountIDs {

@@ -1169,7 +1169,7 @@ public final class StatusPersistenceStore {
     }
 
     public func integrationSummaries() throws -> [IntegrationSummary] {
-        let accountSummaries = try database.query(
+        try database.query(
             """
             SELECT a.id, a.plugin_id AS provider, a.display_name, a.status, a.last_error, a.last_refreshed_at, p.installed_version
             FROM accounts a
@@ -1177,24 +1177,6 @@ public final class StatusPersistenceStore {
             ORDER BY a.display_name ASC, a.id ASC
             """
         ).map(integrationSummary(from:))
-        let pluginSummaries = try database.query(
-            """
-            SELECT id, name, enabled, installed_version
-            FROM plugins
-            WHERE NOT EXISTS (
-              SELECT 1 FROM accounts WHERE accounts.plugin_id = plugins.id
-            )
-            ORDER BY name ASC, id ASC
-            """
-        ).map(installedPluginIntegrationSummary(from:))
-
-        return (accountSummaries + pluginSummaries).sorted { lhs, rhs in
-            let comparison = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
-            if comparison == .orderedSame {
-                return lhs.id < rhs.id
-            }
-            return comparison == .orderedAscending
-        }
     }
 
     public func dashboardSnapshot(now: Date = Date()) throws -> DashboardSnapshot {
@@ -1202,7 +1184,7 @@ public final class StatusPersistenceStore {
         let events = try recentEvents(limit: 10)
         let metrics = try metrics()
         let integrations = try integrationSummaries()
-        let audit = try auditEntries(limit: 10)
+        let audit = try dashboardAuditEntries(limit: 10)
 
         return DashboardSnapshot(
             headline: dashboardHeadline(statusItems: items, integrations: integrations),
@@ -1219,6 +1201,15 @@ public final class StatusPersistenceStore {
             integrations: integrations,
             auditEntries: audit
         )
+    }
+
+    private func dashboardAuditEntries(limit: Int) throws -> [AuditEntry] {
+        let candidates = try auditEntries(limit: max(limit * 3, limit))
+        return Array(candidates.filter(shouldShowAuditEntryOnDashboard(_:)).prefix(limit))
+    }
+
+    private func shouldShowAuditEntryOnDashboard(_ entry: AuditEntry) -> Bool {
+        !(entry.status == "skipped" && entry.title == "Plugin trigger skipped")
     }
 
     public func installPlugin(_ record: PluginInstallRecord) throws {

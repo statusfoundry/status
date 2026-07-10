@@ -724,7 +724,7 @@ import Testing
     #expect(try service.enqueueDueConfiguredPluginJobs(now: now.addingTimeInterval(30)).isEmpty)
 }
 
-@Test func pluginRuntimeServiceAuditsSkippedCronTriggerWithoutBackgroundPermission() throws {
+@Test func pluginRuntimeServiceDoesNotAuditDeferredCronTriggerWithoutBackgroundPermission() throws {
     let database = try temporaryRuntimeDatabase()
     let store = StatusPersistenceStore(database: database)
     let now = Date(timeIntervalSince1970: 1_783_433_520)
@@ -804,13 +804,8 @@ import Testing
 
     let jobs = try service.enqueueDueConfiguredPluginJobs(now: now)
 
-    let audit = try #require(try store.auditEntry(
-        id: "aud_trg_com_status_website_poll_site_skipped_background_refresh_permission"
-    ))
     #expect(jobs.isEmpty)
-    #expect(audit.status == "skipped")
-    #expect(audit.title == "Plugin trigger skipped")
-    #expect(audit.detail == "Status skipped Check website uptime because com.status.website does not have background refresh permission.")
+    #expect(try store.auditEntries().isEmpty)
     #expect(try store.trigger(id: "trg_com_status_website_poll_site")?.nextRunAt == nil)
 }
 

@@ -873,7 +873,7 @@ import Testing
     #expect(snapshot == .empty)
 }
 
-@Test func dashboardSnapshotShowsInstalledPluginsBeforeAccountSetup() throws {
+@Test func dashboardSnapshotDoesNotTreatInstalledPluginsAsConfiguredApps() throws {
     let database = try temporaryDatabase()
     try StatusDatabaseMigrator.migrate(database)
     let store = StatusPersistenceStore(database: database)
@@ -910,18 +910,7 @@ import Testing
 
     let snapshot = try store.dashboardSnapshot(now: now)
 
-    #expect(snapshot.headline == "Everything tracked is okay")
-    #expect(snapshot.summary == "1 app tracked, 0 recent events, no open attention items.")
-    #expect(snapshot.integrations == [
-        IntegrationSummary(
-            id: manifest.id,
-            name: manifest.name,
-            provider: manifest.id,
-            state: "Setup needed",
-            severity: .notice,
-            lastSyncDescription: "Never synced"
-        )
-    ])
+    #expect(snapshot == .empty)
 }
 
 @Test func dashboardSnapshotReadsPersistedRows() throws {
@@ -983,6 +972,35 @@ import Testing
     #expect(snapshot.metrics.map(\.label) == ["Review state"])
     #expect(snapshot.integrations.map(\.name) == ["Example Account"])
     #expect(snapshot.auditEntries == [audit])
+}
+
+@Test func dashboardSnapshotFiltersDeferredPluginTriggerAuditNoise() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let skipped = AuditEntry(
+        id: "aud_trigger_skipped",
+        title: "Plugin trigger skipped",
+        detail: "Status skipped Check workflow runs because no configured account is available.",
+        timestamp: now,
+        status: "skipped"
+    )
+    let meaningful = AuditEntry(
+        id: "aud_event_ingested",
+        title: "Event ingested",
+        detail: "github.workflow.failed entered the event pipeline.",
+        timestamp: now.addingTimeInterval(-1),
+        status: "success"
+    )
+
+    try store.insertAuditEntry(skipped)
+    try store.insertAuditEntry(meaningful)
+
+    let snapshot = try store.dashboardSnapshot(now: now)
+
+    #expect(snapshot.auditEntries == [meaningful])
+    #expect(try store.auditEntries(limit: 2) == [skipped, meaningful])
 }
 
 @Test func dashboardSnapshotShowsConfiguredAppTileFields() throws {
