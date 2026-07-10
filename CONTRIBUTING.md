@@ -44,12 +44,15 @@ Use Conventional Commits:
 
 Public plugin upload is not supported in v1. Third-party plugins use pull request review.
 
+Read `docs/22-plugin-governance.md` before proposing a new plugin or changing registry publication rules.
+
 Plugin submissions must:
 
 - be declarative data only;
 - declare all domains and permissions;
 - avoid arbitrary executable code;
 - avoid plugin-owned UI;
+- include a complete `README.md` based on `plugins/README.template.md`;
 - include fixtures where mappings are added;
 - pass `npm run plugins:build` and `npm run check`;
 - be reviewed before they are signed or published.

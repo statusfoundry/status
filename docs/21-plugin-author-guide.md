@@ -173,6 +173,8 @@ See `docs/18-testing.md` for fixture layout and golden-test expectations.
 
 v1 has no public upload form and no self-service publishing.
 
+Status uses the governance model in `docs/22-plugin-governance.md`: source-first pull requests, CI validation, maintainer/security review, Status signatures, immutable R2 artifacts, and registry metadata updates. External upload endpoints may exist later as intake tools, but they must not publish directly to the installable registry.
+
 Submission path:
 
 ```txt
@@ -204,4 +206,5 @@ Only `official` and `verified-third-party` packages appear in the hosted registr
 - `docs/16-mapping-language.md` — mapping language
 - `docs/18-testing.md` — fixtures and CI expectations
 - `docs/19-cloudflare-platform.md` — registry hosting and review flow
+- `docs/22-plugin-governance.md` — repository, trust, review, signing, and publication rules
 - `CONTRIBUTING.md` — repository contribution rules

@@ -79,6 +79,16 @@ const devBemm = useBemm('developers-guide', { return: 'string' })
               </div>
             </article>
 
+            <article :class="[bemm('card'), devBemm('card'), devBemm('card', 'wide')]">
+              <h2>Governance model</h2>
+              <div :class="devBemm('split-list')">
+                <section v-for="item in guide.governance" :key="item.title">
+                  <h3>{{ item.title }}</h3>
+                  <p>{{ item.body }}</p>
+                </section>
+              </div>
+            </article>
+
             <article :class="[bemm('card'), devBemm('card')]">
               <h2>Submission path</h2>
               <ol :class="devBemm('workflow')">

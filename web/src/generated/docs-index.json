@@ -88,6 +88,14 @@
       "sourcePath": "docs/21-plugin-author-guide.md",
       "sourceUrl": "https://github.com/statusfoundry/status/blob/main/docs/21-plugin-author-guide.md",
       "summary": "How to copy the example template, validate a plugin locally, test in Developer Mode, and submit for registry review."
+    },
+    {
+      "slug": "plugin-governance",
+      "title": "Plugin Governance",
+      "path": "/docs/plugin-governance/",
+      "sourcePath": "docs/22-plugin-governance.md",
+      "sourceUrl": "https://github.com/statusfoundry/status/blob/main/docs/22-plugin-governance.md",
+      "summary": "Repository model, trust levels, third-party review path, signing, publication, and revocation rules for Status plugins."
     }
   ]
 }

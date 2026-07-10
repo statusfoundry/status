@@ -10,6 +10,7 @@ export const PUBLISHED_DOC_SOURCES = [
   { slug: 'cloudflare-platform', sourcePath: 'docs/19-cloudflare-platform.md' },
   { slug: 'handoff-checklist', sourcePath: 'docs/20-handoff-checklist.md' },
   { slug: 'plugin-author-guide', sourcePath: 'docs/21-plugin-author-guide.md' },
+  { slug: 'plugin-governance', sourcePath: 'docs/22-plugin-governance.md' },
 ];
 
 export function buildDocPathMap(sources = PUBLISHED_DOC_SOURCES) {

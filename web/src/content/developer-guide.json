@@ -52,6 +52,20 @@
       "body": "Cloudflare R2 stores immutable .statusplugin.zip packages, checksums, signatures, manifests, and registry snapshots. Published versions are never overwritten."
     }
   ],
+  "governance": [
+    {
+      "title": "Canonical source",
+      "body": "statusfoundry/status is the source of truth for the app, website, registry, schemas, docs, bundled official plugins, examples, and CI."
+    },
+    {
+      "title": "Monorepo first",
+      "body": "Official plugins start in the main repository so schemas, fixtures, docs, registry metadata, and app-owned views can be reviewed together."
+    },
+    {
+      "title": "Optional splits later",
+      "body": "Separate status-plugin-{provider} repositories are reserved for large official plugins with independent maintainers or release cycles."
+    }
+  ],
   "submission": [
     {
       "title": "No public upload in v1",
@@ -117,6 +131,7 @@
   ],
   "relatedDocs": [
     { "slug": "plugin-author-guide", "label": "Full author guide" },
+    { "slug": "plugin-governance", "label": "Plugin governance" },
     { "slug": "plugin-system", "label": "Plugin system reference" },
     { "slug": "testing", "label": "Fixtures and CI expectations" },
     { "slug": "cloudflare-platform", "label": "Registry review and hosting" }

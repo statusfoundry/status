@@ -4,6 +4,8 @@ The plugin system is the main extensibility layer of Status.
 
 Plugins are declarative integration packages. They do not own UI. They do not run arbitrary native code. They describe how Status can connect to a service, fetch or receive data, normalize it into common objects, and optionally perform controlled actions.
 
+Publication follows `docs/22-plugin-governance.md`: v1 uses source-first pull requests, CI validation, maintainer/security review, Status signatures, immutable R2 artifacts, and registry metadata updates. There is no direct public upload path into the installable registry.
+
 ## Core principle
 
 ```txt

@@ -67,6 +67,11 @@ const documents = [
     sourcePath: 'docs/21-plugin-author-guide.md',
     summary: 'How to copy the example template, validate a plugin locally, test in Developer Mode, and submit for registry review.',
   },
+  {
+    slug: 'plugin-governance',
+    sourcePath: 'docs/22-plugin-governance.md',
+    summary: 'Repository model, trust levels, third-party review path, signing, publication, and revocation rules for Status plugins.',
+  },
 ];
 
 function titleFromMarkdown(markdown, fallback) {
