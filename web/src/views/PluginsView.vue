@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useBemm } from 'bemm'
 import SiteLayout from '@/components/SiteLayout.vue'
+import PluginIcon from '@/components/PluginIcon.vue'
 import pluginsData from '@/generated/plugins.json'
 import registryData from '@/generated/registry.json'
 
@@ -15,6 +16,7 @@ type PluginDoc = (typeof pluginsData.plugins)[number]
 const plugins = registryData.plugins.map((plugin) => ({
   ...plugin,
   author: pluginDocsById[plugin.id]?.author ?? plugin.author,
+  iconSvg: pluginDocsById[plugin.id]?.iconSvg ?? null,
 }))
 const templatePlugins = pluginsData.plugins.filter((plugin) => plugin.published === false)
 const registryChecks = [
@@ -83,7 +85,13 @@ function templateTrustLabel(plugin: PluginDoc) {
           <div :class="directoryBemm()" aria-label="Plugin directory">
             <article v-for="plugin in plugins" :key="plugin.id" :class="directoryBemm('item')">
               <div :class="directoryBemm('head')">
-                <div>
+                <PluginIcon
+                  :name="plugin.name"
+                  :accent-color="plugin.accentColor"
+                  :icon-svg="plugin.iconSvg"
+                  size="md"
+                />
+                <div :class="directoryBemm('head-text')">
                   <h2>{{ plugin.name }}</h2>
                   <p>{{ plugin.summary }}</p>
                   <p v-if="plugin.author?.name" :class="directoryBemm('author')">
@@ -123,7 +131,13 @@ function templateTrustLabel(plugin: PluginDoc) {
             <h2 :class="directoryBemm('section-title')">Templates and examples</h2>
             <article v-for="plugin in templatePlugins" :key="plugin.id" :class="directoryBemm('item')">
               <div :class="directoryBemm('head')">
-                <div>
+                <PluginIcon
+                  :name="plugin.name"
+                  :accent-color="plugin.accentColor"
+                  :icon-svg="plugin.iconSvg"
+                  size="md"
+                />
+                <div :class="directoryBemm('head-text')">
                   <h3>{{ plugin.name }}</h3>
                   <p>{{ plugin.summary }}</p>
                 </div>
@@ -165,8 +179,14 @@ function templateTrustLabel(plugin: PluginDoc) {
     align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-m);
+  }
 
-    h2 {
+  &__head-text {
+    flex: 1;
+    min-width: 0;
+
+    h2,
+    h3 {
       margin: 0;
       font-size: var(--font-size-lg);
       font-weight: var(--font-weight-semibold);
@@ -229,6 +249,11 @@ function templateTrustLabel(plugin: PluginDoc) {
     &__meta {
       grid-template-columns: 1fr;
       display: grid;
+    }
+
+    &__head {
+      display: flex;
+      flex-wrap: wrap;
     }
   }
 }

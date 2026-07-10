@@ -7,6 +7,9 @@
       "summary": "Track app review, builds, and release status.",
       "description": "Read-only App Store Connect status events for apps, review state, build processing, and release readiness.",
       "category": "developer",
+      "icon": "sf:app.badge",
+      "accentColor": "#2F80ED",
+      "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"App Store Connect\">\n  <defs>\n    <linearGradient id=\"status-appstoreconnect-bg\" x1=\"10\" y1=\"58\" x2=\"56\" y2=\"8\" gradientUnits=\"userSpaceOnUse\">\n      <stop offset=\"0\" stop-color=\"#0A64FF\"/>\n      <stop offset=\"1\" stop-color=\"#69D2FF\"/>\n    </linearGradient>\n  </defs>\n  <rect width=\"64\" height=\"64\" rx=\"14\" fill=\"url(#status-appstoreconnect-bg)\"/>\n  <path d=\"M21.5 43.5h21\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"6\" stroke-linecap=\"round\"/>\n  <path d=\"M28.5 43.5 39.8 24\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"6\" stroke-linecap=\"round\"/>\n  <path d=\"M35.5 43.5 24.2 24\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"6\" stroke-linecap=\"round\"/>\n  <path d=\"M32 20.5v-2\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"5\" stroke-linecap=\"round\"/>\n  <circle cx=\"47.5\" cy=\"18.5\" r=\"5.5\" fill=\"#FFFFFF\" opacity=\".92\"/>\n</svg>",
       "author": {
         "name": "Status Foundry",
         "publisherId": "status-foundry",
@@ -35,6 +38,68 @@
       "websitePath": "/plugins/com.status.appstoreconnect/",
       "readmeTitle": "App Store Connect",
       "readmeHtml": "<p>Read-only App Store Connect status events for apps, review state, build processing, and release readiness.</p>\n<h2 id=\"why-install-this-plugin\" class=\"nizel-docs-heading\">Why install this plugin</h2>\n<p>Install App Store Connect when you ship iOS or macOS apps and need review rejections and release readiness changes to reach you through Status — not buried in App Store Connect email or tabs. Status turns app version state into events you can route to inbox, digest, or immediate notifications.</p>\n<h2 id=\"what-you-configure\" class=\"nizel-docs-heading\">What you configure</h2>\n<p>Create one configured app per App Store Connect app:</p>\n<ul>\n<li><strong>App ID</strong> — the App Store Connect app identifier to monitor</li>\n</ul>\n<p>Auth uses App Store Connect API key material (<code class=\"nizel-code\">issuerId</code>, <code class=\"nizel-code\">keyId</code>, <code class=\"nizel-code\">.p8</code> private key) stored in Keychain.</p>\n<h2 id=\"what-it-exposes\" class=\"nizel-docs-heading\">What it exposes</h2>\n<h3 id=\"resources\">Resources</h3>\n<ul>\n<li><strong>app</strong> — the configured App Store Connect app and its version/review context</li>\n</ul>\n<h3 id=\"events\">Events</h3>\n<table><thead><tr><th>Event</th><th>Meaning</th><th>Default notification</th></tr></thead><tbody><tr><td><code class=\"nizel-code\">app.review.rejected</code></td><td>An App Store version moved into a rejected review state</td><td>Immediate</td></tr><tr><td><code class=\"nizel-code\">app.version.ready_for_sale</code></td><td>An App Store version is ready for sale</td><td>Digest</td></tr></tbody></table>\n<h3 id=\"views\">Views</h3>\n<ul>\n<li><strong>Apps</strong> — overview of configured apps and version state</li>\n<li><strong>App detail</strong> — version and review fields for the selected app</li>\n</ul>\n<h3 id=\"checks\">Checks</h3>\n<ul>\n<li><strong>Check app review status</strong> — cron schedule every 20 minutes</li>\n<li><strong>Refresh apps</strong> — manual refresh of app list and version state</li>\n</ul>\n<h2 id=\"suggested-automations\" class=\"nizel-docs-heading\">Suggested automations</h2>\n<p>Suggested rules ship disabled. Enable presets if you want review rejection events in the inbox or as immediate notifications.</p>\n<h2 id=\"actions\" class=\"nizel-docs-heading\">Actions</h2>\n<p>Read-only in v1. Status does not submit builds, edit metadata, or reply to App Review automatically.</p>\n<h2 id=\"permissions-and-domains\" class=\"nizel-docs-heading\">Permissions and domains</h2>\n<ul>\n<li><code class=\"nizel-code\">network</code> — call App Store Connect HTTPS APIs</li>\n<li><code class=\"nizel-code\">keychain</code> — store API key references and secrets</li>\n<li><code class=\"nizel-code\">private-key</code> — use the App Store Connect <code class=\"nizel-code\">.p8</code> signing key</li>\n<li><code class=\"nizel-code\">background-refresh</code> — run scheduled review checks</li>\n<li><strong>Domains:</strong> <code class=\"nizel-code\">api.appstoreconnect.apple.com</code></li>\n</ul>\n<h2 id=\"what-it-does-not-do\" class=\"nizel-docs-heading\">What it does not do</h2>\n<ul>\n<li>Does not submit builds or change App Store metadata</li>\n<li>Does not reply to App Review on your behalf</li>\n<li>Does not replace App Store Connect for deep release management</li>\n</ul>\n<h2 id=\"setup\" class=\"nizel-docs-heading\">Setup</h2>\n<ol>\n<li>Install <strong>App Store Connect</strong> from the Status plugin store.</li>\n<li>Create a configured app and enter the App Store Connect app ID.</li>\n<li>Add API key credentials with access to the app.</li>\n<li>Grant network, keychain, private-key, and background refresh permissions.</li>\n<li>Run <strong>Refresh apps</strong>, then enable <strong>Check app review status</strong> for scheduled polling.</li>\n</ol>",
+      "readmeToc": [
+        {
+          "id": "why-install-this-plugin",
+          "text": "Why install this plugin",
+          "depth": 2
+        },
+        {
+          "id": "what-you-configure",
+          "text": "What you configure",
+          "depth": 2
+        },
+        {
+          "id": "what-it-exposes",
+          "text": "What it exposes",
+          "depth": 2
+        },
+        {
+          "id": "resources",
+          "text": "Resources",
+          "depth": 3
+        },
+        {
+          "id": "events",
+          "text": "Events",
+          "depth": 3
+        },
+        {
+          "id": "views",
+          "text": "Views",
+          "depth": 3
+        },
+        {
+          "id": "checks",
+          "text": "Checks",
+          "depth": 3
+        },
+        {
+          "id": "suggested-automations",
+          "text": "Suggested automations",
+          "depth": 2
+        },
+        {
+          "id": "actions",
+          "text": "Actions",
+          "depth": 2
+        },
+        {
+          "id": "permissions-and-domains",
+          "text": "Permissions and domains",
+          "depth": 2
+        },
+        {
+          "id": "what-it-does-not-do",
+          "text": "What it does not do",
+          "depth": 2
+        },
+        {
+          "id": "setup",
+          "text": "Setup",
+          "depth": 2
+        }
+      ],
       "published": true
     },
     {
@@ -43,6 +108,9 @@
       "summary": "Track workflow failures, pull requests, and issue activity.",
       "description": "Read-only GitHub repository events for workflow failures, pull requests, and issue activity.",
       "category": "developer",
+      "icon": "sf:chevron.left.forwardslash.chevron.right",
+      "accentColor": "#4B5563",
+      "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"GitHub\">\n  <rect width=\"64\" height=\"64\" rx=\"14\" fill=\"#181A20\"/>\n  <path fill=\"#FFFFFF\" d=\"M32 11.2c-11.8 0-21.4 9.6-21.4 21.4 0 9.4 6.1 17.4 14.6 20.3 1.1.2 1.5-.5 1.5-1v-3.7c-5.9 1.3-7.2-2.5-7.2-2.5-1-2.4-2.4-3.1-2.4-3.1-2-1.4.1-1.4.1-1.4 2.2.2 3.4 2.3 3.4 2.3 2 3.4 5.2 2.4 6.4 1.8.2-1.4.8-2.4 1.4-2.9-4.7-.5-9.7-2.4-9.7-10.6 0-2.3.8-4.3 2.2-5.8-.2-.5-1-2.7.2-5.7 0 0 1.9-.6 6 2.2 1.7-.5 3.5-.7 5.3-.7s3.6.2 5.3.7c4.1-2.8 6-2.2 6-2.2 1.2 3 .4 5.2.2 5.7 1.4 1.5 2.2 3.5 2.2 5.8 0 8.2-5 10-9.7 10.6.8.7 1.5 2 1.5 4v5.9c0 .6.4 1.2 1.5 1 8.5-2.8 14.6-10.8 14.6-20.3 0-11.8-9.6-21.4-21.4-21.4Z\"/>\n</svg>",
       "author": {
         "name": "Status Foundry",
         "publisherId": "status-foundry",
@@ -70,6 +138,68 @@
       "websitePath": "/plugins/com.status.github/",
       "readmeTitle": "GitHub",
       "readmeHtml": "<p>Read-only GitHub repository events for workflow failures, pull requests, and issue activity.</p>\n<h2 id=\"why-install-this-plugin\" class=\"nizel-docs-heading\">Why install this plugin</h2>\n<p>Install GitHub when you need a calm operational signal above your repositories — especially failing workflows and fresh pull request activity — without living inside the GitHub UI. Status normalizes repository state into events, inbox items, and native views so you can see what changed and open the provider when action is needed.</p>\n<h2 id=\"what-you-configure\" class=\"nizel-docs-heading\">What you configure</h2>\n<p>Create one configured app per repository you want to watch:</p>\n<ul>\n<li><strong>Owner</strong> — GitHub user or organization name</li>\n<li><strong>Repository</strong> — repository name</li>\n</ul>\n<p>Status stores a GitHub personal access token in Keychain when you complete auth setup. The plugin only calls declared <code class=\"nizel-code\">api.github.com</code> endpoints.</p>\n<h2 id=\"what-it-exposes\" class=\"nizel-docs-heading\">What it exposes</h2>\n<h3 id=\"resources\">Resources</h3>\n<ul>\n<li><strong>repository</strong> — the tracked repository and its latest activity context</li>\n</ul>\n<h3 id=\"events\">Events</h3>\n<table><thead><tr><th>Event</th><th>Meaning</th><th>Default notification</th></tr></thead><tbody><tr><td><code class=\"nizel-code\">github.workflow.failed</code></td><td>A GitHub Actions workflow run completed with a failure</td><td>Dashboard only</td></tr><tr><td><code class=\"nizel-code\">github.pull_request.opened</code></td><td>A pull request was opened on the tracked repository</td><td>Digest</td></tr></tbody></table>\n<h3 id=\"views\">Views</h3>\n<ul>\n<li><strong>Repositories</strong> — resource list of tracked repositories</li>\n<li><strong>Recent Repository Activity</strong> — timeline of recent repository activity</li>\n</ul>\n<h3 id=\"checks\">Checks</h3>\n<ul>\n<li><strong>Check workflow runs</strong> — cron schedule every 15 minutes</li>\n<li><strong>Refresh repository activity</strong> — manual refresh on demand</li>\n</ul>\n<h2 id=\"suggested-automations\" class=\"nizel-docs-heading\">Suggested automations</h2>\n<ul>\n<li><strong>Notify on failed workflows</strong> — adds workflow failures to the Status inbox and can show a local notification when you enable the preset</li>\n</ul>\n<p>All suggested rules install disabled.</p>\n<h2 id=\"actions\" class=\"nizel-docs-heading\">Actions</h2>\n<p>Read-only in v1. No merge, close, or branch mutation actions.</p>\n<h2 id=\"permissions-and-domains\" class=\"nizel-docs-heading\">Permissions and domains</h2>\n<ul>\n<li><code class=\"nizel-code\">network</code> — poll GitHub HTTPS APIs</li>\n<li><code class=\"nizel-code\">keychain</code> — store the GitHub token securely</li>\n<li><code class=\"nizel-code\">background-refresh</code> — run scheduled workflow checks</li>\n<li><strong>Domains:</strong> <code class=\"nizel-code\">api.github.com</code></li>\n</ul>\n<h2 id=\"what-it-does-not-do\" class=\"nizel-docs-heading\">What it does not do</h2>\n<ul>\n<li>Does not replace the GitHub dashboard or Actions UI</li>\n<li>Does not merge pull requests, close issues, or modify branches</li>\n<li>Does not receive webhooks in the current package (polling only)</li>\n</ul>\n<h2 id=\"setup\" class=\"nizel-docs-heading\">Setup</h2>\n<ol>\n<li>Install <strong>GitHub</strong> from the Status plugin store.</li>\n<li>Create a configured app and enter owner and repository.</li>\n<li>Add a GitHub token with read access to the repository.</li>\n<li>Grant network and background refresh permissions.</li>\n<li>Run <strong>Refresh repository activity</strong>, then enable <strong>Check workflow runs</strong> if you want scheduled polling.</li>\n</ol>",
+      "readmeToc": [
+        {
+          "id": "why-install-this-plugin",
+          "text": "Why install this plugin",
+          "depth": 2
+        },
+        {
+          "id": "what-you-configure",
+          "text": "What you configure",
+          "depth": 2
+        },
+        {
+          "id": "what-it-exposes",
+          "text": "What it exposes",
+          "depth": 2
+        },
+        {
+          "id": "resources",
+          "text": "Resources",
+          "depth": 3
+        },
+        {
+          "id": "events",
+          "text": "Events",
+          "depth": 3
+        },
+        {
+          "id": "views",
+          "text": "Views",
+          "depth": 3
+        },
+        {
+          "id": "checks",
+          "text": "Checks",
+          "depth": 3
+        },
+        {
+          "id": "suggested-automations",
+          "text": "Suggested automations",
+          "depth": 2
+        },
+        {
+          "id": "actions",
+          "text": "Actions",
+          "depth": 2
+        },
+        {
+          "id": "permissions-and-domains",
+          "text": "Permissions and domains",
+          "depth": 2
+        },
+        {
+          "id": "what-it-does-not-do",
+          "text": "What it does not do",
+          "depth": 2
+        },
+        {
+          "id": "setup",
+          "text": "Setup",
+          "depth": 2
+        }
+      ],
       "published": true
     },
     {
@@ -78,6 +208,9 @@
       "summary": "Track GitLab pipelines, merge requests, issues, and project activity.",
       "description": "Read-only GitLab project events for failed pipelines, merge requests, issues, and project activity.",
       "category": "developer",
+      "icon": "sf:shippingbox",
+      "accentColor": "#FC6D26",
+      "iconSvg": null,
       "author": {
         "name": "Status Foundry",
         "publisherId": "status-foundry",
@@ -105,6 +238,68 @@
       "websitePath": "/plugins/com.status.gitlab/",
       "readmeTitle": "GitLab",
       "readmeHtml": "<p>Read-only GitLab project events for failed pipelines, merge requests, issues, and project activity.</p>\n<h2 id=\"why-install-this-plugin\" class=\"nizel-docs-heading\">Why install this plugin</h2>\n<p>Install GitLab when you track delivery work in GitLab projects and want failed pipelines, new merge requests, and new issues to surface in Status alongside your other operational signals. The plugin links back to GitLab pages for deep work while Status owns notifications and inbox routing.</p>\n<h2 id=\"what-you-configure\" class=\"nizel-docs-heading\">What you configure</h2>\n<p>Create one configured app per GitLab project:</p>\n<ul>\n<li><strong>Project ID or URL-encoded path</strong> — numeric project ID (for example <code class=\"nizel-code\">278964</code>) or encoded namespace path (for example <code class=\"nizel-code\">group%2Fproject</code>)</li>\n</ul>\n<p>Status stores a GitLab <code class=\"nizel-code\">PRIVATE-TOKEN</code> in Keychain through the shared plugin auth flow.</p>\n<h2 id=\"what-it-exposes\" class=\"nizel-docs-heading\">What it exposes</h2>\n<h3 id=\"resources\">Resources</h3>\n<ul>\n<li><strong>project</strong> — the tracked GitLab project and its latest pipeline/activity context</li>\n</ul>\n<h3 id=\"events\">Events</h3>\n<table><thead><tr><th>Event</th><th>Meaning</th><th>Default notification</th></tr></thead><tbody><tr><td><code class=\"nizel-code\">gitlab.pipeline.failed</code></td><td>A project pipeline completed with a failed status</td><td>Dashboard only</td></tr><tr><td><code class=\"nizel-code\">gitlab.merge_request.opened</code></td><td>A merge request was opened on the tracked project</td><td>Digest</td></tr><tr><td><code class=\"nizel-code\">gitlab.issue.opened</code></td><td>An issue was opened on the tracked project</td><td>Digest</td></tr></tbody></table>\n<h3 id=\"views\">Views</h3>\n<ul>\n<li><strong>Projects</strong> — resource list of tracked GitLab projects</li>\n<li><strong>Recent Project Activity</strong> — timeline of recent project events</li>\n</ul>\n<h3 id=\"checks\">Checks</h3>\n<ul>\n<li><strong>Check pipelines</strong> — cron schedule every 15 minutes</li>\n<li><strong>Refresh project</strong> — manual project refresh</li>\n<li><strong>Refresh project activity</strong> — manual activity refresh</li>\n</ul>\n<h2 id=\"suggested-automations\" class=\"nizel-docs-heading\">Suggested automations</h2>\n<p>Suggested rules ship disabled. Enable presets after install if you want inbox or notification routing for failed pipelines.</p>\n<h2 id=\"actions\" class=\"nizel-docs-heading\">Actions</h2>\n<p>Read-only in v1. No pipeline retry, merge, or issue mutation actions.</p>\n<h2 id=\"permissions-and-domains\" class=\"nizel-docs-heading\">Permissions and domains</h2>\n<ul>\n<li><code class=\"nizel-code\">network</code> — call GitLab HTTPS APIs</li>\n<li><code class=\"nizel-code\">keychain</code> — store the private token securely</li>\n<li><code class=\"nizel-code\">background-refresh</code> — run scheduled pipeline checks</li>\n<li><strong>Domains:</strong> <code class=\"nizel-code\">gitlab.com</code></li>\n</ul>\n<h2 id=\"what-it-does-not-do\" class=\"nizel-docs-heading\">What it does not do</h2>\n<ul>\n<li>Does not replace GitLab's project dashboard</li>\n<li>Does not retry pipelines, merge requests, or modify issues automatically</li>\n<li>Does not support self-managed GitLab domains in this package yet</li>\n</ul>\n<h2 id=\"setup\" class=\"nizel-docs-heading\">Setup</h2>\n<ol>\n<li>Install <strong>GitLab</strong> from the Status plugin store.</li>\n<li>Create a configured app and enter the project ID or encoded path.</li>\n<li>Add a GitLab personal access token with read access to the project.</li>\n<li>Grant network and background refresh permissions.</li>\n<li>Run <strong>Refresh project</strong>, then enable <strong>Check pipelines</strong> for scheduled polling.</li>\n</ol>",
+      "readmeToc": [
+        {
+          "id": "why-install-this-plugin",
+          "text": "Why install this plugin",
+          "depth": 2
+        },
+        {
+          "id": "what-you-configure",
+          "text": "What you configure",
+          "depth": 2
+        },
+        {
+          "id": "what-it-exposes",
+          "text": "What it exposes",
+          "depth": 2
+        },
+        {
+          "id": "resources",
+          "text": "Resources",
+          "depth": 3
+        },
+        {
+          "id": "events",
+          "text": "Events",
+          "depth": 3
+        },
+        {
+          "id": "views",
+          "text": "Views",
+          "depth": 3
+        },
+        {
+          "id": "checks",
+          "text": "Checks",
+          "depth": 3
+        },
+        {
+          "id": "suggested-automations",
+          "text": "Suggested automations",
+          "depth": 2
+        },
+        {
+          "id": "actions",
+          "text": "Actions",
+          "depth": 2
+        },
+        {
+          "id": "permissions-and-domains",
+          "text": "Permissions and domains",
+          "depth": 2
+        },
+        {
+          "id": "what-it-does-not-do",
+          "text": "What it does not do",
+          "depth": 2
+        },
+        {
+          "id": "setup",
+          "text": "Setup",
+          "depth": 2
+        }
+      ],
       "published": true
     },
     {
@@ -113,6 +308,9 @@
       "summary": "Track Google Play reviews and low-rating app feedback.",
       "description": "Read-only Google Play Console status for Android app reviews, ratings, and release-facing signals.",
       "category": "developer",
+      "icon": "sf:play.square.stack",
+      "accentColor": "#34A853",
+      "iconSvg": null,
       "author": {
         "name": "Status Foundry",
         "publisherId": "status-foundry",
@@ -143,6 +341,28 @@
       "websitePath": "/plugins/com.status.googleplay/",
       "readmeTitle": "Google Play Plugin",
       "readmeHtml": "<p>The Google Play plugin is an official Status plugin for Android apps published through Google Play Console.</p>\n<p>It is read-only in Status v1. It does not reply to reviews, edit store listings, submit releases, change tracks, or modify billing state.</p>\n<h2 id=\"what-it-shows\" class=\"nizel-docs-heading\">What It Shows</h2>\n<ul>\n<li>recent Google Play reviews for a configured package name;</li>\n<li>review star ratings and reviewer language;</li>\n<li>app version and Android version fields when Google returns them;</li>\n<li>low-rating review events that can be routed to notifications or the Status inbox.</li>\n</ul>\n<h2 id=\"authentication\" class=\"nizel-docs-heading\">Authentication</h2>\n<p>This plugin uses Google OAuth 2 with PKCE. Status opens the Google authorization page, receives the <code class=\"nizel-code\">status://oauth/googleplay</code> callback, stores the token set in Keychain, and injects request authorization headers at runtime.</p>\n<p>The OAuth account must have access to the target app in Google Play Console.</p>\n<h2 id=\"setup\" class=\"nizel-docs-heading\">Setup</h2>\n<ol>\n<li>Install the Google Play plugin.</li>\n<li>Grant Network, Keychain, OAuth, and Background Refresh permissions.</li>\n<li>Connect a Google account through OAuth.</li>\n<li>Enter the Android package name, for example <code class=\"nizel-code\">com.example.app</code>.</li>\n<li>Save the app.</li>\n<li>Run a manual refresh or let the scheduled review check run.</li>\n</ol>\n<h2 id=\"boundaries\" class=\"nizel-docs-heading\">Boundaries</h2>\n<p>Status is not a replacement for Google Play Console. This plugin surfaces operational signals that are useful in a personal status dashboard and links back to the source system for deeper work.</p>\n<p>Official Status plugins should:</p>\n<ul>\n<li>use declarative requests and mappings only;</li>\n<li>keep write actions out of v1 unless the action is explicit, reversible, and audited;</li>\n<li>store tokens only through Status Keychain references;</li>\n<li>emit normalized resources, events, and metrics;</li>\n<li>document setup requirements and source-system permissions.</li>\n</ul>",
+      "readmeToc": [
+        {
+          "id": "what-it-shows",
+          "text": "What It Shows",
+          "depth": 2
+        },
+        {
+          "id": "authentication",
+          "text": "Authentication",
+          "depth": 2
+        },
+        {
+          "id": "setup",
+          "text": "Setup",
+          "depth": 2
+        },
+        {
+          "id": "boundaries",
+          "text": "Boundaries",
+          "depth": 2
+        }
+      ],
       "published": true
     },
     {
@@ -151,6 +371,9 @@
       "summary": "Track Jira project issues and create follow-up issues from Status automations.",
       "description": "Read Jira project issues and create controlled follow-up issues from Status rules.",
       "category": "developer",
+      "icon": "sf:checklist",
+      "accentColor": "#0C66E4",
+      "iconSvg": null,
       "author": {
         "name": "Status Foundry",
         "publisherId": "status-foundry",
@@ -178,6 +401,68 @@
       "websitePath": "/plugins/com.status.jira/",
       "readmeTitle": "Jira",
       "readmeHtml": "<p>Read Jira project issue status and create controlled follow-up issues from Status rules.</p>\n<h2 id=\"why-install-this-plugin\" class=\"nizel-docs-heading\">Why install this plugin</h2>\n<p>Install Jira when Status should show the important work state of a project and route follow-up from other apps into Jira. It is not a replacement for Jira boards or backlog planning; it is a compact operational view and a controlled action target.</p>\n<h2 id=\"what-you-configure\" class=\"nizel-docs-heading\">What you configure</h2>\n<p>Create one configured app per Jira project:</p>\n<ul>\n<li><strong>Atlassian site</strong> — your Jira Cloud hostname, for example <code class=\"nizel-code\">example.atlassian.net</code></li>\n<li><strong>Project key</strong> — the Jira project key, for example <code class=\"nizel-code\">STATUS</code></li>\n<li><strong>Atlassian email</strong> — the email for the Atlassian account</li>\n<li><strong>API token</strong> — an Atlassian API token for that account</li>\n</ul>\n<h2 id=\"what-it-exposes\" class=\"nizel-docs-heading\">What it exposes</h2>\n<h3 id=\"resources\">Resources</h3>\n<ul>\n<li><strong>jira_issue</strong> — recent issues in the configured project</li>\n</ul>\n<h3 id=\"events\">Events</h3>\n<table><thead><tr><th>Event</th><th>Meaning</th><th>Default notification</th></tr></thead><tbody><tr><td><code class=\"nizel-code\">jira.issue.open</code></td><td>A recent issue is still in a non-done status category</td><td>Dashboard only</td></tr></tbody></table>\n<h3 id=\"views\">Views</h3>\n<ul>\n<li><strong>Jira issues</strong> — recent issues with status, priority, assignee, and summary</li>\n<li><strong>Recent Jira issue activity</strong> — issue status and update activity</li>\n</ul>\n<h3 id=\"checks\">Checks</h3>\n<ul>\n<li><strong>Check Jira issues</strong> — cron schedule every 30 minutes</li>\n<li><strong>Refresh Jira issues</strong> — manual check on demand</li>\n</ul>\n<h2 id=\"suggested-automations\" class=\"nizel-docs-heading\">Suggested automations</h2>\n<p>Suggested rules ship disabled. Enable presets per configured app if you want open issue events added to the Status inbox.</p>\n<h2 id=\"actions\" class=\"nizel-docs-heading\">Actions</h2>\n<ul>\n<li><strong>Create Jira issue</strong> — controlled <code class=\"nizel-code\">jira.createIssue</code> action that creates a Task in the configured project after an explicit Status rule/action review and <code class=\"nizel-code\">write-actions</code> permission grant.</li>\n</ul>\n<h2 id=\"permissions-and-domains\" class=\"nizel-docs-heading\">Permissions and domains</h2>\n<ul>\n<li><code class=\"nizel-code\">network</code> — read and write Jira REST API data</li>\n<li><code class=\"nizel-code\">keychain</code> — store the Atlassian API token securely</li>\n<li><code class=\"nizel-code\">write-actions</code> — allow reviewed issue creation actions</li>\n<li><code class=\"nizel-code\">user-configured-domains</code> — call the Atlassian hostname entered during setup</li>\n<li><code class=\"nizel-code\">background-refresh</code> — run scheduled project checks</li>\n</ul>\n<h2 id=\"what-it-does-not-do\" class=\"nizel-docs-heading\">What it does not do</h2>\n<ul>\n<li>Does not replace Jira boards, reports, releases, or planning views</li>\n<li>Does not transition issues automatically in v1</li>\n<li>Does not delete issues, comments, or attachments</li>\n<li>Does not send Jira notifications directly</li>\n</ul>\n<h2 id=\"setup\" class=\"nizel-docs-heading\">Setup</h2>\n<ol>\n<li>In Atlassian, create an API token for the account that should read and create issues.</li>\n<li>Install <strong>Jira</strong> from the Status plugin store.</li>\n<li>Create a configured app with the Atlassian site, project key, email, and API token.</li>\n<li>Grant network, keychain, background refresh, and write action permissions as needed.</li>\n<li>Run <strong>Refresh Jira issues</strong> once, then choose dashboard tile fields in the app settings.</li>\n</ol>",
+      "readmeToc": [
+        {
+          "id": "why-install-this-plugin",
+          "text": "Why install this plugin",
+          "depth": 2
+        },
+        {
+          "id": "what-you-configure",
+          "text": "What you configure",
+          "depth": 2
+        },
+        {
+          "id": "what-it-exposes",
+          "text": "What it exposes",
+          "depth": 2
+        },
+        {
+          "id": "resources",
+          "text": "Resources",
+          "depth": 3
+        },
+        {
+          "id": "events",
+          "text": "Events",
+          "depth": 3
+        },
+        {
+          "id": "views",
+          "text": "Views",
+          "depth": 3
+        },
+        {
+          "id": "checks",
+          "text": "Checks",
+          "depth": 3
+        },
+        {
+          "id": "suggested-automations",
+          "text": "Suggested automations",
+          "depth": 2
+        },
+        {
+          "id": "actions",
+          "text": "Actions",
+          "depth": 2
+        },
+        {
+          "id": "permissions-and-domains",
+          "text": "Permissions and domains",
+          "depth": 2
+        },
+        {
+          "id": "what-it-does-not-do",
+          "text": "What it does not do",
+          "depth": 2
+        },
+        {
+          "id": "setup",
+          "text": "Setup",
+          "depth": 2
+        }
+      ],
       "published": true
     },
     {
@@ -186,6 +471,9 @@
       "summary": "Example declarative plugin package for operational status data.",
       "description": "Example declarative plugin package for operational status data.",
       "category": "example",
+      "icon": "sf:wrench.and.screwdriver",
+      "accentColor": "#8B5CF6",
+      "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"Mock Operations\">\n  <rect width=\"64\" height=\"64\" rx=\"14\" fill=\"#8B5CF6\"/>\n  <path d=\"M22 42 42 22\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"6\" stroke-linecap=\"round\"/>\n  <path d=\"M20 24 16 20l4-4 4 4\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <path d=\"m40 44 4 4 4-4-4-4\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <circle cx=\"43\" cy=\"21\" r=\"5\" fill=\"#FFFFFF\" opacity=\".9\"/>\n</svg>",
       "author": {
         "name": "Status Foundry",
         "publisherId": "status-foundry",
@@ -214,6 +502,88 @@
       "websitePath": "/plugins/com.status.example.mockops/",
       "readmeTitle": "Mock Operations",
       "readmeHtml": "<p>Example declarative plugin package for operational status data.</p>\n<h2 id=\"why-install-this-plugin\" class=\"nizel-docs-heading\">Why install this plugin</h2>\n<p>Install Mock Operations only for <strong>development and authoring</strong> — not for production monitoring. It demonstrates every v1 package file so plugin authors can validate schemas, preview fixture mappings in Developer Mode, and copy the structure for a real provider integration.</p>\n<h2 id=\"what-you-configure\" class=\"nizel-docs-heading\">What you configure</h2>\n<p>Example setup fields for a fictional service:</p>\n<ul>\n<li>Native setup schema with provider configuration placeholders</li>\n<li>Recorded fixtures instead of live API dependencies during tests</li>\n</ul>\n<h2 id=\"what-it-exposes\" class=\"nizel-docs-heading\">What it exposes</h2>\n<h3 id=\"resources\">Resources</h3>\n<ul>\n<li><strong>service</strong> — example operational service records from fixture data</li>\n</ul>\n<h3 id=\"events\">Events</h3>\n<table><thead><tr><th>Event</th><th>Meaning</th><th>Default notification</th></tr></thead><tbody><tr><td><code class=\"nizel-code\">mock.service.degraded</code></td><td>Example service entered a degraded state</td><td>Dashboard only</td></tr><tr><td><code class=\"nizel-code\">mock.service.recovered</code></td><td>Example service recovered</td><td>Digest</td></tr><tr><td><code class=\"nizel-code\">mock.error_rate.high</code></td><td>Example error rate crossed a threshold</td><td>Dashboard only</td></tr></tbody></table>\n<h3 id=\"views\">Views</h3>\n<ul>\n<li>Overview cards, resource lists, timelines, and alert list descriptors declared in <code class=\"nizel-code\">views.json</code></li>\n</ul>\n<h3 id=\"checks\">Checks</h3>\n<ul>\n<li>Manual and cron triggers declared in <code class=\"nizel-code\">triggers.json</code> for fixture-driven refresh flows</li>\n</ul>\n<h2 id=\"suggested-automations\" class=\"nizel-docs-heading\">Suggested automations</h2>\n<ul>\n<li>Example presets in <code class=\"nizel-code\">rules.presets.json</code> install disabled</li>\n<li>Demonstrates inbox and notification actions without enabling them by default</li>\n</ul>\n<h2 id=\"actions\" class=\"nizel-docs-heading\">Actions</h2>\n<p>Includes example write-action declarations for author education. Actions require explicit <code class=\"nizel-code\">write-actions</code> permission and user approval in Status.</p>\n<h2 id=\"permissions-and-domains\" class=\"nizel-docs-heading\">Permissions and domains</h2>\n<ul>\n<li><code class=\"nizel-code\">network</code> — example HTTPS requests to <code class=\"nizel-code\">example.com</code></li>\n<li><code class=\"nizel-code\">background-refresh</code> — example scheduled triggers</li>\n<li><code class=\"nizel-code\">local-notification-suggestion</code> — example notification presets</li>\n<li><code class=\"nizel-code\">write-actions</code> — example controlled write declarations</li>\n<li><strong>Domains:</strong> <code class=\"nizel-code\">example.com</code></li>\n</ul>\n<h2 id=\"what-it-does-not-do\" class=\"nizel-docs-heading\">What it does not do</h2>\n<ul>\n<li>Does not connect to a real production API in the template form</li>\n<li>Is not published to the registry as a trusted integration</li>\n<li>Must be adapted before use with a real provider</li>\n</ul>\n<h2 id=\"setup\" class=\"nizel-docs-heading\">Setup</h2>\n<h3 id=\"validate-in-the-monorepo\">Validate in the monorepo</h3>\n<pre class=\"shiki\" tabindex=\"0\"><code><span class=\"line\"><span>npm</span><span> run</span><span> plugins:validate-local</span><span> --</span><span> plugins/examples/mock-operations</span></span>\n<span class=\"line\"></span></code></pre>\n<h3 id=\"test-in-the-app\">Test in the app</h3>\n<ol>\n<li>Build and open StatusMac.</li>\n<li>Enable Developer Mode.</li>\n<li>Use <strong>Install Local</strong> and select this folder.</li>\n<li>Configure the plugin and run a manual trigger.</li>\n<li>Use <strong>Preview Fixture</strong> to inspect mapped output.</li>\n</ol>\n<h3 id=\"fork-friendly-template\">Fork-friendly template</h3>\n<p>A standalone copy lives at <code class=\"nizel-code\">status-plugin-example/</code> in the Status repository. Regenerate it with <code class=\"nizel-code\">npm run plugin-example:sync</code>.</p>\n<h2 id=\"submit-for-review\" class=\"nizel-docs-heading\">Submit for review</h2>\n<p>v1 has no public upload form. Open a pull request with fixtures and validation evidence when adapting this template for a real provider.</p>",
+      "readmeToc": [
+        {
+          "id": "why-install-this-plugin",
+          "text": "Why install this plugin",
+          "depth": 2
+        },
+        {
+          "id": "what-you-configure",
+          "text": "What you configure",
+          "depth": 2
+        },
+        {
+          "id": "what-it-exposes",
+          "text": "What it exposes",
+          "depth": 2
+        },
+        {
+          "id": "resources",
+          "text": "Resources",
+          "depth": 3
+        },
+        {
+          "id": "events",
+          "text": "Events",
+          "depth": 3
+        },
+        {
+          "id": "views",
+          "text": "Views",
+          "depth": 3
+        },
+        {
+          "id": "checks",
+          "text": "Checks",
+          "depth": 3
+        },
+        {
+          "id": "suggested-automations",
+          "text": "Suggested automations",
+          "depth": 2
+        },
+        {
+          "id": "actions",
+          "text": "Actions",
+          "depth": 2
+        },
+        {
+          "id": "permissions-and-domains",
+          "text": "Permissions and domains",
+          "depth": 2
+        },
+        {
+          "id": "what-it-does-not-do",
+          "text": "What it does not do",
+          "depth": 2
+        },
+        {
+          "id": "setup",
+          "text": "Setup",
+          "depth": 2
+        },
+        {
+          "id": "validate-in-the-monorepo",
+          "text": "Validate in the monorepo",
+          "depth": 3
+        },
+        {
+          "id": "test-in-the-app",
+          "text": "Test in the app",
+          "depth": 3
+        },
+        {
+          "id": "fork-friendly-template",
+          "text": "Fork-friendly template",
+          "depth": 3
+        },
+        {
+          "id": "submit-for-review",
+          "text": "Submit for review",
+          "depth": 2
+        }
+      ],
       "published": false
     },
     {
@@ -222,6 +592,9 @@
       "summary": "Track website health and response status.",
       "description": "Declarative uptime checks for sites and endpoints the user chooses to track.",
       "category": "monitoring",
+      "icon": "sf:globe",
+      "accentColor": "#16A34A",
+      "iconSvg": null,
       "author": {
         "name": "Status Foundry",
         "publisherId": "status-foundry",
@@ -247,6 +620,68 @@
       "websitePath": "/plugins/com.status.website/",
       "readmeTitle": "Website Uptime",
       "readmeHtml": "<p>Declarative uptime checks for sites and endpoints the user chooses to track.</p>\n<h2 id=\"why-install-this-plugin\" class=\"nizel-docs-heading\">Why install this plugin</h2>\n<p>Install Website Uptime when you want simple, local-first availability monitoring for hosts you care about — status pages, APIs, marketing sites, or internal endpoints — without standing up a separate uptime SaaS. Status emits clear down/recovered events and can notify you immediately when a site stops responding.</p>\n<h2 id=\"what-you-configure\" class=\"nizel-docs-heading\">What you configure</h2>\n<p>Create one configured app per host:</p>\n<ul>\n<li><strong>Host</strong> — hostname only, without <code class=\"nizel-code\">https://</code> or a path (for example <code class=\"nizel-code\">status-registry.hakobs.com</code>)</li>\n</ul>\n<p>No third-party API token is required. Checks run from your Mac or iOS device through declared HTTPS requests.</p>\n<h2 id=\"what-it-exposes\" class=\"nizel-docs-heading\">What it exposes</h2>\n<h3 id=\"resources\">Resources</h3>\n<ul>\n<li><strong>website</strong> — the tracked host and its latest health check result</li>\n</ul>\n<h3 id=\"events\">Events</h3>\n<table><thead><tr><th>Event</th><th>Meaning</th><th>Default notification</th></tr></thead><tbody><tr><td><code class=\"nizel-code\">website.down</code></td><td>The tracked site did not return a healthy response</td><td>Immediate</td></tr><tr><td><code class=\"nizel-code\">website.recovered</code></td><td>The tracked site returned to a healthy response</td><td>Digest</td></tr></tbody></table>\n<p>Down events can open a downtime incident closed by recovery events.</p>\n<h3 id=\"views\">Views</h3>\n<ul>\n<li><strong>Websites</strong> — list of tracked hosts with latest status fields</li>\n<li><strong>Website detail</strong> — latest check result and response context</li>\n</ul>\n<h3 id=\"checks\">Checks</h3>\n<ul>\n<li><strong>Check website uptime</strong> — cron schedule every 5 minutes</li>\n<li><strong>Refresh website status</strong> — manual check on demand</li>\n</ul>\n<h2 id=\"suggested-automations\" class=\"nizel-docs-heading\">Suggested automations</h2>\n<p>Suggested rules ship disabled. Enable presets if you want downtime routed to inbox or immediate notifications.</p>\n<h2 id=\"actions\" class=\"nizel-docs-heading\">Actions</h2>\n<p>Read-only in v1. The plugin checks endpoints; it does not modify DNS, hosting, or site content.</p>\n<h2 id=\"permissions-and-domains\" class=\"nizel-docs-heading\">Permissions and domains</h2>\n<ul>\n<li><code class=\"nizel-code\">network</code> — perform HTTPS health checks</li>\n<li><code class=\"nizel-code\">background-refresh</code> — run scheduled uptime polling</li>\n<li><code class=\"nizel-code\">user-configured-domains</code> — check hosts you enter during setup (no fixed provider domain list)</li>\n</ul>\n<h2 id=\"what-it-does-not-do\" class=\"nizel-docs-heading\">What it does not do</h2>\n<ul>\n<li>Does not replace full synthetic monitoring with multi-region probes</li>\n<li>Does not edit hosting, DNS, or TLS configuration</li>\n<li>Does not run from Status cloud infrastructure in v1 (checks originate on your device)</li>\n</ul>\n<h2 id=\"setup\" class=\"nizel-docs-heading\">Setup</h2>\n<ol>\n<li>Install <strong>Website Uptime</strong> from the Status plugin store.</li>\n<li>Create a configured app and enter the host to monitor.</li>\n<li>Grant network and background refresh permissions.</li>\n<li>Run <strong>Refresh website status</strong>, then enable <strong>Check website uptime</strong> for scheduled polling.</li>\n</ol>",
+      "readmeToc": [
+        {
+          "id": "why-install-this-plugin",
+          "text": "Why install this plugin",
+          "depth": 2
+        },
+        {
+          "id": "what-you-configure",
+          "text": "What you configure",
+          "depth": 2
+        },
+        {
+          "id": "what-it-exposes",
+          "text": "What it exposes",
+          "depth": 2
+        },
+        {
+          "id": "resources",
+          "text": "Resources",
+          "depth": 3
+        },
+        {
+          "id": "events",
+          "text": "Events",
+          "depth": 3
+        },
+        {
+          "id": "views",
+          "text": "Views",
+          "depth": 3
+        },
+        {
+          "id": "checks",
+          "text": "Checks",
+          "depth": 3
+        },
+        {
+          "id": "suggested-automations",
+          "text": "Suggested automations",
+          "depth": 2
+        },
+        {
+          "id": "actions",
+          "text": "Actions",
+          "depth": 2
+        },
+        {
+          "id": "permissions-and-domains",
+          "text": "Permissions and domains",
+          "depth": 2
+        },
+        {
+          "id": "what-it-does-not-do",
+          "text": "What it does not do",
+          "depth": 2
+        },
+        {
+          "id": "setup",
+          "text": "Setup",
+          "depth": 2
+        }
+      ],
       "published": true
     },
     {
@@ -255,6 +690,9 @@
       "summary": "Track YouTube channel status, latest uploads, and creator metrics.",
       "description": "Read-only YouTube channel status for creator accounts, latest uploads, subscriber counts, and channel-level signals.",
       "category": "content",
+      "icon": "sf:play.rectangle",
+      "accentColor": "#FF0033",
+      "iconSvg": null,
       "author": {
         "name": "Status Foundry",
         "publisherId": "status-foundry",
@@ -285,6 +723,33 @@
       "websitePath": "/plugins/com.status.youtube/",
       "readmeTitle": "YouTube",
       "readmeHtml": "<h2 id=\"why-install-this-plugin\" class=\"nizel-docs-heading\">Why install this plugin</h2>\n<p>Install YouTube when you want Status to keep a calm, read-only view of creator account health across your channels. It is designed for quick operational awareness: latest uploads, basic channel statistics, visibility state, and direct links back to YouTube Studio.</p>\n<p>Status does not replace YouTube Studio. The plugin only normalizes the small set of signals that help you notice what changed and where to act next.</p>\n<h2 id=\"what-status-shows\" class=\"nizel-docs-heading\">What Status shows</h2>\n<ul>\n<li>Connected channels and their current public/private visibility state.</li>\n<li>Subscriber, view, and video counts reported by the YouTube Data API.</li>\n<li>Recently published uploads for the connected Google account.</li>\n<li>Links back to YouTube Studio and the public video page.</li>\n<li>Dashboard and inbox signals when a channel is not public.</li>\n</ul>\n<h2 id=\"authentication\" class=\"nizel-docs-heading\">Authentication</h2>\n<p>This plugin uses Google OAuth 2 with PKCE. Status opens the provider authorization page, receives the <code class=\"nizel-code\">status://oauth/youtube</code> callback, stores the token set in Keychain, and injects request authorization headers at runtime.</p>\n<p>Required scope:</p>\n<pre class=\"shiki\" tabindex=\"0\"><code><span class=\"line\"><span>https://www.googleapis.com/auth/youtube.readonly</span></span>\n<span class=\"line\"><span></span></span></code></pre>\n<h2 id=\"setup\" class=\"nizel-docs-heading\">Setup</h2>\n<ol>\n<li>Install <strong>YouTube</strong> from the Status plugin catalog.</li>\n<li>Grant Network, Keychain, OAuth, and Background Refresh permissions.</li>\n<li>Open app settings and choose <strong>Connect YouTube</strong>.</li>\n<li>Sign in with the Google account that can view the channel.</li>\n<li>Save the app with a clear name, for example <code class=\"nizel-code\">Hakobs YouTube</code>.</li>\n</ol>\n<h2 id=\"boundaries\" class=\"nizel-docs-heading\">Boundaries</h2>\n<p>Read-only in v1. The plugin does not upload videos, edit metadata, delete comments, change visibility, manage monetization, or send messages.</p>",
+      "readmeToc": [
+        {
+          "id": "why-install-this-plugin",
+          "text": "Why install this plugin",
+          "depth": 2
+        },
+        {
+          "id": "what-status-shows",
+          "text": "What Status shows",
+          "depth": 2
+        },
+        {
+          "id": "authentication",
+          "text": "Authentication",
+          "depth": 2
+        },
+        {
+          "id": "setup",
+          "text": "Setup",
+          "depth": 2
+        },
+        {
+          "id": "boundaries",
+          "text": "Boundaries",
+          "depth": 2
+        }
+      ],
       "published": true
     }
   ]

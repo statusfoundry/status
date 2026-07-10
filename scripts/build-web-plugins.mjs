@@ -55,7 +55,21 @@ async function loadPluginDoc(pluginDirectory, publishers, { requireReadme }) {
   }
 
   const sourcePath = path.relative(root, readmePath).split(path.sep).join('/');
-  const { html: readmeHtml } = await renderMarkdown(readme, { stripTitle: true, docPathMap });
+  const { html: readmeHtml, toc: readmeToc } = await renderMarkdown(readme, { stripTitle: true, docPathMap });
+
+  let iconSvg = null;
+  try {
+    const iconPath = path.join(pluginDirectory, 'icon.svg');
+    const iconData = await readFile(iconPath, 'utf8');
+    const trimmed = iconData.trim();
+    if (trimmed.startsWith('<svg') && !/<script[\s>]/i.test(iconData) && !/\son[a-z]+\s*=/i.test(iconData) && !/<foreignObject[\s>]/i.test(iconData)) {
+      iconSvg = trimmed;
+    }
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      throw error;
+    }
+  }
 
   return {
     id: manifest.id,
@@ -63,6 +77,9 @@ async function loadPluginDoc(pluginDirectory, publishers, { requireReadme }) {
     summary,
     description: manifest.description,
     category: manifest.category,
+    icon: manifest.icon ?? null,
+    accentColor: manifest.accentColor ?? null,
+    iconSvg,
     author: resolveAuthor(manifest.author, publishers),
     version: manifest.version,
     trustLevel,
@@ -74,6 +91,7 @@ async function loadPluginDoc(pluginDirectory, publishers, { requireReadme }) {
     websitePath: `/plugins/${manifest.id}/`,
     readmeTitle: titleFromMarkdown(readme, manifest.name),
     readmeHtml,
+    readmeToc: readmeToc.map(({ id, text, depth }) => ({ id, text, depth })),
   };
 }
 
