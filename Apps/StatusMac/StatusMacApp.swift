@@ -334,9 +334,7 @@ private struct MacRootView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(sidebarApps) { app in
-                            Button {
-                                selection = .app(pluginID: app.pluginID, accountID: app.accountID)
-                            } label: {
+                            NavigationLink(value: MacSection.app(pluginID: app.pluginID, accountID: app.accountID)) {
                                 Label {
                                     Text(app.name)
                                         .lineLimit(1)
@@ -350,7 +348,6 @@ private struct MacRootView: View {
                                     )
                                 }
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }

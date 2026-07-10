@@ -49,26 +49,33 @@ private struct AttentionSection: View {
 
     var body: some View {
         SectionBlock(title: "Needs attention") {
-            VStack(spacing: 10) {
-                ForEach(items) { item in
-                    HStack(alignment: .top, spacing: 12) {
-                        SeverityDot(severity: item.severity)
-                            .padding(.top, 5)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.title)
-                                .font(.headline)
-                            Text(item.summary)
-                                .foregroundStyle(.secondary)
+            if items.isEmpty {
+                DashboardEmptyRow(
+                    title: "No open attention items",
+                    detail: "Status will show important changes here when connected apps report something that needs action."
+                )
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(items) { item in
+                        HStack(alignment: .top, spacing: 12) {
+                            SeverityDot(severity: item.severity)
+                                .padding(.top, 5)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.title)
+                                    .font(.headline)
+                                Text(item.summary)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 12)
+                            if let link = item.actionLink {
+                                Link(link.label, destination: link.url)
+                                    .font(.callout.weight(.semibold))
+                            }
                         }
-                        Spacer(minLength: 12)
-                        if let link = item.actionLink {
-                            Link(link.label, destination: link.url)
-                                .font(.callout.weight(.semibold))
-                        }
+                        .padding(16)
+                        .background(Color.statusSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    .padding(16)
-                    .background(Color.statusSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
         }
@@ -108,9 +115,16 @@ private struct AppSection: View {
 
     var body: some View {
         SectionBlock(title: "Apps") {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 12)], spacing: 12) {
-                ForEach(apps) { app in
-                    appTile(for: app)
+            if apps.isEmpty {
+                DashboardEmptyRow(
+                    title: "No apps configured",
+                    detail: "Set up an app from the Plugins catalog to start tracking resources, events, and dashboard tiles."
+                )
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 12)], spacing: 12) {
+                    ForEach(apps) { app in
+                        appTile(for: app)
+                    }
                 }
             }
         }
@@ -293,25 +307,32 @@ private struct EventSection: View {
 
     var body: some View {
         SectionBlock(title: "Recent events") {
-            VStack(spacing: 10) {
-                ForEach(events) { event in
-                    HStack(alignment: .top, spacing: 12) {
-                        SeverityDot(severity: event.severity)
-                            .padding(.top, 5)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(event.title)
-                                .font(.headline)
-                            Text(event.summary)
-                                .foregroundStyle(.secondary)
-                            Text(event.type)
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.tertiary)
+            if events.isEmpty {
+                DashboardEmptyRow(
+                    title: "No recent events",
+                    detail: "Manual refreshes and background checks will appear here once an app emits normalized events."
+                )
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(events) { event in
+                        HStack(alignment: .top, spacing: 12) {
+                            SeverityDot(severity: event.severity)
+                                .padding(.top, 5)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(event.title)
+                                    .font(.headline)
+                                Text(event.summary)
+                                    .foregroundStyle(.secondary)
+                                Text(event.type)
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Spacer()
                         }
-                        Spacer()
+                        .padding(14)
+                        .background(Color.statusSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    .padding(14)
-                    .background(Color.statusSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
         }
@@ -323,33 +344,40 @@ private struct AuditSection: View {
 
     var body: some View {
         SectionBlock(title: "Audit log") {
-            VStack(spacing: 10) {
-                ForEach(entries) { entry in
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Text(entry.title)
-                                .font(.headline)
-                            Spacer(minLength: 12)
-                            Text(entry.status)
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .foregroundStyle(entry.statusColor)
-                                .background(entry.statusColor.opacity(0.12))
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                            Text(entry.timestamp, style: .relative)
-                                .font(.caption)
+            if entries.isEmpty {
+                DashboardEmptyRow(
+                    title: "No recent audit entries",
+                    detail: "Status records refreshes, automations, notifications, and actions here when they run."
+                )
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(entries) { entry in
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                Text(entry.title)
+                                    .font(.headline)
+                                Spacer(minLength: 12)
+                                Text(entry.status)
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .foregroundStyle(entry.statusColor)
+                                    .background(entry.statusColor.opacity(0.12))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                Text(entry.timestamp, style: .relative)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(entry.detail)
                                 .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            AuditProvenance(entry: entry)
                         }
-                        Text(entry.detail)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        AuditProvenance(entry: entry)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(Color.statusSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(Color.statusSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
         }
@@ -386,6 +414,33 @@ private struct SectionBlock<Content: View>: View {
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct DashboardEmptyRow: View {
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "checkmark.circle")
+                .font(.title3)
+                .foregroundStyle(.green)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.callout.weight(.semibold))
+                Text(detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Color.statusSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

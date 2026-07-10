@@ -1426,10 +1426,7 @@ public struct PluginAppDetailView: View {
                     PluginRuntimeStatusView(status: runtimeStatus)
                 }
                 if plugin.views.isEmpty {
-                    EmptyPluginState(
-                        title: "No app views",
-                        detail: "\(plugin.name) does not declare dashboard or detail views yet."
-                    )
+                    PluginFallbackAppDataPanel(plugin: plugin, resources: resources)
                 } else {
                     PluginDeclaredViewsPanel(plugin: plugin, resources: resources)
                 }
@@ -1474,6 +1471,90 @@ public struct PluginAppDetailView: View {
                 }
             }
         }
+    }
+}
+
+private struct PluginFallbackAppDataPanel: View {
+    let plugin: InstalledPlugin
+    let resources: [Resource]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Resources")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            if resources.isEmpty {
+                EmptyPluginState(
+                    title: "No data stored yet",
+                    detail: "Run this app after setup to fetch \(plugin.name) resources and events."
+                )
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(resources.prefix(12)) { resource in
+                        PluginResourceSummaryRow(resource: resource)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct PluginResourceSummaryRow: View {
+    let resource: Resource
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(resource.name)
+                        .font(.callout.weight(.semibold))
+                        .lineLimit(1)
+                    Text(resource.type)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+                if visibleFields.isEmpty == false {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], spacing: 6) {
+                        ForEach(visibleFields, id: \.key) { field in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(field.key)
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                                    .lineLimit(1)
+                                Text(field.value)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+            Spacer(minLength: 12)
+            if let actionURL = resource.actionURL {
+                Link(destination: actionURL) {
+                    Image(systemName: "arrow.up.right")
+                }
+                .buttonStyle(.bordered)
+                .help("Open source")
+                .accessibilityLabel(Text("Open \(resource.name)"))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color.statusSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var visibleFields: [(key: String, value: String)] {
+        resource.fields
+            .filter { $0.value.isEmpty == false }
+            .sorted { lhs, rhs in lhs.key.localizedCaseInsensitiveCompare(rhs.key) == .orderedAscending }
+            .prefix(6)
+            .map { (key: $0.key, value: $0.value) }
     }
 }
 
