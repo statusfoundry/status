@@ -726,7 +726,7 @@ public final class PluginStoreViewModel: ObservableObject {
     public func run(_ plugin: InstalledPlugin) async {
         guard runningPluginID == nil else { return }
         guard let account = selectedAccount(for: plugin) else {
-            runErrors[setupKey(for: plugin)] = "Save an app before refreshing this plugin."
+            runErrors[setupKey(for: plugin)] = "Save an app before refreshing it."
             return
         }
         let key = setupKey(pluginID: plugin.id, accountID: account.id)
@@ -746,7 +746,7 @@ public final class PluginStoreViewModel: ObservableObject {
     public func testRequest(_ requestID: String, for plugin: InstalledPlugin) async {
         guard testingRequestKey == nil else { return }
         guard let account = selectedAccount(for: plugin) else {
-            testRequestErrors[setupKey(for: plugin)] = "Save an app before testing plugin requests."
+            testRequestErrors[setupKey(for: plugin)] = "Save an app before testing requests for it."
             return
         }
         let key = testRequestKey(pluginID: plugin.id, accountID: account.id, requestID: requestID)
@@ -2163,7 +2163,7 @@ private struct InstalledPluginSection: View {
         }
         let accounts = configuredAccounts[plugin.id, default: []]
         guard let selectedAccount = selectedAccount(for: plugin, accounts: accounts) else {
-            return "Save an app before refreshing this plugin."
+            return "Save an app before refreshing it."
         }
         let missing = missingRuntimePermissions(
             selectedAccount: selectedAccount,
@@ -2732,7 +2732,7 @@ private struct PluginSettingsPanel: View {
             return nil
         }
         guard selectedPersistedAccountID != nil else {
-            return "Save an app before refreshing this plugin."
+            return "Save an app before refreshing it."
         }
         let missing = missingRuntimePermissions
         guard missing.isEmpty == false else {
@@ -2817,7 +2817,7 @@ private struct PluginRequestTestPanel: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 if selectedAccountID == nil {
-                    Text("Save an app before testing plugin requests.")
+                    Text("Save an app before testing requests for it.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

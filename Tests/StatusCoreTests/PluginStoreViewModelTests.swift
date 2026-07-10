@@ -188,6 +188,73 @@ import Testing
 }
 
 @MainActor
+@Test func pluginStoreViewModelReportsAppRequiredBeforeRefresh() async throws {
+    let plugin = InstalledPlugin(
+        id: "com.status.github",
+        name: "GitHub",
+        author: "Status Foundry",
+        description: "GitHub repository checks.",
+        category: "development",
+        trustLevel: .official,
+        installedVersion: "0.1.0",
+        installPath: "/tmp/com.status.github",
+        installedAt: Date(timeIntervalSince1970: 1_783_433_520),
+        updatedAt: Date(timeIntervalSince1970: 1_783_433_520)
+    )
+    var didRun = false
+    let viewModel = PluginStoreViewModel(
+        loadInstalled: { [plugin] },
+        loadAvailable: { [] },
+        installPlugin: { _ in },
+        canRunPlugin: { _ in true },
+        runPlugin: { _, _ in
+            didRun = true
+            return "ran"
+        },
+        loadAccounts: { _ in [] }
+    )
+
+    await viewModel.reload()
+    await viewModel.run(plugin)
+
+    #expect(didRun == false)
+    #expect(viewModel.runErrors["\(plugin.id):__new__:\(plugin.id)"] == "Save an app before refreshing it.")
+}
+
+@MainActor
+@Test func pluginStoreViewModelReportsAppRequiredBeforeTestingRequest() async throws {
+    let plugin = InstalledPlugin(
+        id: "com.status.github",
+        name: "GitHub",
+        author: "Status Foundry",
+        description: "GitHub repository checks.",
+        category: "development",
+        trustLevel: .official,
+        installedVersion: "0.1.0",
+        installPath: "/tmp/com.status.github",
+        installedAt: Date(timeIntervalSince1970: 1_783_433_520),
+        updatedAt: Date(timeIntervalSince1970: 1_783_433_520)
+    )
+    var didTest = false
+    let viewModel = PluginStoreViewModel(
+        loadInstalled: { [plugin] },
+        loadAvailable: { [] },
+        installPlugin: { _ in },
+        loadAccounts: { _ in [] },
+        testPluginRequest: { _, _, _ in
+            didTest = true
+            return "preview"
+        }
+    )
+
+    await viewModel.reload()
+    await viewModel.testRequest("list_workflow_runs", for: plugin)
+
+    #expect(didTest == false)
+    #expect(viewModel.testRequestErrors["\(plugin.id):__new__:\(plugin.id)"] == "Save an app before testing requests for it.")
+}
+
+@MainActor
 @Test func pluginStoreViewModelRemovesSelectedConfiguredApp() async throws {
     let plugin = InstalledPlugin(
         id: "com.status.github",
