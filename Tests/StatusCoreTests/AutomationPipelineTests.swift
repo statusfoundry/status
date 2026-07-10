@@ -256,7 +256,59 @@ import Testing
         ActionRuntimeProviderAction(
             actionRunID: actionRun.id,
             action: "jira.createIssue",
+            targetProvider: "com.status.jira",
             provider: event.provider,
+            parameters: ["summary": "Workflow failed"],
+            event: event
+        )
+    ])
+}
+
+@Test func automationPipelineRoutesCrossAppProviderActionToDeclaringPlugin() async throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_530)
+    let event = workflowFailedEvent(provider: "com.status.github")
+    let rule = Rule(
+        id: "rul_github_to_jira",
+        name: "Failed workflow creates Jira issue",
+        enabled: true,
+        provider: "com.status.github",
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [
+            RuleActionDefinition(action: "jira.createIssue", parameters: ["summary": "{{event.title}}"])
+        ]
+    )
+    try installActionPlugin(
+        provider: "com.status.jira",
+        store: store,
+        at: now,
+        actions: [
+            PackagedPluginAction(id: "jira.createIssue", label: "Create issue", requiresWritePermission: true, request: "create_issue")
+        ],
+        requests: PackagedPluginRequests(requests: [
+            "create_issue": PackagedPluginRequest(method: "POST", url: "https://example.atlassian.net/rest/api/3/issue")
+        ])
+    )
+    try store.setPluginPermission(pluginID: "com.status.jira", permission: .writeActions, granted: true, grantedAt: now)
+    let executor = RecordingProviderActionExecutor(result: ["issue_key": "STATUS-2"])
+    let pipeline = AutomationPipeline(
+        store: store,
+        actionRunner: ActionRunner(now: { now }),
+        providerActionExecutor: executor
+    )
+
+    let result = try await pipeline.process(event: event, rules: [rule])
+
+    let actionRun = try #require(result.actionResults.first?.actionRun)
+    #expect(executor.actions == [
+        ActionRuntimeProviderAction(
+            actionRunID: actionRun.id,
+            action: "jira.createIssue",
+            targetProvider: "com.status.jira",
+            provider: "com.status.github",
             parameters: ["summary": "Workflow failed"],
             event: event
         )
@@ -309,6 +361,7 @@ import Testing
         ActionRuntimeProviderAction(
             actionRunID: actionRun.id,
             action: "linear.createIssue",
+            targetProvider: "com.example.linear",
             provider: event.provider,
             parameters: ["title": "Workflow failed"],
             event: event

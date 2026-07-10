@@ -4,20 +4,26 @@ import SwiftUI
 @MainActor
 public final class RulesViewModel: ObservableObject {
     @Published public private(set) var rules: [Rule]
+    @Published public private(set) var actionOptions: [CrossAppRuleActionOption]
     @Published public private(set) var loadError: String?
 
     private let loadRules: () throws -> [Rule]
+    private let loadActionOptions: () throws -> [CrossAppRuleActionOption]
     private let saveRule: (Rule) throws -> Void
     private let deleteRule: (Rule) throws -> Void
 
     public init(
         initialRules: [Rule] = [],
+        initialActionOptions: [CrossAppRuleActionOption] = CrossAppRuleActionOption.builtIn,
         loadRules: @escaping () throws -> [Rule],
+        loadActionOptions: @escaping () throws -> [CrossAppRuleActionOption] = { CrossAppRuleActionOption.builtIn },
         saveRule: @escaping (Rule) throws -> Void,
         deleteRule: @escaping (Rule) throws -> Void = { _ in }
     ) {
         self.rules = initialRules
+        self.actionOptions = initialActionOptions
         self.loadRules = loadRules
+        self.loadActionOptions = loadActionOptions
         self.saveRule = saveRule
         self.deleteRule = deleteRule
     }
@@ -25,9 +31,11 @@ public final class RulesViewModel: ObservableObject {
     public func reload() {
         do {
             rules = try loadRules()
+            actionOptions = try loadActionOptions()
             loadError = nil
         } catch {
             rules = []
+            actionOptions = CrossAppRuleActionOption.builtIn
             loadError = error.localizedDescription
         }
     }
@@ -131,7 +139,8 @@ public struct RulesContainerView: View {
             },
             deleteRule: { rule in
                 viewModel.delete(rule)
-            }
+            },
+            actionOptions: viewModel.actionOptions
         )
         .overlay(alignment: .bottom) {
             if let loadError = viewModel.loadError {
@@ -151,6 +160,46 @@ public struct RulesContainerView: View {
             viewModel.reload()
         }
     }
+}
+
+public struct CrossAppRuleActionOption: Identifiable, Equatable, Sendable {
+    public var id: String { action }
+    public var action: String
+    public var label: String
+    public var provider: String?
+    public var inputFields: [PackagedPluginActionInputField]
+    public var safety: ActionSafetyLevel
+
+    public init(
+        action: String,
+        label: String,
+        provider: String? = nil,
+        inputFields: [PackagedPluginActionInputField] = [],
+        safety: ActionSafetyLevel = .safe
+    ) {
+        self.action = action
+        self.label = label
+        self.provider = provider
+        self.inputFields = inputFields
+        self.safety = safety
+    }
+
+    public static let builtIn = [
+        CrossAppRuleActionOption(action: "status.inbox.add", label: "Add to Status inbox"),
+        CrossAppRuleActionOption(action: "notification.show", label: "Show notification", inputFields: [
+            PackagedPluginActionInputField(key: "title", label: "Title", type: .template, defaultValue: "{{event.title}}")
+        ]),
+        CrossAppRuleActionOption(action: "status.open_url", label: "Open URL", inputFields: [
+            PackagedPluginActionInputField(key: "url", label: "URL", type: .template, required: true, defaultValue: "{{event.actionUrl}}")
+        ]),
+        CrossAppRuleActionOption(action: "audit.note", label: "Record audit note", inputFields: [
+            PackagedPluginActionInputField(key: "note", label: "Note", type: .template, defaultValue: "{{event.summary}}")
+        ]),
+        CrossAppRuleActionOption(action: "webhook.post", label: "Send webhook", inputFields: [
+            PackagedPluginActionInputField(key: "url", label: "Webhook URL", type: .template, required: true, defaultValue: "https://example.com/hooks/status"),
+            PackagedPluginActionInputField(key: "summary", label: "Summary", type: .template, defaultValue: "{{event.summary}}")
+        ], safety: .reviewRequired)
+    ]
 }
 
 public struct AlertsView: View {
@@ -345,6 +394,7 @@ public struct RulesListView: View {
     private let setRuleEnabled: ((Rule, Bool) -> Void)?
     private let saveRule: ((String?, String, String?, String, [RuleCondition], [RuleActionDefinition], Bool) -> Void)?
     private let deleteRule: ((Rule) -> Void)?
+    private let actionOptions: [CrossAppRuleActionOption]
     @State private var editingRuleID: String?
     @State private var draftName = ""
     @State private var draftProvider = ""
@@ -360,12 +410,14 @@ public struct RulesListView: View {
         rules: [Rule],
         setRuleEnabled: ((Rule, Bool) -> Void)? = nil,
         saveRule: ((String?, String, String?, String, [RuleCondition], [RuleActionDefinition], Bool) -> Void)? = nil,
-        deleteRule: ((Rule) -> Void)? = nil
+        deleteRule: ((Rule) -> Void)? = nil,
+        actionOptions: [CrossAppRuleActionOption] = CrossAppRuleActionOption.builtIn
     ) {
         self.rules = rules
         self.setRuleEnabled = setRuleEnabled
         self.saveRule = saveRule
         self.deleteRule = deleteRule
+        self.actionOptions = actionOptions
     }
 
     public var body: some View {
@@ -432,6 +484,7 @@ public struct RulesListView: View {
                         draftEnabled: $draftEnabled,
                         draftCondition: $draftCondition,
                         draftActions: $draftActions,
+                        actionOptions: actionOptions,
                         save: saveDraft,
                         cancel: resetDraft
                     )
@@ -441,7 +494,7 @@ public struct RulesListView: View {
     }
 
     private var draftActionsForSave: [RuleActionDefinition] {
-        draftActions.compactMap(\.ruleAction)
+        draftActions.compactMap { $0.ruleAction(actionOptions: actionOptions) }
     }
 
     private var draftConditionsForSave: [RuleCondition] {
@@ -529,6 +582,7 @@ private struct CrossAppRuleEditor: View {
     @Binding var draftEnabled: Bool
     @Binding var draftCondition: CrossAppRuleConditionDraft
     @Binding var draftActions: [CrossAppRuleActionDraft]
+    let actionOptions: [CrossAppRuleActionOption]
     let save: () -> Void
     let cancel: () -> Void
 
@@ -587,26 +641,35 @@ private struct CrossAppRuleEditor: View {
                     .controlSize(.small)
                 }
                 ForEach($draftActions) { $action in
-                    HStack(spacing: 8) {
-                        Picker("Action", selection: $action.action) {
-                            ForEach(CrossAppRuleActionDraft.actions, id: \.self) { actionID in
-                                Text(actionID).tag(actionID)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Picker("Action", selection: $action.action) {
+                                ForEach(actionOptions) { option in
+                                    Text(option.provider.map { "\(option.label) (\($0))" } ?? option.label)
+                                        .tag(option.action)
+                                }
                             }
+                            .onChange(of: action.action) { _, newAction in
+                                action.applyDefaults(from: option(for: newAction))
+                            }
+                            Spacer(minLength: 8)
+                            Button(role: .destructive) {
+                                draftActions.removeAll { $0.id == action.id }
+                            } label: {
+                                Image(systemName: "minus.circle")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .help("Remove action")
+                            .accessibilityLabel(Text("Remove action"))
                         }
-                        if action.requiresValue {
-                            TextField(action.valuePlaceholder, text: $action.value)
-                                .textFieldStyle(.roundedBorder)
+                        if let option = option(for: action.action) {
+                            CrossAppRuleActionFields(action: $action, option: option)
                         }
-                        Button(role: .destructive) {
-                            draftActions.removeAll { $0.id == action.id }
-                        } label: {
-                            Image(systemName: "minus.circle")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .help("Remove action")
-                        .accessibilityLabel(Text("Remove action"))
                     }
+                    .padding(10)
+                    .background(Color.statusBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
 
@@ -618,6 +681,12 @@ private struct CrossAppRuleEditor: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if draftActions.contains(where: { option(for: $0.action)?.safety == .reviewRequired }) {
+                    Text("Review-required provider actions need the target plugin's write-actions permission before they can run.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             HStack(spacing: 8) {
@@ -644,7 +713,34 @@ private struct CrossAppRuleEditor: View {
     private var isSaveDisabled: Bool {
         draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
             draftEventType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-            draftActions.compactMap(\.ruleAction).isEmpty
+            draftActions.compactMap { $0.ruleAction(actionOptions: actionOptions) }.isEmpty
+    }
+
+    private func option(for action: String) -> CrossAppRuleActionOption? {
+        actionOptions.first { $0.action == action } ?? CrossAppRuleActionOption.builtIn.first { $0.action == action }
+    }
+}
+
+private struct CrossAppRuleActionFields: View {
+    @Binding var action: CrossAppRuleActionDraft
+    let option: CrossAppRuleActionOption
+
+    var body: some View {
+        if option.inputFields.isEmpty == false {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(option.inputFields, id: \.key) { field in
+                    TextField(field.placeholder ?? field.defaultValue ?? field.label, text: binding(for: field))
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+        }
+    }
+
+    private func binding(for field: PackagedPluginActionInputField) -> Binding<String> {
+        Binding(
+            get: { action.parameters[field.key] ?? field.defaultValue ?? "" },
+            set: { action.parameters[field.key] = $0 }
+        )
     }
 }
 
@@ -683,55 +779,53 @@ private struct CrossAppRuleConditionDraft: Equatable {
 private struct CrossAppRuleActionDraft: Identifiable, Equatable {
     let id: UUID
     var action: String
-    var value: String
+    var parameters: [String: String]
 
-    static let actions = ["status.inbox.add", "notification.show", "status.open_url", "audit.note"]
-
-    init(id: UUID = UUID(), action: String = "notification.show", value: String = "{{event.title}}") {
+    init(id: UUID = UUID(), action: String = "notification.show", value: String = "{{event.title}}", parameters: [String: String]? = nil) {
         self.id = id
         self.action = action
-        self.value = value
+        self.parameters = parameters ?? Self.defaultParameters(for: action, value: value)
     }
 
     init(action definition: RuleActionDefinition) {
         id = UUID()
         action = definition.action
-        value = definition.parameters["title"] ??
-            definition.parameters["url"] ??
-            definition.parameters["note"] ??
-            definition.parameters["body"] ??
-            ""
+        parameters = definition.parameters
     }
 
-    var requiresValue: Bool {
-        action != "status.inbox.add"
+    mutating func applyDefaults(from option: CrossAppRuleActionOption?) {
+        parameters = Dictionary(uniqueKeysWithValues: (option?.inputFields ?? [])
+            .map { ($0.key, $0.defaultValue ?? "") })
     }
 
-    var valuePlaceholder: String {
-        switch action {
-        case "status.open_url":
-            return "{{event.actionUrl}}"
-        case "audit.note":
-            return "Note"
-        default:
-            return "{{event.title}}"
+    func ruleAction(actionOptions: [CrossAppRuleActionOption]) -> RuleActionDefinition? {
+        guard let option = actionOptions.first(where: { $0.action == action }) ?? CrossAppRuleActionOption.builtIn.first(where: { $0.action == action }) else {
+            return nil
         }
+        var cleaned = parameters
+            .mapValues { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.value.isEmpty == false }
+        for field in option.inputFields where field.required {
+            guard cleaned[field.key]?.isEmpty == false else { return nil }
+        }
+        if action == "status.inbox.add" {
+            cleaned = [:]
+        }
+        return RuleActionDefinition(action: action, parameters: cleaned)
     }
 
-    var ruleAction: RuleActionDefinition? {
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    private static func defaultParameters(for action: String, value: String) -> [String: String] {
         switch action {
         case "status.inbox.add":
-            return RuleActionDefinition(action: action)
+            return [:]
         case "notification.show":
-            return RuleActionDefinition(action: action, parameters: trimmedValue.isEmpty ? [:] : ["title": trimmedValue])
+            return ["title": value]
         case "status.open_url":
-            guard trimmedValue.isEmpty == false else { return nil }
-            return RuleActionDefinition(action: action, parameters: ["url": trimmedValue])
+            return ["url": value]
         case "audit.note":
-            return RuleActionDefinition(action: action, parameters: trimmedValue.isEmpty ? [:] : ["note": trimmedValue])
+            return ["note": value]
         default:
-            return nil
+            return [:]
         }
     }
 }

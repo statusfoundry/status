@@ -39,7 +39,8 @@ public final class AutomationPipeline {
             for result in actionRunner.run(
                 match,
                 reviewPermissionGranted: reviewPermissionGranted,
-                safetyLevel: actionSafetyLevel
+                safetyLevel: actionSafetyLevel,
+                targetProvider: targetProvider
             ) {
                 try store.upsertActionRun(result.actionRun)
                 try store.insertAuditEntry(result.auditEntry)
@@ -178,16 +179,17 @@ public final class AutomationPipeline {
         guard actionSafetyLevel(for: action) == .reviewRequired else {
             return false
         }
-        let provider: String?
-        if action.action == "webhook.post" {
-            provider = rule.provider
-        } else {
-            provider = providerDeclaringAction(action.action) ?? rule.provider
-        }
-        guard let provider else { return false }
+        guard let provider = targetProvider(rule: rule, action: action) else { return false }
         return ((try? store.pluginPermissions(pluginID: provider)) ?? []).contains { permission in
             permission.permission == .writeActions && permission.granted
         }
+    }
+
+    private func targetProvider(rule: Rule, action: RuleActionDefinition) -> String? {
+        if action.action == "webhook.post" {
+            return rule.provider
+        }
+        return providerDeclaringAction(action.action) ?? rule.provider
     }
 
     private func actionSafetyLevel(for action: RuleActionDefinition) -> ActionSafetyLevel {

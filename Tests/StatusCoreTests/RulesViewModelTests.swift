@@ -40,6 +40,57 @@ import Testing
 }
 
 @MainActor
+@Test func rulesViewModelLoadsProviderActionOptionsAndSavesParameters() throws {
+    var storedRules = [Rule]()
+    let providerAction = CrossAppRuleActionOption(
+        action: "jira.createIssue",
+        label: "Create Jira issue",
+        provider: "com.status.jira",
+        inputFields: [
+            PackagedPluginActionInputField(
+                key: "summary",
+                label: "Summary",
+                type: .template,
+                required: true,
+                defaultValue: "{{event.title}}"
+            )
+        ],
+        safety: .reviewRequired
+    )
+    let viewModel = RulesViewModel {
+        storedRules
+    } loadActionOptions: {
+        CrossAppRuleActionOption.builtIn + [providerAction]
+    } saveRule: { rule in
+        storedRules.removeAll { $0.id == rule.id }
+        storedRules.append(rule)
+    }
+
+    viewModel.reload()
+
+    #expect(viewModel.actionOptions.contains(providerAction))
+
+    viewModel.saveCrossAppRule(
+        existingRuleID: nil,
+        name: "GitHub failure creates Jira issue",
+        provider: "com.status.github",
+        eventType: "github.workflow.failed",
+        conditions: [],
+        actions: [
+            RuleActionDefinition(action: "jira.createIssue", parameters: ["summary": "{{event.title}}"])
+        ],
+        enabled: true
+    )
+
+    let rule = try #require(storedRules.first)
+    #expect(rule.scope == .crossApp)
+    #expect(rule.provider == "com.status.github")
+    #expect(rule.actions == [
+        RuleActionDefinition(action: "jira.createIssue", parameters: ["summary": "{{event.title}}"])
+    ])
+}
+
+@MainActor
 @Test func rulesViewModelDeletesCrossAppRules() throws {
     let rule = Rule(
         id: "rule_cross_app_delete_me",

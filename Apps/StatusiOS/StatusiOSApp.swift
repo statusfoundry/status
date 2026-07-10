@@ -245,6 +245,8 @@ private struct IOSRootView: View {
             return try LocalStatusStore.openApplicationSupportStore()
                 .rules()
                 .filter { $0.scope == .crossApp }
+        } loadActionOptions: {
+            try crossAppRuleActionOptions()
         } saveRule: { rule in
             var crossAppRule = rule
             crossAppRule.scope = .crossApp
@@ -253,6 +255,28 @@ private struct IOSRootView: View {
         } deleteRule: { rule in
             try LocalStatusStore.openApplicationSupportStore().deleteRule(id: rule.id)
         }
+    }
+
+    private func crossAppRuleActionOptions() throws -> [CrossAppRuleActionOption] {
+        let store = try LocalStatusStore.openApplicationSupportStore()
+        var options = CrossAppRuleActionOption.builtIn
+        for plugin in try store.installedPlugins() where plugin.enabled {
+            guard let definition = try store.installedPluginDefinition(pluginID: plugin.id) else {
+                continue
+            }
+            for action in definition.actions {
+                options.append(
+                    CrossAppRuleActionOption(
+                        action: action.id,
+                        label: action.label,
+                        provider: plugin.id,
+                        inputFields: action.inputSchema?.fields ?? [],
+                        safety: ActionRunner.safetyLevel(for: action)
+                    )
+                )
+            }
+        }
+        return options
     }
 
     private func makeAuditLogViewModel() -> AuditLogViewModel {

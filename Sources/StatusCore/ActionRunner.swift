@@ -156,6 +156,7 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
     fileprivate mutating func recordProviderAction(
         actionRunID: String,
         action: String,
+        targetProvider: String?,
         provider: String?,
         parameters: [String: String],
         event: Event
@@ -163,6 +164,7 @@ public struct ActionRuntimeEffects: Equatable, Sendable {
         providerActions.append(ActionRuntimeProviderAction(
             actionRunID: actionRunID,
             action: action,
+            targetProvider: targetProvider,
             provider: provider,
             parameters: parameters,
             event: event
@@ -232,6 +234,7 @@ public struct ActionRuntimeWebhook: Equatable, Sendable {
 public struct ActionRuntimeProviderAction: Equatable, Sendable {
     public var actionRunID: String
     public var action: String
+    public var targetProvider: String?
     public var provider: String?
     public var parameters: [String: String]
     public var event: Event
@@ -239,12 +242,14 @@ public struct ActionRuntimeProviderAction: Equatable, Sendable {
     public init(
         actionRunID: String,
         action: String,
+        targetProvider: String? = nil,
         provider: String? = nil,
         parameters: [String: String],
         event: Event
     ) {
         self.actionRunID = actionRunID
         self.action = action
+        self.targetProvider = targetProvider
         self.provider = provider
         self.parameters = parameters
         self.event = event
@@ -263,7 +268,8 @@ public final class ActionRunner {
     public func run(
         _ match: RuleMatch,
         reviewPermissionGranted: (Rule, RuleActionDefinition) -> Bool = { _, _ in false },
-        safetyLevel: (RuleActionDefinition) -> ActionSafetyLevel = { ActionRunner.safetyLevel(for: $0.action) }
+        safetyLevel: (RuleActionDefinition) -> ActionSafetyLevel = { ActionRunner.safetyLevel(for: $0.action) },
+        targetProvider: (Rule, RuleActionDefinition) -> String? = { _, _ in nil }
     ) -> [ActionExecutionResult] {
         match.actions.enumerated().map { index, action in
             run(
@@ -272,7 +278,8 @@ public final class ActionRunner {
                 rule: match.rule,
                 event: match.event,
                 reviewPermissionGranted: reviewPermissionGranted,
-                safetyLevel: safetyLevel
+                safetyLevel: safetyLevel,
+                targetProvider: targetProvider
             )
         }
     }
@@ -311,7 +318,8 @@ public final class ActionRunner {
         rule: Rule,
         event: Event,
         reviewPermissionGranted: (Rule, RuleActionDefinition) -> Bool,
-        safetyLevel: (RuleActionDefinition) -> ActionSafetyLevel
+        safetyLevel: (RuleActionDefinition) -> ActionSafetyLevel,
+        targetProvider: (Rule, RuleActionDefinition) -> String?
     ) -> ActionExecutionResult {
         let startedAt = now()
         let runID = "run_\(rule.id)_\(event.id)_\(index)"
@@ -337,7 +345,12 @@ public final class ActionRunner {
                 break
             }
             do {
-                result = try performReviewRequiredAction(definition, event: event, actionRunID: runID)
+                result = try performReviewRequiredAction(
+                    definition,
+                    event: event,
+                    actionRunID: runID,
+                    targetProvider: targetProvider(rule, definition)
+                )
             } catch let actionError as ActionRunnerError {
                 status = .unsupported
                 error = actionError.errorDescription
@@ -408,7 +421,8 @@ public final class ActionRunner {
     private func performReviewRequiredAction(
         _ definition: RuleActionDefinition,
         event: Event,
-        actionRunID: String
+        actionRunID: String,
+        targetProvider: String?
     ) throws -> [String: String] {
         switch definition.action {
         case "webhook.post":
@@ -425,6 +439,7 @@ public final class ActionRunner {
             effects.recordProviderAction(
                 actionRunID: actionRunID,
                 action: definition.action,
+                targetProvider: targetProvider,
                 provider: event.provider,
                 parameters: parameters,
                 event: event

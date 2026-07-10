@@ -734,7 +734,7 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
                 request: request
             ))
         }
-        if let provider = action.provider,
+        if let provider = action.targetProvider ?? action.provider,
            let exact = matches.first(where: { $0.plugin.id == provider }) {
             return exact
         }
