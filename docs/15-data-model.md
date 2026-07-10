@@ -126,7 +126,7 @@ SQLiteDatabase
 
 StatusDatabaseMigrator
 → applies the current schema
-→ sets PRAGMA user_version = 6
+→ sets PRAGMA user_version = 7
 
 StatusPersistenceStore
 → first round-trip store for events, status items, audit entries,

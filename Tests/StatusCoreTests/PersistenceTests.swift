@@ -194,6 +194,57 @@ import Testing
     #expect(userVersion == .integer(Int64(StatusDatabaseMigrator.currentUserVersion)))
 }
 
+@Test func migrationUpgradesVersionFiveRulesAndPreferencesTables() throws {
+    // Regression: a v5 database has rules without scope/account_id and
+    // notification_preferences without account_id. schemaV0's index on
+    // rules (account_id, enabled) must not run before those columns exist.
+    let database = try temporaryDatabase()
+    try database.executeBatch(
+        """
+        CREATE TABLE rules (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          enabled INTEGER NOT NULL DEFAULT 1,
+          provider TEXT,
+          event_type TEXT NOT NULL,
+          conditions_json TEXT NOT NULL,
+          actions_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE notification_preferences (
+          id TEXT PRIMARY KEY,
+          scope TEXT NOT NULL,
+          plugin_id TEXT NOT NULL,
+          event_type TEXT,
+          mode TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX idx_notification_preferences_event
+          ON notification_preferences (plugin_id, event_type)
+          WHERE scope = 'event';
+        PRAGMA user_version = 5;
+        """
+    )
+
+    try StatusDatabaseMigrator.migrate(database)
+
+    let ruleColumns = try database.query("PRAGMA table_info('rules')")
+        .map { try $0.requiredText("name") }
+    let preferenceColumns = try database.query("PRAGMA table_info('notification_preferences')")
+        .map { try $0.requiredText("name") }
+    let userVersion = try database.query("PRAGMA user_version").first?["user_version"]
+
+    #expect(ruleColumns.contains("scope"))
+    #expect(ruleColumns.contains("account_id"))
+    #expect(preferenceColumns.contains("account_id"))
+    #expect(userVersion == .integer(Int64(StatusDatabaseMigrator.currentUserVersion)))
+
+    // Migrating again is a no-op, and re-running from a stale stamp converges.
+    try StatusDatabaseMigrator.migrate(database)
+}
+
 @Test func eventStatusItemAndAuditEntryRoundTripThroughSQLite() throws {
     let database = try temporaryDatabase()
     try StatusDatabaseMigrator.migrate(database)

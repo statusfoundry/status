@@ -1,7 +1,7 @@
 import Foundation
 
 public enum StatusDatabaseMigrator {
-    public static let currentUserVersion = 6
+    public static let currentUserVersion = 7
 
     public static func migrate(_ database: SQLiteDatabase) throws {
         try database.executeBatch("""
@@ -16,59 +16,19 @@ public enum StatusDatabaseMigrator {
             return
         }
 
+        // Columns added after a table first shipped must exist before schemaV0
+        // runs: CREATE TABLE IF NOT EXISTS skips pre-existing tables, so the
+        // index definitions in schemaV0 would otherwise reference columns an
+        // older table does not have. Each step checks live table state, not
+        // the recorded version, so any historical database converges.
+        try addColumnIfMissing(database, table: "plugin_versions", column: "signed_by", definition: "TEXT")
+        try addColumnIfMissing(database, table: "plugins", column: "accent_color", definition: "TEXT")
+        try addColumnIfMissing(database, table: "rules", column: "scope", definition: "TEXT NOT NULL DEFAULT 'plugin'")
+        try addColumnIfMissing(database, table: "rules", column: "account_id", definition: "TEXT")
+        try addColumnIfMissing(database, table: "notification_preferences", column: "account_id", definition: "TEXT")
+        try database.executeBatch("DROP INDEX IF EXISTS idx_notification_preferences_event;")
+
         try database.executeBatch(schemaV0)
-        if numericUserVersion > 0 && numericUserVersion < 3 {
-            try addColumnIfMissing(
-                database,
-                table: "plugin_versions",
-                column: "signed_by",
-                definition: "TEXT"
-            )
-        }
-        if numericUserVersion > 0 && numericUserVersion < 4 {
-            try database.executeBatch(notificationPreferencesSchema)
-        }
-        if numericUserVersion > 0 && numericUserVersion < 5 {
-            try addColumnIfMissing(
-                database,
-                table: "plugins",
-                column: "accent_color",
-                definition: "TEXT"
-            )
-        }
-        if numericUserVersion > 0 && numericUserVersion < 6 {
-            try addColumnIfMissing(
-                database,
-                table: "rules",
-                column: "scope",
-                definition: "TEXT NOT NULL DEFAULT 'plugin'"
-            )
-            try addColumnIfMissing(
-                database,
-                table: "rules",
-                column: "account_id",
-                definition: "TEXT"
-            )
-            try addColumnIfMissing(
-                database,
-                table: "notification_preferences",
-                column: "account_id",
-                definition: "TEXT"
-            )
-            try database.executeBatch("""
-            DROP INDEX IF EXISTS idx_notification_preferences_event;
-            CREATE INDEX IF NOT EXISTS idx_rules_account ON rules (account_id, enabled);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_preferences_plugin_event
-              ON notification_preferences (plugin_id, event_type)
-              WHERE scope = 'event' AND account_id IS NULL;
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_preferences_app
-              ON notification_preferences (account_id)
-              WHERE scope = 'app';
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_preferences_account_event
-              ON notification_preferences (account_id, event_type)
-              WHERE scope = 'event' AND account_id IS NOT NULL;
-            """)
-        }
         try database.executeBatch("PRAGMA user_version = \(currentUserVersion);")
     }
 
@@ -80,6 +40,9 @@ public enum StatusDatabaseMigrator {
     ) throws {
         let columns = try database.query("PRAGMA table_info('\(table)')")
             .compactMap { row in row["name"]?.textValue }
+        // An empty result means the table does not exist yet; schemaV0 will
+        // create it with the current shape, so there is nothing to alter.
+        guard columns.isEmpty == false else { return }
         guard columns.contains(column) == false else { return }
         try database.execute("ALTER TABLE \(table) ADD COLUMN \(column) \(definition)")
     }
