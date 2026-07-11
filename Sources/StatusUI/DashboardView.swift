@@ -163,6 +163,8 @@ private struct AppSection: View {
             }
             if let primaryItem {
                 DashboardPrimaryTileItem(item: primaryItem)
+            } else {
+                DashboardTileEmptyHint()
             }
             if secondaryItems.isEmpty == false {
                 DashboardSecondaryTileItems(items: secondaryItems)
@@ -308,6 +310,33 @@ private struct DashboardPrimaryTileItem: View {
             return .green
         }
         return .blue
+    }
+}
+
+private struct DashboardTileEmptyHint: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "arrow.clockwise.circle")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Waiting for dashboard data")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text("Refresh this app after setup to fill this tile.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.045))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
