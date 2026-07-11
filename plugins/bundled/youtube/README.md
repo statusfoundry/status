@@ -36,8 +36,9 @@ Auth uses Google OAuth 2 with PKCE. Status owns authorization, token refresh, an
 
 ### Checks
 
-- **Check channels** - cron schedule for channel and visibility polling
-- **Refresh uploads** - manual refresh of recent uploads
+- **Refresh channel stats** - manual refresh of channel visibility and metrics
+- **Refresh recent uploads** - manual refresh of recent uploads
+- **Check YouTube channels** - cron schedule for channel and visibility polling
 
 ## Suggested automations
 
@@ -69,4 +70,4 @@ Read-only in v1. Status does not publish, edit, delete, schedule, monetize, or m
 3. Create a configured app in Status and paste the Google OAuth client ID.
 4. Grant network, keychain, OAuth, and background refresh permissions.
 5. Connect with Google OAuth using the creator account you want to watch.
-6. Run **Refresh uploads**, then enable **Check channels** if you want scheduled polling.
+6. Run **Refresh channel stats** and **Refresh recent uploads**, then enable **Check YouTube channels** if you want scheduled polling.

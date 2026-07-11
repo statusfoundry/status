@@ -149,6 +149,118 @@ import Testing
     #expect(uploadOutput.events[0].timestamp == ISO8601DateFormatter().date(from: "2026-07-09T10:00:00Z"))
 }
 
+@Test func bundledGitHubPluginRunsAllManualChecksForConfiguredApp() async throws {
+    let database = try temporaryBundledPluginDatabase()
+    let store = StatusPersistenceStore(database: database)
+    let credentials = InMemoryCredentialStore()
+    let installRoot = FileManager.default.temporaryDirectory
+        .appendingPathComponent("status-bundled-\(UUID().uuidString)", isDirectory: true)
+    let installer = BundledPluginInstaller(store: store, installRoot: installRoot)
+    _ = try installer.install(pluginID: "com.status.github", installedAt: Date(timeIntervalSince1970: 1_783_433_520))
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    try grantBundledPermissions([.network, .keychain, .backgroundRefresh], pluginID: "com.status.github", store: store, at: now)
+    let plugin = try #require(try store.installedPlugin(id: "com.status.github"))
+    _ = try PluginSetupConfiguration.saveValues(
+        ["owner": "statusfoundry", "repo": "status", "token": "github_pat_example"],
+        for: plugin,
+        service: PluginRuntimeService(store: store, credentialStore: nil),
+        credentialStore: credentials,
+        now: now
+    )
+    let account = try #require(try store.accountConfigurations(pluginID: "com.status.github").first)
+    let activityFixture = try Data(contentsOf: bundledPluginDirectory(pluginID: "com.status.github").appendingPathComponent("fixtures/list_repository_activity.json"))
+    let workflowFixture = try Data(contentsOf: bundledPluginDirectory(pluginID: "com.status.github").appendingPathComponent("fixtures/list_workflow_runs.json"))
+    let transport = BundledProviderTransport(expectedAuthorization: "Bearer github_pat_example") { request in
+        if request.url.path == "/repos/statusfoundry/status/events" {
+            return PluginHTTPResponse(data: activityFixture, statusCode: 200, url: request.url)
+        }
+        if request.url.path == "/repos/statusfoundry/status/actions/runs" {
+            #expect(request.url.query?.contains("per_page=25") == true)
+            return PluginHTTPResponse(data: workflowFixture, statusCode: 200, url: request.url)
+        }
+        Issue.record("Unexpected GitHub request URL: \(request.url.absoluteString)")
+        return PluginHTTPResponse(data: Data("{}".utf8), statusCode: 404, url: request.url)
+    }
+    let service = PluginRuntimeService(store: store, transport: transport, credentialStore: credentials)
+
+    let jobs = try service.enqueueManualConfiguredPluginRuns(pluginID: "com.status.github", accountID: account.id, now: now)
+    var resourceCount = 0
+    var eventTypes: [String] = []
+    for job in jobs {
+        let result = try await service.runQueuedPluginJob(jobID: job.id, now: now)
+        resourceCount += result.mappingOutput.resources.count
+        eventTypes.append(contentsOf: result.mappingOutput.events.map(\.type))
+    }
+
+    #expect(jobs.map(\.triggerID) == ["trg_com_status_github_refresh_activity", "trg_com_status_github_refresh_workflows"])
+    #expect(resourceCount == 1)
+    #expect(eventTypes.sorted() == ["github.pull_request.opened", "github.workflow.failed"])
+    #expect(try store.resource(id: "\(account.id):123456")?.name == "example-org/example-repo")
+    #expect(try store.statusItemCount() == 1)
+}
+
+@Test func bundledYouTubePluginRunsAllManualChecksForConfiguredOAuthApp() async throws {
+    let database = try temporaryBundledPluginDatabase()
+    let store = StatusPersistenceStore(database: database)
+    let credentials = InMemoryCredentialStore()
+    let installRoot = FileManager.default.temporaryDirectory
+        .appendingPathComponent("status-bundled-\(UUID().uuidString)", isDirectory: true)
+    let installer = BundledPluginInstaller(store: store, installRoot: installRoot)
+    _ = try installer.install(pluginID: "com.status.youtube", installedAt: Date(timeIntervalSince1970: 1_783_433_520))
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    try grantBundledPermissions([.network, .keychain, .oauth, .backgroundRefresh], pluginID: "com.status.youtube", store: store, at: now)
+    let plugin = try #require(try store.installedPlugin(id: "com.status.youtube"))
+    _ = try PluginSetupConfiguration.saveOAuthTokenSet(
+        PluginOAuthTokenSet(
+            accessToken: "youtube_access",
+            refreshToken: "youtube_refresh",
+            expiresAt: now.addingTimeInterval(3_600),
+            clientID: "youtube-client.apps.googleusercontent.com"
+        ),
+        setupValues: [PluginOAuth.clientIDSetupFieldKey: "youtube-client.apps.googleusercontent.com"],
+        for: plugin,
+        service: PluginRuntimeService(store: store, credentialStore: nil),
+        credentialStore: credentials,
+        now: now
+    )
+    let account = try #require(try store.accountConfigurations(pluginID: "com.status.youtube").first)
+    let channelFixture = try Data(contentsOf: bundledPluginDirectory(pluginID: "com.status.youtube").appendingPathComponent("fixtures/list_my_channels.json"))
+    let uploadFixture = try Data(contentsOf: bundledPluginDirectory(pluginID: "com.status.youtube").appendingPathComponent("fixtures/list_recent_uploads.json"))
+    let transport = BundledProviderTransport(expectedAuthorization: "Bearer youtube_access") { request in
+        let query = request.url.query ?? ""
+        if request.url.path == "/youtube/v3/channels" {
+            #expect(query.contains("mine=true"))
+            return PluginHTTPResponse(data: channelFixture, statusCode: 200, url: request.url)
+        }
+        if request.url.path == "/youtube/v3/search" {
+            #expect(query.contains("forMine=true"))
+            #expect(query.contains("type=video"))
+            return PluginHTTPResponse(data: uploadFixture, statusCode: 200, url: request.url)
+        }
+        Issue.record("Unexpected YouTube request URL: \(request.url.absoluteString)")
+        return PluginHTTPResponse(data: Data("{}".utf8), statusCode: 404, url: request.url)
+    }
+    let service = PluginRuntimeService(store: store, transport: transport, credentialStore: credentials)
+
+    let jobs = try service.enqueueManualConfiguredPluginRuns(pluginID: "com.status.youtube", accountID: account.id, now: now)
+    var resourceCount = 0
+    var eventTypes: [String] = []
+    var metricCount = 0
+    for job in jobs {
+        let result = try await service.runQueuedPluginJob(jobID: job.id, now: now)
+        resourceCount += result.mappingOutput.resources.count
+        eventTypes.append(contentsOf: result.mappingOutput.events.map(\.type))
+        metricCount += result.mappingOutput.metrics.count
+    }
+
+    #expect(jobs.map(\.triggerID) == ["trg_com_status_youtube_refresh_channels", "trg_com_status_youtube_refresh_recent_uploads"])
+    #expect(resourceCount == 2)
+    #expect(eventTypes.sorted() == ["youtube.channel.visibility_limited", "youtube.video.published"])
+    #expect(metricCount == 3)
+    #expect(try store.resources(pluginID: "com.status.youtube", accountID: account.id).map(\.type).sorted() == ["channel", "video"])
+    #expect(try store.statusItemCount() == 1)
+}
+
 @Test func bundledGooglePlayPluginMapsReviewsAndMetrics() throws {
     let database = try temporaryBundledPluginDatabase()
     let store = StatusPersistenceStore(database: database)
@@ -363,6 +475,22 @@ private func temporaryBundledPluginDatabase() throws -> SQLiteDatabase {
     let database = try SQLiteDatabase(path: path)
     try StatusDatabaseMigrator.migrate(database)
     return database
+}
+
+private func grantBundledPermissions(_ permissions: [PluginPermission], pluginID: String, store: StatusPersistenceStore, at date: Date) throws {
+    for permission in permissions {
+        try store.setPluginPermission(pluginID: pluginID, permission: permission, granted: true, grantedAt: date)
+    }
+}
+
+private struct BundledProviderTransport: PluginRequestHTTPTransport {
+    var expectedAuthorization: String
+    var responseForRequest: @Sendable (PluginHTTPRequest) throws -> PluginHTTPResponse
+
+    func response(for request: PluginHTTPRequest) async throws -> PluginHTTPResponse {
+        #expect(request.headers["Authorization"] == expectedAuthorization)
+        return try responseForRequest(request)
+    }
 }
 
 private func repositoryRoot() -> URL {

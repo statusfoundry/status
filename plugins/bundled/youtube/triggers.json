@@ -8,6 +8,12 @@
       "request": "list_my_channels"
     },
     {
+      "id": "refresh_channels",
+      "type": "manual",
+      "label": "Refresh channel stats",
+      "request": "list_my_channels"
+    },
+    {
       "id": "refresh_recent_uploads",
       "type": "manual",
       "label": "Refresh recent uploads",

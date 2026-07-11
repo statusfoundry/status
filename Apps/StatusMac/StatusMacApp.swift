@@ -255,12 +255,18 @@ private struct MacPluginSettingsWindow: View {
     private func runConfiguredPluginCheck(pluginID: String, accountID: String, accountName: String) async throws -> String {
         let store = try LocalStatusStore.openApplicationSupportStore()
         let service = PluginRuntimeService(store: store, effectDispatcher: MacActionEffectDispatcher())
-        let job = try service.enqueueManualConfiguredPluginRun(
+        let jobs = try service.enqueueManualConfiguredPluginRuns(
             pluginID: pluginID,
             accountID: accountID
         )
-        let result = try await service.runQueuedPluginJob(jobID: job.id)
-        return "\(accountName): \(result.mappingOutput.resources.count) resource stored, \(result.mappingOutput.events.count) events processed."
+        var resourceCount = 0
+        var eventCount = 0
+        for job in jobs {
+            let result = try await service.runQueuedPluginJob(jobID: job.id)
+            resourceCount += result.mappingOutput.resources.count
+            eventCount += result.mappingOutput.events.count
+        }
+        return "\(accountName): \(jobs.count) \(jobs.count == 1 ? "check" : "checks"), \(resourceCount) resource\(resourceCount == 1 ? "" : "s") stored, \(eventCount) event\(eventCount == 1 ? "" : "s") processed."
     }
 
     private func testConfiguredPluginRequest(pluginID: String, requestID: String, accountID: String) async throws -> String {
@@ -1122,12 +1128,18 @@ private struct MacRootView: View {
     private func runConfiguredPluginCheck(pluginID: String, accountID: String, accountName: String) async throws -> String {
         let store = try LocalStatusStore.openApplicationSupportStore()
         let service = PluginRuntimeService(store: store, effectDispatcher: MacActionEffectDispatcher())
-        let job = try service.enqueueManualConfiguredPluginRun(
+        let jobs = try service.enqueueManualConfiguredPluginRuns(
             pluginID: pluginID,
             accountID: accountID
         )
-        let result = try await service.runQueuedPluginJob(jobID: job.id)
-        return "\(accountName): \(result.mappingOutput.resources.count) resource stored, \(result.mappingOutput.events.count) events processed."
+        var resourceCount = 0
+        var eventCount = 0
+        for job in jobs {
+            let result = try await service.runQueuedPluginJob(jobID: job.id)
+            resourceCount += result.mappingOutput.resources.count
+            eventCount += result.mappingOutput.events.count
+        }
+        return "\(accountName): \(jobs.count) \(jobs.count == 1 ? "check" : "checks"), \(resourceCount) resource\(resourceCount == 1 ? "" : "s") stored, \(eventCount) event\(eventCount == 1 ? "" : "s") processed."
     }
 
     private func refreshConfiguredAppsFromOverview() async throws -> String {
@@ -1151,11 +1163,13 @@ private struct MacRootView: View {
             }
             for account in accounts {
                 do {
-                    let job = try service.enqueueManualConfiguredPluginRun(pluginID: plugin.id, accountID: account.id)
-                    let result = try await service.runQueuedPluginJob(jobID: job.id)
+                    let jobs = try service.enqueueManualConfiguredPluginRuns(pluginID: plugin.id, accountID: account.id)
                     refreshedCount += 1
-                    resourceCount += result.mappingOutput.resources.count
-                    eventCount += result.mappingOutput.events.count
+                    for job in jobs {
+                        let result = try await service.runQueuedPluginJob(jobID: job.id)
+                        resourceCount += result.mappingOutput.resources.count
+                        eventCount += result.mappingOutput.events.count
+                    }
                 } catch {
                     failedApps.append("\(account.accountName): \(error.localizedDescription)")
                 }

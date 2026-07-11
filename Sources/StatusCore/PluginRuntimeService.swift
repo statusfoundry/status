@@ -202,15 +202,7 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
         guard try store.accountConfiguration(accountID: accountID) != nil else {
             throw PluginRuntimeServiceError.accountNotConfigured(accountID)
         }
-        guard var trigger = try store.triggers()
-            .filter({ $0.pluginID == pluginID && $0.kind == .manual && $0.enabled })
-            .sorted(by: { lhs, rhs in
-                if (lhs.requestID != nil) != (rhs.requestID != nil) {
-                    return lhs.requestID != nil
-                }
-                return lhs.id < rhs.id
-            })
-            .first else {
+        guard var trigger = try enabledManualTriggers(pluginID: pluginID).first else {
             throw PluginRuntimeServiceError.runnableTriggerUnavailable(pluginID)
         }
         guard let requestID = trigger.requestID ?? bundledManualRequestID(pluginID: pluginID) else {
@@ -229,6 +221,41 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
         trigger.lastRunAt = now
         try store.upsertTrigger(trigger, updatedAt: now)
         return job
+    }
+
+    public func enqueueManualConfiguredPluginRuns(
+        pluginID: String,
+        accountID: String,
+        now: Date = Date()
+    ) throws -> [JobRecord] {
+        guard try store.accountConfiguration(accountID: accountID) != nil else {
+            throw PluginRuntimeServiceError.accountNotConfigured(accountID)
+        }
+        let triggers = try enabledManualTriggers(pluginID: pluginID)
+        guard triggers.isEmpty == false else {
+            throw PluginRuntimeServiceError.runnableTriggerUnavailable(pluginID)
+        }
+
+        var jobs: [JobRecord] = []
+        for var trigger in triggers {
+            guard let requestID = trigger.requestID ?? bundledManualRequestID(pluginID: pluginID) else {
+                throw PluginRuntimeServiceError.triggerRequestUnavailable(trigger.id)
+            }
+            let job = JobRecord(
+                id: jobID(pluginID: pluginID, requestID: requestID, accountID: accountID, date: now),
+                pluginID: pluginID,
+                triggerID: trigger.id,
+                accountID: accountID,
+                status: .queued,
+                queuedAt: now
+            )
+            try store.upsertJob(job)
+            trigger.requestID = requestID
+            trigger.lastRunAt = now
+            try store.upsertTrigger(trigger, updatedAt: now)
+            jobs.append(job)
+        }
+        return jobs
     }
 
     public func runNextQueuedPluginJob(headers: [String: String] = [:], now: Date = Date()) async throws -> PluginRequestJobResult? {
@@ -1127,5 +1154,16 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
         default:
             nil
         }
+    }
+
+    private func enabledManualTriggers(pluginID: String) throws -> [TriggerDefinition] {
+        try store.triggers()
+            .filter { $0.pluginID == pluginID && $0.kind == .manual && $0.enabled }
+            .sorted { lhs, rhs in
+                if (lhs.requestID != nil) != (rhs.requestID != nil) {
+                    return lhs.requestID != nil
+                }
+                return lhs.id < rhs.id
+            }
     }
 }

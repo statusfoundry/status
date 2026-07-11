@@ -81,8 +81,8 @@ export const registry = {
           ],
           "packageUrl": "https://status-registry.hakobs.com/plugins/com.status.github/0.1.0/com.status.github-0.1.0.statusplugin.zip",
           "manifestUrl": "https://status-registry.hakobs.com/plugins/com.status.github/0.1.0/manifest.json",
-          "sha256": "e91bc7422f2989513ba6e5e9f1e3e6746170a0d7de03047a24957a48cc28653f",
-          "signature": "RiohMOUIDboNhaqKH7q6FzSmvK3uBHj3bcXvlJbdVGy0KZvjbXbTrJDhUH3cDMe36SX83u5+Pf9fNChGYo3FBA==",
+          "sha256": "12a6537bfec3a0bea68f0507a1ab7b808d7a8fdbb4046fd8707468fd6cbc4744",
+          "signature": "p89PfqBCNcfpHwqxfgnCKSTacJxsWZ8QG5vA/8RKAmx0xyfAkAw2pc+k1une2dYofhevywU7Hj+K/C1G0ZawDg==",
           "signedBy": "status-foundry-dev",
           "releasedAt": "2026-07-07T12:00:00Z"
         }
@@ -300,8 +300,8 @@ export const registry = {
           ],
           "packageUrl": "https://status-registry.hakobs.com/plugins/com.status.youtube/0.1.0/com.status.youtube-0.1.0.statusplugin.zip",
           "manifestUrl": "https://status-registry.hakobs.com/plugins/com.status.youtube/0.1.0/manifest.json",
-          "sha256": "85f94a942d22c25ac9ecb1267a4e7a1824fb13ce5bcafdd5bff5bec625afd34c",
-          "signature": "KiSKYg5sY6skPuCgXA836pqcvuSSFiyv1dZ4fe96C+LdYA4QWvnNiXyy4LoAmSZ6Q+p4AhmJCiNEOG8brPllAA==",
+          "sha256": "9221099c3e5b9b7c213d7b69813e7f1f367ef0f47804c8bc3e24a274b5450e5c",
+          "signature": "NQCOlIo2KfTvVF2BPhwqVszMB175W2d04z1u1PAtsc/N3voaaWXOooJCmIzCqHGqBitlX3Y+neLVyS6uojOxBg==",
           "signedBy": "status-foundry-dev",
           "releasedAt": "2026-07-09T12:00:00Z"
         }

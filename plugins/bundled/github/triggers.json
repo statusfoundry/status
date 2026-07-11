@@ -8,6 +8,12 @@
       "request": "list_workflow_runs"
     },
     {
+      "id": "refresh_workflows",
+      "type": "manual",
+      "label": "Refresh workflow runs",
+      "request": "list_workflow_runs"
+    },
+    {
       "id": "refresh_activity",
       "type": "manual",
       "label": "Refresh repository activity",
