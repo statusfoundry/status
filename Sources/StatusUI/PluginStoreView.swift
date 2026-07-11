@@ -2346,7 +2346,7 @@ private struct InstalledPluginRow: View {
                     Button {
                         openSettings(plugin)
                     } label: {
-                        Label("Set Up Apps", systemImage: "gearshape")
+                        Label(settingsActionTitle, systemImage: "gearshape")
                     }
                     .buttonStyle(.bordered)
                     if canRun {
@@ -2406,7 +2406,16 @@ private struct InstalledPluginRow: View {
         if accounts.count == 1 {
             return accounts[0].accountName
         }
-        return "\(accounts.count) apps"
+        let visibleNames = accounts.prefix(2).map(\.accountName).joined(separator: ", ")
+        let remainingCount = accounts.count - 2
+        if remainingCount > 0 {
+            return "\(visibleNames) + \(remainingCount) more"
+        }
+        return visibleNames
+    }
+
+    private var settingsActionTitle: String {
+        accounts.isEmpty ? "Set Up App" : "Manage Apps"
     }
 }
 
@@ -2525,46 +2534,6 @@ private struct PluginSettingsPanel: View {
             if let settingsRunUnavailableReason {
                 SettingsRunUnavailableView(reason: settingsRunUnavailableReason)
             }
-            if permissions.isEmpty == false {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Permissions")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    VStack(spacing: 8) {
-                        ForEach(permissions) { permission in
-                            PluginPermissionToggle(
-                                permission: permission,
-                                isSaving: savingPermissionID == permissionChangeID(permission),
-                                update: { granted in
-                                    setPermissionGrant(plugin, permission.permission, granted)
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-            if triggers.isEmpty == false {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Checks")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    VStack(spacing: 8) {
-                        ForEach(triggers) { trigger in
-                            PluginTriggerToggle(
-                                trigger: trigger,
-                                isSaving: savingTriggerID == trigger.id,
-                                update: { enabled in
-                                    setTriggerEnabled(plugin, trigger, enabled)
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-            if let runtimeStatus {
-                PluginRuntimeStatusView(status: runtimeStatus)
-            }
-            PluginDeclaredViewsPanel(plugin: plugin, resources: resources)
             if canConfigure {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("App configuration")
@@ -2630,7 +2599,53 @@ private struct PluginSettingsPanel: View {
                         .buttonStyle(.bordered)
                         .disabled(isSavingSetup || hasMissingRequiredSetupValue)
                     }
-                    Divider()
+                }
+            }
+            if permissions.isEmpty == false {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Permissions")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    VStack(spacing: 8) {
+                        ForEach(permissions) { permission in
+                            PluginPermissionToggle(
+                                permission: permission,
+                                isSaving: savingPermissionID == permissionChangeID(permission),
+                                update: { granted in
+                                    setPermissionGrant(plugin, permission.permission, granted)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            if triggers.isEmpty == false {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Checks")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    VStack(spacing: 8) {
+                        ForEach(triggers) { trigger in
+                            PluginTriggerToggle(
+                                trigger: trigger,
+                                isSaving: savingTriggerID == trigger.id,
+                                update: { enabled in
+                                    setTriggerEnabled(plugin, trigger, enabled)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            if let runtimeStatus {
+                PluginRuntimeStatusView(status: runtimeStatus)
+            }
+            PluginDeclaredViewsPanel(plugin: plugin, resources: resources)
+            if canConfigure {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("App behavior")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
                     PluginRequestTestPanel(
                         plugin: plugin,
                         requestIDs: requestIDs,
