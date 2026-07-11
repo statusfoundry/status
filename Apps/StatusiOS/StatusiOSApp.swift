@@ -652,9 +652,6 @@ private struct IOSRootView: View {
 
     private func bootstrapBundledPlugins() throws {
         let store = try LocalStatusStore.openApplicationSupportStore()
-        guard try store.syncState(ownerType: "app", ownerID: "bundled-plugins") != "installed" else {
-            return
-        }
         let installer = BundledPluginInstaller(store: store, installRoot: try pluginInstallRoot())
         try installer.installAll()
         try store.upsertSyncState(

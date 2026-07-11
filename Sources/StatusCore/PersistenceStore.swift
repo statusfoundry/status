@@ -705,6 +705,26 @@ public final class StatusPersistenceStore {
         )
     }
 
+    public func markAccountRefresh(accountID: String, status: String, lastError: String?, refreshedAt: Date) throws {
+        try database.execute(
+            """
+            UPDATE accounts
+            SET status = ?,
+                last_error = ?,
+                last_refreshed_at = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            bindings: [
+                .text(status),
+                lastError.map { .text($0) } ?? .null,
+                .text(ISO8601.string(from: refreshedAt)),
+                .text(ISO8601.string(from: refreshedAt)),
+                .text(accountID)
+            ]
+        )
+    }
+
     public func account(id: String) throws -> Account? {
         guard let row = try database.query("SELECT * FROM accounts WHERE id = ?", bindings: [.text(id)]).first else {
             return nil
@@ -1816,10 +1836,15 @@ public final class StatusPersistenceStore {
         guard let configuration = try accountConfiguration(accountID: accountID) else {
             return []
         }
-        let selectedFields = configuration.variables[PluginSetupConfiguration.dashboardTileFieldsKey, default: ""]
+        var selectedFields = configuration.variables[PluginSetupConfiguration.dashboardTileFieldsKey, default: ""]
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { $0.isEmpty == false }
+        if selectedFields.isEmpty,
+           let defaultFields = try installedPlugin(id: pluginID)?.dashboardTile?.defaultFields.prefix(4),
+           defaultFields.isEmpty == false {
+            selectedFields = Array(defaultFields)
+        }
         guard selectedFields.isEmpty == false else {
             return []
         }

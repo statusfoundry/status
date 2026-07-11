@@ -280,9 +280,6 @@ private struct MacPluginSettingsWindow: View {
 
     private func bootstrapBundledPlugins() throws {
         let store = try LocalStatusStore.openApplicationSupportStore()
-        guard try store.syncState(ownerType: "app", ownerID: "bundled-plugins") != "installed" else {
-            return
-        }
         let installer = BundledPluginInstaller(store: store, installRoot: try pluginInstallRoot())
         try installer.installAll()
         try store.upsertSyncState(
@@ -440,9 +437,6 @@ private func notificationPreferenceID(pluginID: String, accountID: String?, even
 
 private func bootstrapBundledPluginsForNotificationPreferences() throws {
     let store = try LocalStatusStore.openApplicationSupportStore()
-    guard try store.syncState(ownerType: "app", ownerID: "bundled-plugins") != "installed" else {
-        return
-    }
     let databaseURL = try LocalStatusStore.applicationSupportDatabaseURL()
     let directory = databaseURL.deletingLastPathComponent().appendingPathComponent("Plugins", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -1251,9 +1245,6 @@ private struct MacRootView: View {
 
     private func bootstrapBundledPlugins() throws {
         let store = try LocalStatusStore.openApplicationSupportStore()
-        guard try store.syncState(ownerType: "app", ownerID: "bundled-plugins") != "installed" else {
-            return
-        }
         let installer = BundledPluginInstaller(store: store, installRoot: try pluginInstallRoot())
         try installer.installAll()
         try store.upsertSyncState(

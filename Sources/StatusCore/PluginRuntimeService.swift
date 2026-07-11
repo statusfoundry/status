@@ -307,33 +307,36 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
         guard let job = try store.job(id: jobID), job.status == .queued else {
             throw PluginRuntimeServiceError.queuedJobUnavailable(jobID)
         }
-        guard let trigger = try store.trigger(id: job.triggerID),
-              let requestID = trigger.requestID else {
-            try failQueuedJob(job, at: now, error: PluginRuntimeServiceError.triggerRequestUnavailable(job.triggerID))
-            throw PluginRuntimeServiceError.triggerRequestUnavailable(job.triggerID)
-        }
-        guard let accountID = job.accountID,
-              let configuration = try store.accountConfiguration(accountID: accountID) else {
-            let missingAccountID = job.accountID ?? "unknown"
-            try failQueuedJob(job, at: now, error: PluginRuntimeServiceError.accountNotConfigured(missingAccountID))
-            throw PluginRuntimeServiceError.accountNotConfigured(missingAccountID)
-        }
 
-        return try await executeInstalledPluginRequest(
-            PluginRuntimeRequest(
-                pluginID: job.pluginID,
-                requestID: requestID,
-                accountID: configuration.id,
-                accountName: configuration.accountName,
-                variables: configuration.variables,
-                headers: try await resolvedHeaders(base: headers, pluginID: job.pluginID, configuration: configuration, now: now),
-                now: now
-            ),
-            jobID: job.id,
-            triggerID: job.triggerID,
-            queuedAt: job.queuedAt,
-            upsertAccount: false
-        )
+        do {
+            guard let trigger = try store.trigger(id: job.triggerID),
+                  let requestID = trigger.requestID else {
+                throw PluginRuntimeServiceError.triggerRequestUnavailable(job.triggerID)
+            }
+            guard let accountID = job.accountID,
+                  let configuration = try store.accountConfiguration(accountID: accountID) else {
+                throw PluginRuntimeServiceError.accountNotConfigured(job.accountID ?? "unknown")
+            }
+
+            return try await executeInstalledPluginRequest(
+                PluginRuntimeRequest(
+                    pluginID: job.pluginID,
+                    requestID: requestID,
+                    accountID: configuration.id,
+                    accountName: configuration.accountName,
+                    variables: configuration.variables,
+                    headers: try await resolvedHeaders(base: headers, pluginID: job.pluginID, configuration: configuration, now: now),
+                    now: now
+                ),
+                jobID: job.id,
+                triggerID: job.triggerID,
+                queuedAt: job.queuedAt,
+                upsertAccount: false
+            )
+        } catch {
+            try failQueuedJobIfStillQueued(job, at: now, error: error)
+            throw error
+        }
     }
 
     public func runConfiguredPluginRequest(
@@ -515,6 +518,12 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
                     emittedEventIDs: result.mappingOutput.events.map(\.id)
                 )
             )
+            try store.markAccountRefresh(
+                accountID: request.accountID,
+                status: "connected",
+                lastError: nil,
+                refreshedAt: request.now
+            )
             if let job = try store.job(id: jobID) {
                 try store.insertJobAuditEntry(for: job, timestamp: request.now)
             }
@@ -534,6 +543,12 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
                     finishedAt: request.now,
                     error: error.localizedDescription
                 )
+            )
+            try store.markAccountRefresh(
+                accountID: request.accountID,
+                status: "error",
+                lastError: error.localizedDescription,
+                refreshedAt: request.now
             )
             if let job = try store.job(id: jobID) {
                 try store.insertJobAuditEntry(for: job, timestamp: request.now)
@@ -557,10 +572,25 @@ public final class PluginRuntimeService: ProviderActionExecutor, @unchecked Send
                 error: error.localizedDescription
             )
         )
+        if let accountID = job.accountID {
+            try store.markAccountRefresh(
+                accountID: accountID,
+                status: "error",
+                lastError: error.localizedDescription,
+                refreshedAt: date
+            )
+        }
         if let failedJob = try store.job(id: job.id) {
             try store.insertJobAuditEntry(for: failedJob, timestamp: date)
         }
         try recordTriggerFailure(triggerID: job.triggerID, at: date)
+    }
+
+    private func failQueuedJobIfStillQueued(_ job: JobRecord, at date: Date, error: Error) throws {
+        guard (try store.job(id: job.id))?.status == .queued else {
+            return
+        }
+        try failQueuedJob(job, at: date, error: error)
     }
 
     private func recordTriggerSuccess(triggerID: String, at date: Date) throws {

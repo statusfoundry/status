@@ -103,6 +103,23 @@ public struct PluginAuthor: Codable, Equatable, Sendable {
         self.externalUrl = externalUrl
         self.repositoryUrl = repositoryUrl
     }
+
+    public init(from decoder: Decoder) throws {
+        let singleValueContainer = try decoder.singleValueContainer()
+        if let legacyName = try? singleValueContainer.decode(String.self) {
+            self.init(name: legacyName)
+            return
+        }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            name: try container.decode(String.self, forKey: .name),
+            publisherId: try container.decodeIfPresent(String.self, forKey: .publisherId),
+            websitePath: try container.decodeIfPresent(String.self, forKey: .websitePath),
+            externalUrl: try container.decodeIfPresent(URL.self, forKey: .externalUrl),
+            repositoryUrl: try container.decodeIfPresent(URL.self, forKey: .repositoryUrl)
+        )
+    }
 }
 
 extension PluginAuthor: ExpressibleByStringLiteral {

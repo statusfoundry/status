@@ -15,6 +15,29 @@ import Testing
     )
 }
 
+@Test func pluginManifestDecodesLegacyStringAuthor() throws {
+    let data = Data("""
+    {
+      "id": "com.status.website",
+      "name": "Website Uptime",
+      "version": "0.1.0",
+      "author": "Status Foundry",
+      "category": "monitoring",
+      "description": "Checks configured websites.",
+      "minCoreVersion": "0.1.0",
+      "platforms": ["macOS", "iOS"],
+      "permissions": ["network", "user-configured-domains"],
+      "domains": []
+    }
+    """.utf8)
+
+    let manifest = try JSONDecoder().decode(PluginManifest.self, from: data)
+
+    #expect(manifest.author == PluginAuthor(name: "Status Foundry"))
+    #expect(manifest.icon == nil)
+    #expect(manifest.accentColor == nil)
+}
+
 @Test func networkPluginMustDeclareRequestedDomains() throws {
     var manifest = appStoreConnectManifest()
     manifest.domains = []

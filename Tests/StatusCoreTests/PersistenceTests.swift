@@ -1223,6 +1223,113 @@ import Testing
     ])
 }
 
+@Test func dashboardSnapshotFallsBackToPackagedDefaultTileFields() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let packageURL = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appendingPathComponent("Sources/StatusCore/Resources/BundledPlugins/com.status.website-0.1.0.statusplugin.zip")
+    let packageData = try Data(contentsOf: packageURL)
+    let packageDefinition = try PluginPackageDefinition.decode(from: packageData)
+    let manifest = PluginManifest(
+        id: "com.status.website",
+        name: "Website Uptime",
+        version: "0.1.0",
+        author: PluginAuthor(name: "Status Foundry", publisherId: "status-foundry"),
+        category: "monitoring",
+        description: "Read-only website checks.",
+        minCoreVersion: "0.1.0",
+        platforms: [.macOS, .iOS],
+        permissions: [.network, .userConfiguredDomains],
+        domains: []
+    )
+    try store.installPlugin(
+        PluginInstallRecord(
+            manifest: manifest,
+            trustLevel: .official,
+            installPath: "/Application Support/Status/Plugins/com.status.website",
+            packagePath: packageURL.path,
+            verification: PluginPackageVerificationResult(
+                pluginID: manifest.id,
+                version: manifest.version,
+                sha256: PluginPackageVerifier.sha256Hex(packageData),
+                signedBy: "status-foundry-dev"
+            ),
+            signature: "dev-signature",
+            packageDefinition: packageDefinition,
+            installedAt: now
+        )
+    )
+    try store.upsertAccountConfiguration(
+        PluginAccountConfiguration(
+            id: "acc_site",
+            pluginID: "com.status.website",
+            accountName: "Status Website",
+            variables: ["host": "status.hakobs.com"]
+        ),
+        updatedAt: now
+    )
+    try store.upsertResource(
+        Resource(
+            id: "res_site",
+            accountID: "acc_site",
+            pluginID: "com.status.website",
+            type: "website",
+            name: "status.hakobs.com",
+            fields: ["reachable": "true", "statusCode": "200", "responseTimeMs": "123"],
+            actionURL: URL(string: "https://status.hakobs.com")
+        ),
+        externalID: "status.hakobs.com",
+        fields: ["reachable": "true", "statusCode": "200", "responseTimeMs": "123"],
+        seenAt: now
+    )
+
+    let snapshot = try store.dashboardSnapshot(now: now)
+
+    #expect(snapshot.integrations.first?.tileItems == [
+        DashboardTileItem(
+            id: "reachable",
+            label: "Reachable",
+            value: "true",
+            kind: .text,
+            resourceName: "status.hakobs.com",
+            resourceType: "website",
+            actionURL: URL(string: "https://status.hakobs.com")
+        ),
+        DashboardTileItem(
+            id: "statusCode",
+            label: "Status Code",
+            value: "200",
+            kind: .status,
+            resourceName: "status.hakobs.com",
+            resourceType: "website",
+            actionURL: URL(string: "https://status.hakobs.com")
+        ),
+        DashboardTileItem(
+            id: "responseTimeMs",
+            label: "Response Time Ms",
+            value: "123",
+            kind: .count,
+            resourceName: "status.hakobs.com",
+            resourceType: "website",
+            actionURL: URL(string: "https://status.hakobs.com")
+        ),
+        DashboardTileItem(
+            id: "actionUrl",
+            label: "Action Url",
+            value: "https://status.hakobs.com",
+            kind: .link,
+            resourceName: "status.hakobs.com",
+            resourceType: "website",
+            actionURL: URL(string: "https://status.hakobs.com")
+        )
+    ])
+}
+
 @Test func dashboardSnapshotShowsCanonicalAppTileFields() throws {
     let database = try temporaryDatabase()
     try StatusDatabaseMigrator.migrate(database)

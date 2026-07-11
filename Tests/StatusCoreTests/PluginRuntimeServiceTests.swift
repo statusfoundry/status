@@ -492,6 +492,108 @@ import Testing
     #expect(try store.job(id: queued.id)?.status == .success)
     #expect(try store.job(id: queued.id)?.triggerID == "trg_com_status_website_refresh_site")
     #expect(try store.auditEntry(id: "aud_\(queued.id)_success")?.status == "success")
+    #expect(try store.integrationSummaries().first?.state == "Connected")
+    #expect(try store.integrationSummaries().first?.lastSyncDescription != "Never synced")
+}
+
+@Test func pluginRuntimeServiceFailsQueuedJobWhenInstalledMetadataCannotLoad() async throws {
+    let database = try temporaryRuntimeDatabase()
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let packageURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("status-runtime-\(UUID().uuidString).statusplugin.zip")
+    let packageData = runtimeStoredZip(files: [
+        ("requests.json", Data("""
+        {
+          "requests": {
+            "check_site": {
+              "method": "GET",
+              "url": "https://{{host}}",
+              "timeoutSeconds": 15
+            }
+          }
+        }
+        """.utf8)),
+        ("mappings.json", Data("""
+        {
+          "resources": [],
+          "events": []
+        }
+        """.utf8))
+    ])
+    try packageData.write(to: packageURL)
+    let manifest = PluginManifest(
+        id: WebsitePluginSetup.pluginID,
+        name: "Website Uptime",
+        version: "0.1.0",
+        author: PluginAuthor(name: "Status Foundry", publisherId: "status-foundry"),
+        category: "ops",
+        description: "Check configured websites.",
+        minCoreVersion: "0.1.0",
+        platforms: [.macOS, .iOS],
+        permissions: [.network, .userConfiguredDomains],
+        domains: []
+    )
+    try store.installPlugin(
+        PluginInstallRecord(
+            manifest: manifest,
+            trustLevel: .official,
+            installPath: packageURL.deletingLastPathComponent().path,
+            packagePath: packageURL.path,
+            verification: PluginPackageVerificationResult(
+                pluginID: manifest.id,
+                version: manifest.version,
+                sha256: PluginPackageVerifier.sha256Hex(packageData),
+                signedBy: "status-foundry-dev"
+            ),
+            signature: "dev-signature",
+            packageDefinition: try PluginPackageDefinition.decode(from: packageData),
+            installedAt: now
+        )
+    )
+    try grantRuntimePermissions(manifest.permissions, pluginID: manifest.id, store: store, at: now)
+    try store.upsertTrigger(
+        TriggerDefinition(
+            id: "trg_com_status_website_refresh_site",
+            pluginID: manifest.id,
+            kind: .manual,
+            label: "Refresh website status",
+            requestID: WebsitePluginSetup.requestID
+        ),
+        updatedAt: now
+    )
+    let service = PluginRuntimeService(store: store)
+    try service.saveAccountConfiguration(
+        PluginAccountConfiguration(
+            id: "acct_website_status_registry",
+            pluginID: WebsitePluginSetup.pluginID,
+            accountName: "status-registry.hakobs.com",
+            variables: ["host": "status-registry.hakobs.com"]
+        ),
+        now: now
+    )
+    let queued = try service.enqueueManualConfiguredPluginRun(
+        pluginID: WebsitePluginSetup.pluginID,
+        accountID: "acct_website_status_registry",
+        now: now
+    )
+    try database.execute(
+        "UPDATE plugin_versions SET manifest_json = ? WHERE plugin_id = ?",
+        bindings: [.text("{"), .text(manifest.id)]
+    )
+
+    await #expect(throws: (any Error).self) {
+        try await service.runQueuedPluginJob(jobID: queued.id, now: now.addingTimeInterval(1))
+    }
+
+    let failedJob = try #require(try store.job(id: queued.id))
+    #expect(failedJob.status == .failed)
+    #expect(failedJob.startedAt == now.addingTimeInterval(1))
+    #expect(failedJob.finishedAt == now.addingTimeInterval(1))
+    #expect(failedJob.error?.isEmpty == false)
+    #expect(try store.auditEntry(id: "aud_\(queued.id)_failed")?.status == "failed")
+    #expect(try store.integrationSummaries().first?.state == "Needs attention")
+    #expect(try store.integrationSummaries().first?.lastSyncDescription != "Never synced")
 }
 
 @Test func pluginRuntimeServiceRunsDueConfiguredCronWebsiteJob() async throws {
