@@ -90,6 +90,59 @@ import Testing
     #expect(facts.latestResourceDetail == "Latest stored resource")
 }
 
+@Test func pluginCatalogAppSummaryTextDescribesNoConfiguredApps() {
+    let summary = PluginCatalogAppSummaryText(accounts: [], selectedAccountID: nil)
+
+    #expect(summary.primary == "No apps configured")
+    #expect(summary.secondary == "Set up an app from this plugin.")
+}
+
+@Test func pluginCatalogAppSummaryTextDescribesOneConfiguredApp() {
+    let summary = PluginCatalogAppSummaryText(
+        accounts: [
+            PluginAccountConfiguration(
+                id: "acct_work",
+                pluginID: "com.status.github",
+                accountName: "Work GitHub",
+                variables: [:],
+                authType: "apiKey",
+                credentialRef: nil
+            )
+        ],
+        selectedAccountID: "acct_work"
+    )
+
+    #expect(summary.primary == "1 app configured")
+    #expect(summary.secondary == "Work GitHub")
+}
+
+@Test func pluginCatalogAppSummaryTextDescribesSelectedAppForRefresh() {
+    let summary = PluginCatalogAppSummaryText(
+        accounts: [
+            PluginAccountConfiguration(
+                id: "acct_work",
+                pluginID: "com.status.github",
+                accountName: "Work GitHub",
+                variables: [:],
+                authType: "apiKey",
+                credentialRef: nil
+            ),
+            PluginAccountConfiguration(
+                id: "acct_personal",
+                pluginID: "com.status.github",
+                accountName: "Personal GitHub",
+                variables: [:],
+                authType: "apiKey",
+                credentialRef: nil
+            )
+        ],
+        selectedAccountID: "acct_personal"
+    )
+
+    #expect(summary.primary == "2 apps configured")
+    #expect(summary.secondary == "Selected for refresh: Personal GitHub")
+}
+
 @Test func pluginStoreCatalogDetectsAvailableUpdates() throws {
     let installed = InstalledPlugin(
         id: "com.status.github",

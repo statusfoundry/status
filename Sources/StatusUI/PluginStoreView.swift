@@ -2321,6 +2321,7 @@ private struct InstalledPluginSection: View {
                             plugin: plugin,
                             availableUpdate: availableUpdates[plugin.id],
                             accounts: configuredAccounts[plugin.id, default: []],
+                            selectedAccountID: selectedAccountIDs[plugin.id],
                             runtimeStatus: runtimeStatus(for: plugin),
                             canRun: canRun(plugin),
                             runUnavailableReason: runUnavailableReason(for: plugin),
@@ -2435,6 +2436,7 @@ private struct InstalledPluginRow: View {
     let plugin: InstalledPlugin
     let availableUpdate: RegistryPluginSummary?
     let accounts: [PluginAccountConfiguration]
+    let selectedAccountID: String?
     let runtimeStatus: PluginRuntimeStatus?
     let canRun: Bool
     let runUnavailableReason: String?
@@ -2463,17 +2465,26 @@ private struct InstalledPluginRow: View {
                 Text("By \(plugin.author)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    Text(accountSummary)
-                    if let runtimeStatus {
-                        Text(runtimeStatus.status.displayName)
-                            .foregroundStyle(runtimeStatus.status.statusColor)
-                    } else {
-                        Text("Not checked yet")
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(appSummary.primary)
+                    if let secondary = appSummary.secondary {
+                        Text(secondary)
                     }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    if let runtimeStatus {
+                        Text(runtimeStatus.status.displayName)
+                            .foregroundStyle(runtimeStatus.status.statusColor)
+                        Text(runtimeStatus.timestamp, style: .relative)
+                            .foregroundStyle(.tertiary)
+                    } else {
+                        Text("Not checked yet")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.caption)
             }
             Spacer(minLength: 12)
             VStack(alignment: .trailing, spacing: 8) {
@@ -2535,23 +2546,51 @@ private struct InstalledPluginRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private var accountSummary: String {
-        if accounts.isEmpty {
-            return "No apps configured"
-        }
-        if accounts.count == 1 {
-            return accounts[0].accountName
-        }
-        let visibleNames = accounts.prefix(2).map(\.accountName).joined(separator: ", ")
-        let remainingCount = accounts.count - 2
-        if remainingCount > 0 {
-            return "\(visibleNames) + \(remainingCount) more"
-        }
-        return visibleNames
+    private var appSummary: PluginCatalogAppSummaryText {
+        PluginCatalogAppSummaryText(accounts: accounts, selectedAccountID: selectedAccountID)
     }
 
     private var settingsActionTitle: String {
         accounts.isEmpty ? "Set Up App" : "Manage Apps"
+    }
+}
+
+struct PluginCatalogAppSummaryText: Equatable, Sendable {
+    var primary: String
+    var secondary: String?
+
+    init(accounts: [PluginAccountConfiguration], selectedAccountID: String?) {
+        if accounts.isEmpty {
+            self.primary = "No apps configured"
+            self.secondary = "Set up an app from this plugin."
+            return
+        }
+
+        if accounts.count == 1, let account = accounts.first {
+            self.primary = "1 app configured"
+            self.secondary = account.accountName
+            return
+        }
+
+        self.primary = "\(accounts.count) apps configured"
+        if let selectedAccount = Self.selectedAccount(accounts: accounts, selectedAccountID: selectedAccountID) {
+            self.secondary = "Selected for refresh: \(selectedAccount.accountName)"
+        } else {
+            let visibleNames = accounts.prefix(2).map(\.accountName).joined(separator: ", ")
+            let remainingCount = accounts.count - 2
+            self.secondary = remainingCount > 0 ? "\(visibleNames) + \(remainingCount) more" : visibleNames
+        }
+    }
+
+    private static func selectedAccount(
+        accounts: [PluginAccountConfiguration],
+        selectedAccountID: String?
+    ) -> PluginAccountConfiguration? {
+        guard let selectedAccountID,
+              selectedAccountID.hasPrefix(PluginStoreAccountSelection.newAccountPrefix) == false else {
+            return nil
+        }
+        return accounts.first { $0.id == selectedAccountID }
     }
 }
 
