@@ -1550,7 +1550,7 @@ public struct PluginAppDetailView: View {
                 if let runUnavailableReason {
                     RunUnavailableView(reason: runUnavailableReason)
                 }
-                if plugin.views.isEmpty {
+                if resources.isEmpty || plugin.views.isEmpty {
                     PluginFallbackAppDataPanel(plugin: plugin, resources: resources)
                 } else {
                     PluginDeclaredViewsPanel(plugin: plugin, resources: resources)
