@@ -61,7 +61,7 @@ import Testing
     let store = StatusPersistenceStore(database: database)
     let responseURL = try #require(URL(string: "https://status.hakobs.com"))
     let transport = FakePluginRequestTransport(responses: [
-        responseURL: PluginHTTPResponse(data: Data("Service unavailable".utf8), statusCode: 503, url: responseURL)
+        responseURL: PluginHTTPResponse(data: Data("Service unavailable".utf8), statusCode: 503, url: responseURL, responseTimeMs: 812)
     ])
     let runner = PluginRequestJobRunner(
         transport: transport,
@@ -85,6 +85,7 @@ import Testing
         "host": .string("status.hakobs.com"),
         "previousHealthy": .null,
         "reachable": .bool(false),
+        "responseTimeMs": .number(812),
         "statusCode": .number(503)
     ]))
     #expect(result.mappingOutput.resources.map(\.resource.id) == ["acct_web:status.hakobs.com"])

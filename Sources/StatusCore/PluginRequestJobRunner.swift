@@ -26,11 +26,13 @@ public struct PluginHTTPResponse: Equatable, Sendable {
     public var data: Data
     public var statusCode: Int
     public var url: URL
+    public var responseTimeMs: Int?
 
-    public init(data: Data, statusCode: Int, url: URL) {
+    public init(data: Data, statusCode: Int, url: URL, responseTimeMs: Int? = nil) {
         self.data = data
         self.statusCode = statusCode
         self.url = url
+        self.responseTimeMs = responseTimeMs
     }
 }
 
@@ -48,9 +50,16 @@ public struct URLSessionPluginRequestTransport: PluginRequestHTTPTransport {
             urlRequest.setValue(value, forHTTPHeaderField: field)
         }
         urlRequest.httpBody = request.body
+        let startedAt = ContinuousClock.now
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        let elapsed = startedAt.duration(to: ContinuousClock.now)
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 200
-        return PluginHTTPResponse(data: data, statusCode: statusCode, url: request.url)
+        return PluginHTTPResponse(
+            data: data,
+            statusCode: statusCode,
+            url: request.url,
+            responseTimeMs: Int(elapsed.components.seconds * 1_000) + Int(elapsed.components.attoseconds / 1_000_000_000_000_000)
+        )
     }
 }
 
@@ -307,14 +316,21 @@ public final class PluginRequestJobRunner {
     }
 
     private func decodePayload(response: PluginHTTPResponse, variables: [String: String]) -> MappingJSONValue {
+        var runtimeFields: [String: MappingJSONValue] = [
+            "statusCode": .number(Double(response.statusCode))
+        ]
+        if let responseTimeMs = response.responseTimeMs {
+            runtimeFields["responseTimeMs"] = .number(Double(responseTimeMs))
+        }
+
         if let payload = try? decoder.decode(MappingJSONValue.self, from: response.data) {
-            return payload.mergingObjectFields([
-                "statusCode": .number(Double(response.statusCode))
-            ])
+            return payload.mergingObjectFields(runtimeFields)
         }
 
         var fields = variables.mapValues(MappingJSONValue.string)
-        fields["statusCode"] = .number(Double(response.statusCode))
+        for (key, value) in runtimeFields {
+            fields[key] = value
+        }
         fields["reachable"] = .bool((200..<500).contains(response.statusCode))
         fields["previousHealthy"] = .null
         return .object(fields)

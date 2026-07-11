@@ -1302,7 +1302,7 @@ import Testing
         ),
         DashboardTileItem(
             id: "statusCode",
-            label: "Status Code",
+            label: "Status",
             value: "200",
             kind: .status,
             resourceName: "status.hakobs.com",
@@ -1311,7 +1311,7 @@ import Testing
         ),
         DashboardTileItem(
             id: "responseTimeMs",
-            label: "Response Time Ms",
+            label: "Response Time",
             value: "123",
             kind: .count,
             resourceName: "status.hakobs.com",
@@ -1320,7 +1320,7 @@ import Testing
         ),
         DashboardTileItem(
             id: "actionUrl",
-            label: "Action Url",
+            label: "Open",
             value: "https://status.hakobs.com",
             kind: .link,
             resourceName: "status.hakobs.com",
@@ -1400,7 +1400,7 @@ import Testing
         ),
         DashboardTileItem(
             id: "actionUrl",
-            label: "Action Url",
+            label: "Open",
             value: "https://github.com/statusfoundry/status",
             kind: .link,
             resourceName: "statusfoundry/status",
