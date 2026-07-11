@@ -1585,6 +1585,7 @@ public struct PluginAppDetailView: View {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityLabel(Text("Refresh \(app?.accountName ?? plugin.name)"))
                 }
                 if let openSettings {
                     Button {
@@ -1593,6 +1594,7 @@ public struct PluginAppDetailView: View {
                         Label("Settings", systemImage: "gearshape")
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityLabel(Text("Open settings for \(app?.accountName ?? plugin.name)"))
                 }
             }
         }

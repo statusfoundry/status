@@ -580,7 +580,7 @@ private struct MacRootView: View {
                         }
                     )
                 }
-                    .navigationTitle("App")
+                    .navigationTitle(appNavigationTitle(pluginID: pluginID, accountID: accountID))
             case .rules:
                 detailWithAppTabs {
                     RulesContainerView(viewModel: makeRulesViewModel())
@@ -710,6 +710,12 @@ private struct MacRootView: View {
         .help(app.name)
         .accessibilityLabel(Text(app.name))
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    private func appNavigationTitle(pluginID: String, accountID: String?) -> String {
+        sidebarApps.first { app in
+            app.pluginID == pluginID && app.accountID == accountID
+        }?.name ?? "App"
     }
 
     private func makeDashboardViewModel() -> DashboardViewModel {
