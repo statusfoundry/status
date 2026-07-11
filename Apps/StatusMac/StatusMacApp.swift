@@ -726,6 +726,11 @@ private struct MacRootView: View {
         DashboardViewModel {
             try bootstrapBundledPlugins()
             return try LocalStatusStore.openApplicationSupportStore().dashboardSnapshot()
+        } refreshApps: {
+            defer {
+                NotificationCenter.default.post(name: .statusAppDataDidChange, object: nil)
+            }
+            return try await refreshConfiguredAppsFromOverview()
         }
     }
 
@@ -1123,6 +1128,75 @@ private struct MacRootView: View {
         )
         let result = try await service.runQueuedPluginJob(jobID: job.id)
         return "\(accountName): \(result.mappingOutput.resources.count) resource stored, \(result.mappingOutput.events.count) events processed."
+    }
+
+    private func refreshConfiguredAppsFromOverview() async throws -> String {
+        try bootstrapBundledPlugins()
+        let store = try LocalStatusStore.openApplicationSupportStore()
+        let service = PluginRuntimeService(store: store, effectDispatcher: MacActionEffectDispatcher())
+        var refreshedCount = 0
+        var skippedCount = 0
+        var failedApps: [String] = []
+        var resourceCount = 0
+        var eventCount = 0
+
+        for plugin in try store.installedPlugins() where plugin.enabled {
+            let accounts = try store.accountConfigurations(pluginID: plugin.id)
+            guard accounts.isEmpty == false else {
+                continue
+            }
+            guard canRunConfiguredPlugin(pluginID: plugin.id) else {
+                skippedCount += accounts.count
+                continue
+            }
+            for account in accounts {
+                do {
+                    let job = try service.enqueueManualConfiguredPluginRun(pluginID: plugin.id, accountID: account.id)
+                    let result = try await service.runQueuedPluginJob(jobID: job.id)
+                    refreshedCount += 1
+                    resourceCount += result.mappingOutput.resources.count
+                    eventCount += result.mappingOutput.events.count
+                } catch {
+                    failedApps.append("\(account.accountName): \(error.localizedDescription)")
+                }
+            }
+        }
+
+        return overviewRefreshSummary(
+            refreshedCount: refreshedCount,
+            skippedCount: skippedCount,
+            failedApps: failedApps,
+            resourceCount: resourceCount,
+            eventCount: eventCount
+        )
+    }
+
+    private func overviewRefreshSummary(
+        refreshedCount: Int,
+        skippedCount: Int,
+        failedApps: [String],
+        resourceCount: Int,
+        eventCount: Int
+    ) -> String {
+        if refreshedCount == 0, failedApps.isEmpty {
+            if skippedCount > 0 {
+                return "No configured apps have an enabled manual refresh check."
+            }
+            return "No apps configured yet."
+        }
+
+        var parts = [
+            "Refreshed \(refreshedCount) \(refreshedCount == 1 ? "app" : "apps")",
+            "\(resourceCount) \(resourceCount == 1 ? "resource" : "resources") stored",
+            "\(eventCount) \(eventCount == 1 ? "event" : "events") processed"
+        ]
+        if skippedCount > 0 {
+            parts.append("\(skippedCount) \(skippedCount == 1 ? "app" : "apps") skipped")
+        }
+        if failedApps.isEmpty == false {
+            parts.append("\(failedApps.count) failed: \(failedApps.prefix(2).joined(separator: "; "))")
+        }
+        return parts.joined(separator: ". ") + "."
     }
 
     private func testConfiguredPluginRequest(pluginID: String, requestID: String, accountID: String) async throws -> String {

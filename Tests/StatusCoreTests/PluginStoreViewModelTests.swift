@@ -41,6 +41,77 @@ import Testing
     )
 }
 
+@MainActor
+@Test func dashboardViewModelRefreshConfiguredAppsReloadsSnapshotAndStoresResult() async {
+    var loadCount = 0
+    var didRefresh = false
+    let refreshedSnapshot = DashboardSnapshot(
+        headline: "1 app checked",
+        summary: "Status refreshed your configured apps.",
+        statusItems: [],
+        recentEvents: [],
+        metrics: [],
+        integrations: [
+            IntegrationSummary(
+                id: "acct_github",
+                name: "Status GitHub",
+                provider: "com.status.github",
+                state: "Ready",
+                severity: .ok,
+                lastSyncDescription: "Just now"
+            )
+        ],
+        auditEntries: []
+    )
+    let viewModel = DashboardViewModel {
+        loadCount += 1
+        return loadCount == 1 ? .empty : refreshedSnapshot
+    } refreshApps: {
+        didRefresh = true
+        return "Refreshed 1 app. 1 resource stored. 0 events processed."
+    }
+
+    viewModel.reload()
+    await viewModel.refreshConfiguredApps()
+
+    #expect(didRefresh)
+    #expect(viewModel.snapshot == refreshedSnapshot)
+    #expect(viewModel.refreshResult == "Refreshed 1 app. 1 resource stored. 0 events processed.")
+    #expect(viewModel.refreshError == nil)
+    #expect(viewModel.isRefreshingApps == false)
+}
+
+@MainActor
+@Test func dashboardViewModelRefreshConfiguredAppsReloadsSnapshotAfterFailure() async {
+    struct RefreshFailure: Error, LocalizedError {
+        var errorDescription: String? { "Network permission is missing." }
+    }
+
+    var loadCount = 0
+    let viewModel = DashboardViewModel {
+        loadCount += 1
+        return DashboardSnapshot(
+            headline: "Loaded \(loadCount)",
+            summary: "Reloaded after refresh attempt.",
+            statusItems: [],
+            recentEvents: [],
+            metrics: [],
+            integrations: [],
+            auditEntries: []
+        )
+    } refreshApps: {
+        throw RefreshFailure()
+    }
+
+    viewModel.reload()
+    await viewModel.refreshConfiguredApps()
+
+    #expect(viewModel.snapshot.headline == "Loaded 2")
+    #expect(viewModel.refreshResult == nil)
+    #expect(viewModel.refreshError == "Network permission is missing.")
+    #expect(viewModel.isRefreshingApps == false)
+}
+
 @Test func pluginSettingsHeaderPrefersConfiguredAppName() {
     let header = PluginSettingsHeaderText(
         pluginName: "GitHub",

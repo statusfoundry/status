@@ -5,15 +5,24 @@ import SwiftUI
 public final class DashboardViewModel: ObservableObject {
     @Published public private(set) var snapshot: DashboardSnapshot
     @Published public private(set) var loadError: String?
+    @Published public private(set) var isRefreshingApps: Bool
+    @Published public private(set) var refreshResult: String?
+    @Published public private(set) var refreshError: String?
 
     private let loadSnapshot: () throws -> DashboardSnapshot
+    private let refreshApps: (() async throws -> String)?
 
     public init(
         initialSnapshot: DashboardSnapshot = .empty,
-        loadSnapshot: @escaping () throws -> DashboardSnapshot
+        loadSnapshot: @escaping () throws -> DashboardSnapshot,
+        refreshApps: (() async throws -> String)? = nil
     ) {
         self.snapshot = initialSnapshot
+        self.isRefreshingApps = false
+        self.refreshResult = nil
+        self.refreshError = nil
         self.loadSnapshot = loadSnapshot
+        self.refreshApps = refreshApps
     }
 
     public func reload() {
@@ -23,6 +32,22 @@ public final class DashboardViewModel: ObservableObject {
         } catch {
             snapshot = .empty
             loadError = error.localizedDescription
+        }
+    }
+
+    public func refreshConfiguredApps() async {
+        guard isRefreshingApps == false, let refreshApps else { return }
+        isRefreshingApps = true
+        refreshResult = nil
+        refreshError = nil
+        defer { isRefreshingApps = false }
+
+        do {
+            refreshResult = try await refreshApps()
+            reload()
+        } catch {
+            refreshError = error.localizedDescription
+            reload()
         }
     }
 }
@@ -43,7 +68,14 @@ public struct DashboardContainerView: View {
     }
 
     public var body: some View {
-        DashboardView(snapshot: viewModel.snapshot, openApp: openApp)
+        DashboardView(
+            snapshot: viewModel.snapshot,
+            isRefreshingApps: viewModel.isRefreshingApps,
+            refreshResult: viewModel.refreshResult,
+            refreshError: viewModel.refreshError,
+            refreshApps: viewModel.refreshConfiguredApps,
+            openApp: openApp
+        )
             .overlay(alignment: .bottom) {
                 if let loadError = viewModel.loadError {
                     Text(loadError)

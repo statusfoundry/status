@@ -3,17 +3,38 @@ import SwiftUI
 
 public struct DashboardView: View {
     private let snapshot: DashboardSnapshot
+    private let isRefreshingApps: Bool
+    private let refreshResult: String?
+    private let refreshError: String?
+    private let refreshApps: (() async -> Void)?
     private let openApp: ((IntegrationSummary) -> Void)?
 
-    public init(snapshot: DashboardSnapshot, openApp: ((IntegrationSummary) -> Void)? = nil) {
+    public init(
+        snapshot: DashboardSnapshot,
+        isRefreshingApps: Bool = false,
+        refreshResult: String? = nil,
+        refreshError: String? = nil,
+        refreshApps: (() async -> Void)? = nil,
+        openApp: ((IntegrationSummary) -> Void)? = nil
+    ) {
         self.snapshot = snapshot
+        self.isRefreshingApps = isRefreshingApps
+        self.refreshResult = refreshResult
+        self.refreshError = refreshError
+        self.refreshApps = refreshApps
         self.openApp = openApp
     }
 
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                DashboardHeader(snapshot: snapshot)
+                DashboardHeader(
+                    snapshot: snapshot,
+                    isRefreshingApps: isRefreshingApps,
+                    refreshResult: refreshResult,
+                    refreshError: refreshError,
+                    refreshApps: refreshApps
+                )
                 AttentionSection(
                     items: snapshot.statusItems,
                     apps: snapshot.integrations,
@@ -33,16 +54,52 @@ public struct DashboardView: View {
 
 private struct DashboardHeader: View {
     let snapshot: DashboardSnapshot
+    let isRefreshingApps: Bool
+    let refreshResult: String?
+    let refreshError: String?
+    let refreshApps: (() async -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(snapshot.headline)
-                .font(.system(size: 42, weight: .semibold, design: .default))
-                .foregroundStyle(Color.primary)
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(snapshot.headline)
+                    .font(.system(size: 42, weight: .semibold, design: .default))
+                    .foregroundStyle(Color.primary)
+                Spacer(minLength: 12)
+                if let refreshApps {
+                    Button {
+                        Task {
+                            await refreshApps()
+                        }
+                    } label: {
+                        if isRefreshingApps {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Label("Refresh Apps", systemImage: "arrow.clockwise")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isRefreshingApps || snapshot.integrations.isEmpty)
+                    .help(snapshot.integrations.isEmpty ? "Set up an app before refreshing." : "Run manual checks for configured apps.")
+                }
+            }
             Text(snapshot.summary)
                 .font(.title3)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if let refreshResult {
+                Text(refreshResult)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let refreshError {
+                Text(refreshError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
