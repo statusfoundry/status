@@ -1177,7 +1177,7 @@ public final class StatusPersistenceStore {
     public func integrationSummaries() throws -> [IntegrationSummary] {
         try database.query(
             """
-            SELECT a.id, a.plugin_id AS provider, a.display_name, a.status, a.last_error, a.last_refreshed_at, p.name AS provider_name, p.accent_color, p.installed_version
+            SELECT a.id, a.plugin_id AS provider, a.display_name, a.auth_type, a.credential_ref, a.status, a.last_error, a.last_refreshed_at, p.name AS provider_name, p.accent_color, p.installed_version
             FROM accounts a
             LEFT JOIN plugins p ON p.id = a.plugin_id
             ORDER BY a.display_name ASC, a.id ASC
@@ -1722,21 +1722,30 @@ public final class StatusPersistenceStore {
     private func integrationSummary(from row: [String: SQLiteValue]) throws -> IntegrationSummary {
         let lastError = row.optionalText("last_error")
         let status = try row.requiredText("status")
-        let severity: Severity = if lastError?.isEmpty == false {
+        let provider = try row.requiredText("provider")
+        let missingPermissions = try missingRuntimePermissions(
+            pluginID: provider,
+            authType: row.optionalText("auth_type"),
+            credentialRef: row.optionalText("credential_ref")
+        )
+        let severity: Severity = if lastError?.isEmpty == false || missingPermissions.isEmpty == false {
             .warning
         } else if status == "connected" {
             .ok
         } else {
             .notice
         }
-        let provider = try row.requiredText("provider")
         let accountID = try row.requiredText("id")
         return try IntegrationSummary(
             id: accountID,
             name: row.requiredText("display_name"),
             provider: provider,
             providerName: row.optionalText("provider_name"),
-            state: lastError?.isEmpty == false ? "Needs attention" : status.capitalized,
+            state: integrationState(
+                status: status,
+                lastError: lastError,
+                missingPermissions: missingPermissions
+            ),
             severity: severity,
             lastSyncDescription: lastRefreshDescription(row.optionalText("last_refreshed_at")),
             accentColor: row.optionalText("accent_color"),
@@ -1746,6 +1755,46 @@ public final class StatusPersistenceStore {
                 pluginID: provider
             )
         )
+    }
+
+    private func integrationState(
+        status: String,
+        lastError: String?,
+        missingPermissions: [PluginPermission]
+    ) -> String {
+        if lastError?.isEmpty == false {
+            return "Needs attention"
+        }
+        if missingPermissions.isEmpty == false {
+            return "Needs permissions"
+        }
+        return status.capitalized
+    }
+
+    private func missingRuntimePermissions(
+        pluginID: String,
+        authType: String?,
+        credentialRef: String?
+    ) throws -> [PluginPermission] {
+        let permissions = try pluginPermissions(pluginID: pluginID)
+        let declared = Set(permissions.map(\.permission))
+        let granted = Set(permissions.filter(\.granted).map(\.permission))
+        var required: [PluginPermission] = []
+        if declared.contains(.network) {
+            required.append(.network)
+        }
+        if declared.contains(.userConfiguredDomains) {
+            required.append(.userConfiguredDomains)
+        }
+        if credentialRef != nil, declared.contains(.keychain) {
+            required.append(.keychain)
+        }
+        if credentialRef != nil,
+           declared.contains(.privateKey),
+           authType == AuthKind.jwtAPIKey.rawValue || authType == AuthKind.privateKeyJWT.rawValue {
+            required.append(.privateKey)
+        }
+        return required.filter { granted.contains($0) == false }
     }
 
     private func installedPluginIntegrationSummary(from row: [String: SQLiteValue]) throws -> IntegrationSummary {

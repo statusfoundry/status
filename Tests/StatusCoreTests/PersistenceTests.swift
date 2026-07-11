@@ -913,6 +913,62 @@ import Testing
     #expect(snapshot == .empty)
 }
 
+@Test func dashboardSnapshotFlagsConfiguredAppsMissingRuntimePermissions() throws {
+    let database = try temporaryDatabase()
+    try StatusDatabaseMigrator.migrate(database)
+    let store = StatusPersistenceStore(database: database)
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+    let manifest = PluginManifest(
+        id: "com.status.website",
+        name: "Website Uptime",
+        version: "0.1.0",
+        author: PluginAuthor(name: "Status Foundry", publisherId: "status-foundry"),
+        category: "monitoring",
+        description: "Checks user configured websites.",
+        minCoreVersion: "0.1.0",
+        platforms: [.macOS, .iOS],
+        permissions: [.network, .userConfiguredDomains, .backgroundRefresh],
+        domains: []
+    )
+    try store.installPlugin(
+        PluginInstallRecord(
+            manifest: manifest,
+            trustLevel: .official,
+            installPath: "/Application Support/Status/Plugins/com.status.website",
+            packagePath: "/Application Support/Status/Packages/com.status.website-0.1.0.statusplugin.zip",
+            verification: PluginPackageVerificationResult(
+                pluginID: manifest.id,
+                version: manifest.version,
+                sha256: "dcd4260b527a28d62ad2a956b00c4f5616416b2fdc0506e6fe5f6b616f5df5aa",
+                signedBy: "status-foundry-dev"
+            ),
+            signature: "dev-signature",
+            installedAt: now
+        )
+    )
+    try store.setPluginPermission(pluginID: manifest.id, permission: .network, granted: true, grantedAt: now)
+    try store.upsertAccountConfiguration(
+        PluginAccountConfiguration(
+            id: "acct_website",
+            pluginID: manifest.id,
+            accountName: "Status Website",
+            variables: ["host": "status.hakobs.com"]
+        ),
+        updatedAt: now
+    )
+
+    var app = try #require(try store.dashboardSnapshot(now: now).integrations.first)
+    #expect(app.name == "Status Website")
+    #expect(app.state == "Needs permissions")
+    #expect(app.severity == .warning)
+
+    try store.setPluginPermission(pluginID: manifest.id, permission: .userConfiguredDomains, granted: true, grantedAt: now)
+
+    app = try #require(try store.dashboardSnapshot(now: now).integrations.first)
+    #expect(app.state == "Connected")
+    #expect(app.severity == .ok)
+}
+
 @Test func dashboardSnapshotReadsPersistedRows() throws {
     let database = try temporaryDatabase()
     try StatusDatabaseMigrator.migrate(database)
@@ -1036,6 +1092,7 @@ import Testing
             installedAt: now
         )
     )
+    try store.setPluginPermission(pluginID: manifest.id, permission: .network, granted: true, grantedAt: now)
     try store.upsertAccountConfiguration(
         PluginAccountConfiguration(
             id: "acc_work",
