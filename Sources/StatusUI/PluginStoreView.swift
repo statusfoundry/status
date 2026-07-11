@@ -2622,9 +2622,10 @@ private struct PluginSettingsPanel: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     VStack(spacing: 8) {
-                        ForEach(permissions) { permission in
+                        ForEach(sortedPermissions) { permission in
                             PluginPermissionToggle(
                                 permission: permission,
+                                isRequiredForRefresh: runtimeRequiredPermissions.contains(permission.permission),
                                 isSaving: savingPermissionID == permissionChangeID(permission),
                                 update: { granted in
                                     setPermissionGrant(plugin, permission.permission, granted)
@@ -2836,9 +2837,34 @@ private struct PluginSettingsPanel: View {
         return "Grant \(permissionList(missing)) permission before refreshing this app."
     }
 
+    private var sortedPermissions: [InstalledPluginPermission] {
+        permissions.sorted { lhs, rhs in
+            let lhsRank = permissionSortRank(lhs)
+            let rhsRank = permissionSortRank(rhs)
+            if lhsRank != rhsRank {
+                return lhsRank < rhsRank
+            }
+            return lhs.permission.label.localizedCaseInsensitiveCompare(rhs.permission.label) == .orderedAscending
+        }
+    }
+
+    private func permissionSortRank(_ permission: InstalledPluginPermission) -> Int {
+        if runtimeRequiredPermissions.contains(permission.permission) {
+            return 0
+        }
+        if permission.granted == false {
+            return 1
+        }
+        return 2
+    }
+
     private var missingRuntimePermissions: [PluginPermission] {
-        let declared = Set(permissions.map(\.permission))
         let granted = Set(permissions.filter(\.granted).map(\.permission))
+        return runtimeRequiredPermissions.filter { granted.contains($0) == false }
+    }
+
+    private var runtimeRequiredPermissions: [PluginPermission] {
+        let declared = Set(permissions.map(\.permission))
         var required: [PluginPermission] = []
         if declared.contains(.network) {
             required.append(.network)
@@ -2855,7 +2881,7 @@ private struct PluginSettingsPanel: View {
            selectedAccount.authType == AuthKind.jwtAPIKey.rawValue || selectedAccount.authType == AuthKind.privateKeyJWT.rawValue {
             required.append(.privateKey)
         }
-        return required.filter { granted.contains($0) == false }
+        return required
     }
 
     private func permissionList(_ permissions: [PluginPermission]) -> String {
@@ -4374,6 +4400,7 @@ private struct PluginAccountPicker: View {
 
 private struct PluginPermissionToggle: View {
     let permission: InstalledPluginPermission
+    let isRequiredForRefresh: Bool
     let isSaving: Bool
     let update: (Bool) -> Void
 
@@ -4385,8 +4412,15 @@ private struct PluginPermissionToggle: View {
             )
         ) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(permission.permission.label)
-                    .font(.caption)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(permission.permission.label)
+                        .font(.caption)
+                    if isRequiredForRefresh {
+                        Text("Required to refresh")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    }
+                }
                 Text(permission.permission.detail)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
