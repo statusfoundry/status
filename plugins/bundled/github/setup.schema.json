@@ -1,12 +1,13 @@
 {
   "title": "Repository to watch",
-  "description": "Configure one GitHub repository for read-only workflow and activity checks.",
+  "description": "Configure one GitHub repository for read-only workflow and activity checks. Use Owner for the GitHub user or organization, and Repository for the repository name only.",
   "fields": [
     {
       "key": "owner",
       "label": "Owner",
       "type": "text",
       "placeholder": "statusfoundry",
+      "help": "GitHub user or organization, for example statusfoundry.",
       "required": true
     },
     {
@@ -14,6 +15,7 @@
       "label": "Repository",
       "type": "text",
       "placeholder": "status",
+      "help": "Repository name only, for example status. Do not paste the full GitHub URL.",
       "required": true
     }
   ]

@@ -260,15 +260,22 @@ private struct AppSection: View {
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 12)], spacing: 12) {
                     ForEach(apps) { app in
-                        appTile(for: app)
+                        AppDashboardTile(app: app, openApp: openApp)
                     }
                 }
             }
         }
     }
+}
+
+private struct AppDashboardTile: View {
+    let app: IntegrationSummary
+    let openApp: ((IntegrationSummary) -> Void)?
+
+    @State private var isHovering = false
 
     @ViewBuilder
-    private func appTile(for app: IntegrationSummary) -> some View {
+    var body: some View {
         let primaryItem = app.tileItems.first
         let secondaryItems = Array(app.tileItems.dropFirst().prefix(4))
         let accent = IntegrationVisual.visual(for: app.provider, accentColor: app.accentColor).color
@@ -331,7 +338,11 @@ private struct AppSection: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.statusSurface)
             RoundedRectangle(cornerRadius: 8)
-                .fill(accent.opacity(0.055))
+                .fill(accent.opacity(isHovering && openApp != nil ? 0.11 : 0.055))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(accent.opacity(isHovering && openApp != nil ? 0.42 : 0), lineWidth: 1)
         }
         .overlay(alignment: .top) {
             Rectangle()
@@ -339,6 +350,7 @@ private struct AppSection: View {
                 .frame(height: 3)
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .contentShape(RoundedRectangle(cornerRadius: 8))
 
         if let openApp {
             Button {
@@ -347,7 +359,9 @@ private struct AppSection: View {
                 tile
             }
             .buttonStyle(.plain)
+            .onHover { isHovering = $0 }
             .accessibilityLabel(Text("Open \(app.name)"))
+            .accessibilityHint(Text("Shows the configured app details and settings."))
         } else {
             tile
         }

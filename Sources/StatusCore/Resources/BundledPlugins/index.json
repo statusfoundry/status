@@ -33,8 +33,8 @@
       "domains": [
         "api.github.com"
       ],
-      "sha256": "12a6537bfec3a0bea68f0507a1ab7b808d7a8fdbb4046fd8707468fd6cbc4744",
-      "signature": "p89PfqBCNcfpHwqxfgnCKSTacJxsWZ8QG5vA/8RKAmx0xyfAkAw2pc+k1une2dYofhevywU7Hj+K/C1G0ZawDg==",
+      "sha256": "039d3434ea13d20008b0c2ec083d682b1f3b93b8d20162bb1fa49e0259994f13",
+      "signature": "t2M6/+OBJnqSvoo2QgMLL/L6vyGVzDHe8S3xr9xcyLBhUWh1kKfKBWK2URvXGCKdO62t/6UMkoY9ywYdrqgwAQ==",
       "signedBy": "status-foundry-dev",
       "releasedAt": "2026-07-07T12:00:00Z",
       "packageResourceName": "com.status.github-0.1.0.statusplugin.zip",
@@ -128,8 +128,8 @@
         "oauth2.googleapis.com",
         "www.googleapis.com"
       ],
-      "sha256": "9221099c3e5b9b7c213d7b69813e7f1f367ef0f47804c8bc3e24a274b5450e5c",
-      "signature": "NQCOlIo2KfTvVF2BPhwqVszMB175W2d04z1u1PAtsc/N3voaaWXOooJCmIzCqHGqBitlX3Y+neLVyS6uojOxBg==",
+      "sha256": "63c3f3571e1a7b611f7312d38343120f6faace200f774f025c3ac91d992127a0",
+      "signature": "YEydNLQCb15oEX6UpjxdO2whnXCFFJ6L2pGyRXY1nU4exvP0JgAWoeXGLuQn1K/HpnMSJR0j5sTestZ4qgtiCw==",
       "signedBy": "status-foundry-dev",
       "releasedAt": "2026-07-09T12:00:00Z",
       "packageResourceName": "com.status.youtube-0.1.0.statusplugin.zip",

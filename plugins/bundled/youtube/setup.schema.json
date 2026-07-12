@@ -1,13 +1,13 @@
 {
   "title": "YouTube creator account",
-  "description": "Connect a Google account with access to the YouTube channel you want Status to watch.",
+  "description": "Connect a Google account with access to the YouTube channel you want Status to watch. Create a Google Cloud OAuth client first, then paste its public client ID here.",
   "fields": [
     {
       "key": "_status.oauth.clientId",
       "label": "Google OAuth client ID",
       "type": "text",
       "placeholder": "000000000000-example.apps.googleusercontent.com",
-      "help": "Create an OAuth client in Google Cloud for the Status redirect URI status://oauth/youtube. Paste the public client ID here before connecting.",
+      "help": "Create an OAuth client in Google Cloud, enable YouTube Data API v3, add status://oauth/youtube as the redirect URI, then paste the public client ID before connecting.",
       "required": true
     }
   ]
