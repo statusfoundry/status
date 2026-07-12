@@ -17,6 +17,92 @@ import Testing
     #expect(appStoreConnect.brand == .appStoreConnect)
 }
 
+@Test func pluginSetupChecklistTracksGitHubTokenSetup() {
+    let plugin = setupChecklistPlugin(
+        id: "com.status.github",
+        name: "GitHub",
+        auth: PackagedPluginAuth(
+            type: .bearerToken,
+            provider: "github",
+            fields: [
+                PackagedPluginSetupField(id: "token", label: "Personal access token", type: .secret, required: true)
+            ]
+        ),
+        setup: PackagedPluginSetup(
+            title: "Repository",
+            fields: [
+                PackagedPluginSetupField(id: "owner", label: "Owner", type: .text, required: true),
+                PackagedPluginSetupField(id: "repo", label: "Repository", type: .text, required: true)
+            ]
+        )
+    )
+
+    let incomplete = PluginAppSetupChecklist(
+        plugin: plugin,
+        selectedAccount: nil,
+        setupFields: plugin.setup?.fields ?? [],
+        setupValues: ["owner": "statusfoundry", "repo": ""],
+        permissions: setupChecklistPermissions([.network, .keychain, .backgroundRefresh], granted: []),
+        runtimeRequiredPermissions: [.network, .keychain]
+    )
+
+    #expect(incomplete.items.map { $0.id } == ["save", "auth", "permissions", "refresh"])
+    #expect(incomplete.items.map { $0.isComplete } == [false, false, false, false])
+    #expect(incomplete.items[0].detail == "Complete Repository before saving.")
+
+    let complete = PluginAppSetupChecklist(
+        plugin: plugin,
+        selectedAccount: PluginAccountConfiguration(
+            id: "acc_github",
+            pluginID: plugin.id,
+            accountName: "Status repo",
+            variables: ["owner": "statusfoundry", "repo": "status"],
+            authType: AuthKind.bearerToken.rawValue,
+            credentialRef: "keychain://github"
+        ),
+        setupFields: plugin.setup?.fields ?? [],
+        setupValues: ["owner": "statusfoundry", "repo": "status"],
+        permissions: setupChecklistPermissions([.network, .keychain, .backgroundRefresh], granted: [.network, .keychain]),
+        runtimeRequiredPermissions: [.network, .keychain]
+    )
+
+    #expect(complete.items.map { $0.isComplete } == [true, true, true, true])
+}
+
+@Test func pluginSetupChecklistTracksYouTubeOAuthSetup() {
+    let plugin = setupChecklistPlugin(
+        id: "com.status.youtube",
+        name: "YouTube",
+        auth: PackagedPluginAuth(type: .oauth2, provider: "youtube"),
+        setup: PackagedPluginSetup(
+            title: "YouTube creator account",
+            fields: [
+                PackagedPluginSetupField(id: PluginOAuth.clientIDSetupFieldKey, label: "Google OAuth client ID", type: .text, required: true)
+            ]
+        )
+    )
+
+    let checklist = PluginAppSetupChecklist(
+        plugin: plugin,
+        selectedAccount: PluginAccountConfiguration(
+            id: "acc_youtube",
+            pluginID: plugin.id,
+            accountName: "Creator account",
+            variables: [PluginOAuth.clientIDSetupFieldKey: "client.apps.googleusercontent.com"],
+            authType: AuthKind.oauth2.rawValue,
+            credentialRef: nil
+        ),
+        setupFields: plugin.setup?.fields ?? [],
+        setupValues: [PluginOAuth.clientIDSetupFieldKey: "client.apps.googleusercontent.com"],
+        permissions: setupChecklistPermissions([.network, .keychain, .oauth], granted: [.network, .keychain, .oauth]),
+        runtimeRequiredPermissions: [.network, .keychain, .oauth]
+    )
+
+    #expect(checklist.items.map { $0.id } == ["save", "auth", "permissions", "refresh"])
+    #expect(checklist.items[1].label == "Connect OAuth account")
+    #expect(checklist.items.map { $0.isComplete } == [true, false, true, false])
+}
+
 @Test func dashboardTileDisplayValueFormatsRawPluginValuesForUsers() {
     #expect(
         DashboardTileDisplayValue(
@@ -1785,6 +1871,42 @@ private func grantedOAuthPermissions(pluginID: String) -> [InstalledPluginPermis
         InstalledPluginPermission(id: "plp_\(pluginID)_keychain", pluginID: pluginID, permission: .keychain, granted: true),
         InstalledPluginPermission(id: "plp_\(pluginID)_network", pluginID: pluginID, permission: .network, granted: true)
     ]
+}
+
+private func setupChecklistPlugin(
+    id: String,
+    name: String,
+    auth: PackagedPluginAuth?,
+    setup: PackagedPluginSetup?
+) -> InstalledPlugin {
+    InstalledPlugin(
+        id: id,
+        name: name,
+        author: "Status Foundry",
+        description: "\(name) checks.",
+        category: "development",
+        trustLevel: .official,
+        installedVersion: "0.1.0",
+        installPath: "/tmp/\(id)",
+        auth: auth,
+        setup: setup,
+        installedAt: Date(timeIntervalSince1970: 1_783_433_520),
+        updatedAt: Date(timeIntervalSince1970: 1_783_433_520)
+    )
+}
+
+private func setupChecklistPermissions(
+    _ permissions: [PluginPermission],
+    granted: Set<PluginPermission>
+) -> [InstalledPluginPermission] {
+    permissions.map { permission in
+        InstalledPluginPermission(
+            id: "plp_\(permission.rawValue)",
+            pluginID: "plugin",
+            permission: permission,
+            granted: granted.contains(permission)
+        )
+    }
 }
 
 private func registryPluginSummary(id: String, latestVersion: String?) -> RegistryPluginSummary {

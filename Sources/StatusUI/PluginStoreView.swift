@@ -2951,6 +2951,16 @@ private struct PluginSettingsPanel: View {
                         )
                     )
                     .textFieldStyle(.roundedBorder)
+                    PluginAppSetupChecklistView(
+                        checklist: PluginAppSetupChecklist(
+                            plugin: plugin,
+                            selectedAccount: selectedAccount,
+                            setupFields: setupFields,
+                            setupValues: setupValues,
+                            permissions: permissions,
+                            runtimeRequiredPermissions: runtimeRequiredPermissions
+                        )
+                    )
                     if let setup = plugin.setup {
                         Text(setup.title)
                             .font(.caption.weight(.semibold))
@@ -4836,6 +4846,138 @@ private struct PluginPermissionToggle: View {
             }
         }
         .disabled(isSaving)
+    }
+}
+
+struct PluginAppSetupChecklist: Equatable, Sendable {
+    var items: [PluginAppSetupChecklistItem]
+
+    init(
+        plugin: InstalledPlugin,
+        selectedAccount: PluginAccountConfiguration?,
+        setupFields: [PackagedPluginSetupField],
+        setupValues: [String: String],
+        permissions: [InstalledPluginPermission],
+        runtimeRequiredPermissions: [PluginPermission]
+    ) {
+        let missingFields = setupFields
+            .filter { field in
+                field.required && setupValues[field.id, default: field.defaultValue ?? ""]
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .isEmpty
+            }
+            .map(\.label)
+        let missingPermissions = Self.missingRequiredPermissions(
+            permissions: permissions,
+            requiredPermissions: runtimeRequiredPermissions
+        )
+        let isSaved = selectedAccount != nil
+        let hasCredential = selectedAccount?.credentialRef != nil
+        let needsCredential = plugin.auth.map { $0.type != .none } ?? false
+        let authLabel = plugin.auth?.type == .oauth2 ? "Connect OAuth account" : "Store credentials"
+        let authDetail = plugin.auth?.type == .oauth2
+            ? "Connect the provider account before refreshing."
+            : "Save the required credential in Keychain before refreshing."
+
+        var builtItems = [
+            PluginAppSetupChecklistItem(
+                id: "save",
+                label: "Save app",
+                detail: Self.saveDetail(pluginName: plugin.name, missingFields: missingFields),
+                isComplete: isSaved && missingFields.isEmpty
+            )
+        ]
+
+        if needsCredential {
+            builtItems.append(
+                PluginAppSetupChecklistItem(
+                    id: "auth",
+                    label: authLabel,
+                    detail: hasCredential ? "Credential is stored in Keychain." : authDetail,
+                    isComplete: hasCredential
+                )
+            )
+        }
+
+        builtItems.append(
+            PluginAppSetupChecklistItem(
+                id: "permissions",
+                label: "Grant required permissions",
+                detail: missingPermissions.isEmpty
+                    ? "Refresh permissions are granted."
+                    : "Missing \(Self.permissionList(missingPermissions)).",
+                isComplete: missingPermissions.isEmpty
+            )
+        )
+        builtItems.append(
+            PluginAppSetupChecklistItem(
+                id: "refresh",
+                label: "Refresh app",
+                detail: "Run a manual refresh to fetch \(plugin.name) resources and events.",
+                isComplete: isSaved && missingFields.isEmpty && missingPermissions.isEmpty && (needsCredential == false || hasCredential)
+            )
+        )
+
+        items = builtItems
+    }
+
+    private static func missingRequiredPermissions(
+        permissions: [InstalledPluginPermission],
+        requiredPermissions: [PluginPermission]
+    ) -> [PluginPermission] {
+        let granted = Set(permissions.filter(\.granted).map(\.permission))
+        return requiredPermissions.filter { granted.contains($0) == false }
+    }
+
+    private static func saveDetail(pluginName: String, missingFields: [String]) -> String {
+        if missingFields.isEmpty {
+            return "The \(pluginName) app configuration is saved."
+        }
+        return "Complete \(missingFields.joined(separator: ", ")) before saving."
+    }
+
+    private static func permissionList(_ permissions: [PluginPermission]) -> String {
+        permissions.map(\.label).joined(separator: ", ")
+    }
+}
+
+struct PluginAppSetupChecklistItem: Identifiable, Equatable, Sendable {
+    var id: String
+    var label: String
+    var detail: String
+    var isComplete: Bool
+}
+
+private struct PluginAppSetupChecklistView: View {
+    let checklist: PluginAppSetupChecklist
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Setup status")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(checklist.items) { item in
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: item.isComplete ? "checkmark.circle.fill" : "circle")
+                            .font(.caption)
+                            .foregroundStyle(item.isComplete ? Color.green : Color.secondary)
+                            .frame(width: 16)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.label)
+                                .font(.caption.weight(.semibold))
+                            Text(item.detail)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.statusSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
