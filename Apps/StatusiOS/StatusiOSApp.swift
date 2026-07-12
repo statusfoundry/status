@@ -977,21 +977,12 @@ private struct IOSPluginAppDetail: View {
             return []
         }
         let permissionRows = try store.pluginPermissions(pluginID: plugin.id)
-        let declared = Set(permissionRows.map(\.permission))
         let granted = Set(permissionRows.filter(\.granted).map(\.permission))
-        var required: [PluginPermission] = []
-        if declared.contains(.network) {
-            required.append(.network)
-        }
-        if app?.credentialRef != nil, declared.contains(.keychain) {
-            required.append(.keychain)
-        }
-        if let app,
-           app.credentialRef != nil,
-           declared.contains(.privateKey),
-           app.authType == AuthKind.jwtAPIKey.rawValue || app.authType == AuthKind.privateKeyJWT.rawValue {
-            required.append(.privateKey)
-        }
+        let required = PluginRuntimePermissionRequirements(
+            permissions: permissionRows,
+            authType: app?.authType,
+            hasCredential: app?.credentialRef != nil
+        ).requiredPermissions
         return required.filter { granted.contains($0) == false }
     }
 

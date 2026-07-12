@@ -131,6 +131,47 @@ import Testing
     #expect(checklist.items.map { $0.isComplete } == [true, false, true, false])
 }
 
+@Test func pluginRuntimePermissionRequirementsIncludeOAuthForConnectedOAuthApps() {
+    let required = PluginRuntimePermissionRequirements(
+        permissions: setupChecklistPermissions([.network, .keychain, .oauth, .backgroundRefresh], granted: []),
+        authType: AuthKind.oauth2.rawValue,
+        hasCredential: true
+    )
+
+    #expect(required.requiredPermissions == [.network, .keychain, .oauth])
+}
+
+@Test func pluginRuntimePermissionRequirementsDoNotRequireOAuthBeforeConnection() {
+    let required = PluginRuntimePermissionRequirements(
+        permissions: setupChecklistPermissions([.network, .keychain, .oauth, .backgroundRefresh], granted: []),
+        authType: AuthKind.oauth2.rawValue,
+        hasCredential: false
+    )
+
+    #expect(required.requiredPermissions == [.network])
+}
+
+@Test func pluginSetupGuideExplainsGitHubTokenAndYouTubeOAuthSetup() throws {
+    let github = try #require(PluginSetupGuide(plugin: setupChecklistPlugin(
+        id: "com.status.github",
+        name: "GitHub",
+        auth: PackagedPluginAuth(type: .bearerToken, provider: "github"),
+        setup: nil
+    )))
+    let youtube = try #require(PluginSetupGuide(plugin: setupChecklistPlugin(
+        id: "com.status.youtube",
+        name: "YouTube",
+        auth: PackagedPluginAuth(type: .oauth2, provider: "youtube"),
+        setup: nil
+    )))
+
+    #expect(github.detail.contains("fine-grained personal access token"))
+    #expect(github.detail.contains("GitHub OAuth is intentionally not enabled yet"))
+    #expect(github.links.first?.url.absoluteString == "https://github.com/settings/personal-access-tokens/new")
+    #expect(youtube.detail.contains("Google OAuth 2 with PKCE"))
+    #expect(youtube.steps.contains { $0.contains("status://oauth/youtube") })
+}
+
 @Test func dashboardTileDisplayValueFormatsRawPluginValuesForUsers() {
     #expect(
         DashboardTileDisplayValue(

@@ -2961,6 +2961,9 @@ private struct PluginSettingsPanel: View {
                             runtimeRequiredPermissions: runtimeRequiredPermissions
                         )
                     )
+                    if let setupGuide = PluginSetupGuide(plugin: plugin) {
+                        PluginSetupGuidePanel(guide: setupGuide)
+                    }
                     if let setup = plugin.setup {
                         Text(setup.title)
                             .font(.caption.weight(.semibold))
@@ -3269,24 +3272,11 @@ private struct PluginSettingsPanel: View {
     }
 
     private var runtimeRequiredPermissions: [PluginPermission] {
-        let declared = Set(permissions.map(\.permission))
-        var required: [PluginPermission] = []
-        if declared.contains(.network) {
-            required.append(.network)
-        }
-        if declared.contains(.userConfiguredDomains) {
-            required.append(.userConfiguredDomains)
-        }
-        if selectedAccount?.credentialRef != nil, declared.contains(.keychain) {
-            required.append(.keychain)
-        }
-        if let selectedAccount,
-           selectedAccount.credentialRef != nil,
-           declared.contains(.privateKey),
-           selectedAccount.authType == AuthKind.jwtAPIKey.rawValue || selectedAccount.authType == AuthKind.privateKeyJWT.rawValue {
-            required.append(.privateKey)
-        }
-        return required
+        PluginRuntimePermissionRequirements(
+            permissions: permissions,
+            authType: selectedAccount?.authType,
+            hasCredential: selectedAccount?.credentialRef != nil
+        ).requiredPermissions
     }
 
     private func permissionList(_ permissions: [PluginPermission]) -> String {
@@ -4968,6 +4958,84 @@ struct PluginAppSetupChecklistItem: Identifiable, Equatable, Sendable {
     var isComplete: Bool
 }
 
+public struct PluginRuntimePermissionRequirements: Equatable, Sendable {
+    public var requiredPermissions: [PluginPermission]
+
+    public init(
+        permissions: [InstalledPluginPermission],
+        authType: String?,
+        hasCredential: Bool
+    ) {
+        let declared = Set(permissions.map(\.permission))
+        var required: [PluginPermission] = []
+        if declared.contains(.network) {
+            required.append(.network)
+        }
+        if declared.contains(.userConfiguredDomains) {
+            required.append(.userConfiguredDomains)
+        }
+        if hasCredential, declared.contains(.keychain) {
+            required.append(.keychain)
+        }
+        if hasCredential, authType == AuthKind.oauth2.rawValue, declared.contains(.oauth) {
+            required.append(.oauth)
+        }
+        if hasCredential,
+           declared.contains(.privateKey),
+           authType == AuthKind.jwtAPIKey.rawValue || authType == AuthKind.privateKeyJWT.rawValue {
+            required.append(.privateKey)
+        }
+        requiredPermissions = required
+    }
+}
+
+struct PluginSetupGuide: Equatable, Sendable {
+    var title: String
+    var detail: String
+    var steps: [String]
+    var links: [PluginSetupGuideLink]
+
+    init?(plugin: InstalledPlugin) {
+        switch plugin.id {
+        case "com.status.github":
+            self.title = "GitHub setup"
+            self.detail = "The current GitHub app uses a fine-grained personal access token. GitHub OAuth is intentionally not enabled yet because the web flow needs a client secret that should not be shipped in the native app."
+            self.steps = [
+                "Create a fine-grained token for the repository you are adding.",
+                "Grant read-only Metadata, Actions, Pull requests, and Issues access. Add Contents read-only if GitHub requires it for activity reads.",
+                "Paste the token here, save the app, grant Network and Keychain permissions, then refresh."
+            ]
+            self.links = [
+                PluginSetupGuideLink(
+                    label: "Create GitHub token",
+                    url: URL(string: "https://github.com/settings/personal-access-tokens/new")!
+                )
+            ]
+        case "com.status.youtube":
+            self.title = "YouTube OAuth setup"
+            self.detail = "YouTube uses Google OAuth 2 with PKCE. Status needs the public OAuth client ID before it can open the Google authorization page."
+            self.steps = [
+                "Create a Google Cloud OAuth client and enable YouTube Data API v3.",
+                "Add status://oauth/youtube as an allowed redirect URI.",
+                "Paste the client ID, grant Network, Keychain, and OAuth permissions, then connect the creator account."
+            ]
+            self.links = [
+                PluginSetupGuideLink(
+                    label: "Open Google Cloud console",
+                    url: URL(string: "https://console.cloud.google.com/apis/credentials")!
+                )
+            ]
+        default:
+            return nil
+        }
+    }
+}
+
+struct PluginSetupGuideLink: Equatable, Sendable {
+    var label: String
+    var url: URL
+}
+
 private struct PluginAppSetupChecklistView: View {
     let checklist: PluginAppSetupChecklist
 
@@ -4997,6 +5065,50 @@ private struct PluginAppSetupChecklistView: View {
         }
         .padding(10)
         .background(Color.statusSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct PluginSetupGuidePanel: View {
+    let guide: PluginSetupGuide
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(guide.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(guide.detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(Array(guide.steps.enumerated()), id: \.offset) { index, step in
+                    HStack(alignment: .top, spacing: 7) {
+                        Text("\(index + 1).")
+                            .font(.caption2.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                            .frame(width: 18, alignment: .trailing)
+                        Text(step)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            if guide.links.isEmpty == false {
+                HStack(spacing: 10) {
+                    ForEach(guide.links, id: \.url) { link in
+                        Link(destination: link.url) {
+                            Label(link.label, systemImage: "arrow.up.right.square")
+                        }
+                        .font(.caption.weight(.semibold))
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.statusBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
