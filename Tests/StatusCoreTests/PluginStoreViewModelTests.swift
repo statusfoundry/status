@@ -69,6 +69,34 @@ import Testing
     #expect(complete.items.map { $0.isComplete } == [true, true, true, true])
 }
 
+@Test func pluginSetupRequirementStateAcceptsStoredSecretsForSavedApps() {
+    let fields = [
+        PackagedPluginSetupField(id: "token", label: "Personal access token", type: .secret, required: true),
+        PackagedPluginSetupField(id: "owner", label: "Owner", type: .text, required: true)
+    ]
+
+    let newAppMissing = PluginSetupRequirementState.missingRequiredFields(
+        setupFields: fields,
+        setupValues: ["owner": "statusfoundry"],
+        selectedAccount: nil
+    )
+    let savedAppMissing = PluginSetupRequirementState.missingRequiredFields(
+        setupFields: fields,
+        setupValues: ["owner": "statusfoundry"],
+        selectedAccount: PluginAccountConfiguration(
+            id: "acc_github",
+            pluginID: "com.status.github",
+            accountName: "Status repo",
+            variables: ["owner": "statusfoundry"],
+            authType: AuthKind.bearerToken.rawValue,
+            credentialRef: "keychain://github"
+        )
+    )
+
+    #expect(newAppMissing.map { $0.id } == ["token"])
+    #expect(savedAppMissing.isEmpty)
+}
+
 @Test func pluginSetupChecklistTracksYouTubeOAuthSetup() {
     let plugin = setupChecklistPlugin(
         id: "com.status.youtube",

@@ -3202,9 +3202,11 @@ private struct PluginSettingsPanel: View {
     }
 
     private var hasMissingRequiredSetupValue: Bool {
-        setupFields.contains { field in
-            field.required && setupValues[field.id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
+        PluginSetupRequirementState.missingRequiredFields(
+            setupFields: setupFields,
+            setupValues: setupValues,
+            selectedAccount: selectedAccount
+        ).isEmpty == false
     }
 
     private var oauthConnectionReadiness: PluginOAuthConnectionReadiness {
@@ -4863,17 +4865,12 @@ struct PluginAppSetupChecklist: Equatable, Sendable {
         let isSaved = selectedAccount != nil
         let hasCredential = selectedAccount?.credentialRef != nil
         let needsCredential = plugin.auth.map { $0.type != .none } ?? false
-        let missingFields = setupFields
-            .filter { field in
-                guard field.required else { return false }
-                if hasCredential && (field.type == .secret || field.type == .secretFile) {
-                    return false
-                }
-                return setupValues[field.id, default: field.defaultValue ?? ""]
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .isEmpty
-            }
-            .map(\.label)
+        let missingFields = PluginSetupRequirementState.missingRequiredFields(
+            setupFields: setupFields,
+            setupValues: setupValues,
+            selectedAccount: selectedAccount
+        )
+        .map(\.label)
         let missingPermissions = Self.missingRequiredPermissions(
             permissions: permissions,
             requiredPermissions: runtimeRequiredPermissions
@@ -4942,6 +4939,25 @@ struct PluginAppSetupChecklist: Equatable, Sendable {
 
     private static func permissionList(_ permissions: [PluginPermission]) -> String {
         permissions.map(\.label).joined(separator: ", ")
+    }
+}
+
+enum PluginSetupRequirementState {
+    static func missingRequiredFields(
+        setupFields: [PackagedPluginSetupField],
+        setupValues: [String: String],
+        selectedAccount: PluginAccountConfiguration?
+    ) -> [PackagedPluginSetupField] {
+        let hasStoredCredential = selectedAccount?.credentialRef != nil
+        return setupFields.filter { field in
+            guard field.required else { return false }
+            if hasStoredCredential && field.type.isStoredSecretField {
+                return false
+            }
+            return setupValues[field.id, default: field.defaultValue ?? ""]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .isEmpty
+        }
     }
 }
 
@@ -5169,6 +5185,15 @@ private extension PackagedPluginSetupFieldType {
         switch self {
         case .text, .url, .hostname, .number, .toggle, .select, .secret, .secretFile:
             true
+        }
+    }
+
+    var isStoredSecretField: Bool {
+        switch self {
+        case .secret, .secretFile:
+            true
+        case .text, .url, .hostname, .number, .toggle, .select:
+            false
         }
     }
 }
