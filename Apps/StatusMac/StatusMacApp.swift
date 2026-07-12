@@ -476,7 +476,7 @@ private struct MacRootView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            List(selection: $selection) {
+            List {
                 Section("Apps") {
                     if sidebarApps.isEmpty {
                         Text(sidebarPluginError ?? "No apps configured")
@@ -505,7 +505,6 @@ private struct MacRootView: View {
                             }
                             .buttonStyle(.plain)
                             .contentShape(Rectangle())
-                            .tag(app.section)
                             .listRowBackground(selection == app.section ? Color.accentColor.opacity(0.16) : Color.clear)
                             .accessibilityLabel(Text("Open \(app.name)"))
                             .accessibilityAddTraits(selection == app.section ? [.isSelected] : [])
@@ -514,24 +513,12 @@ private struct MacRootView: View {
                 }
 
                 Section {
-                    NavigationLink(value: MacSection.overview) {
-                        Label("Overview", systemImage: "rectangle.grid.2x2")
-                    }
-                    NavigationLink(value: MacSection.alerts) {
-                        Label("Alerts", systemImage: "bell")
-                    }
-                    NavigationLink(value: MacSection.plugins) {
-                        Label("Plugins", systemImage: "puzzlepiece.extension")
-                    }
-                    NavigationLink(value: MacSection.rules) {
-                        Label("Cross-App", systemImage: "slider.horizontal.3")
-                    }
-                    NavigationLink(value: MacSection.audit) {
-                        Label("Audit Log", systemImage: "list.bullet.rectangle")
-                    }
-                    NavigationLink(value: MacSection.settings) {
-                        Label("Settings", systemImage: "gearshape")
-                    }
+                    MacSidebarSectionButton(selection: $selection, section: .overview, title: "Overview", systemImage: "rectangle.grid.2x2")
+                    MacSidebarSectionButton(selection: $selection, section: .alerts, title: "Alerts", systemImage: "bell")
+                    MacSidebarSectionButton(selection: $selection, section: .plugins, title: "Plugins", systemImage: "puzzlepiece.extension")
+                    MacSidebarSectionButton(selection: $selection, section: .rules, title: "Cross-App", systemImage: "slider.horizontal.3")
+                    MacSidebarSectionButton(selection: $selection, section: .audit, title: "Audit Log", systemImage: "list.bullet.rectangle")
+                    MacSidebarSectionButton(selection: $selection, section: .settings, title: "Settings", systemImage: "gearshape")
                 }
             }
             .navigationTitle("Status")
@@ -1380,6 +1367,28 @@ private struct SidebarApp: Identifiable, Hashable {
 
     var section: MacSection {
         .app(pluginID: pluginID, accountID: accountID)
+    }
+}
+
+private struct MacSidebarSectionButton: View {
+    @Binding var selection: MacSection?
+    let section: MacSection
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        Button {
+            selection = section
+        } label: {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .listRowBackground(selection == section ? Color.accentColor.opacity(0.16) : Color.clear)
+        .accessibilityAddTraits(selection == section ? [.isSelected] : [])
     }
 }
 
