@@ -1896,7 +1896,14 @@ public final class StatusPersistenceStore {
         if normalizedField.contains("status") ||
             normalizedField.contains("state") ||
             normalizedField.contains("result") ||
-            normalizedField.contains("severity") {
+            normalizedField.contains("severity") ||
+            normalizedField.contains("reachable") ||
+            normalizedField.contains("available") ||
+            normalizedField.contains("healthy") {
+            return .status
+        }
+        if normalizedValue.caseInsensitiveCompare("true") == .orderedSame ||
+            normalizedValue.caseInsensitiveCompare("false") == .orderedSame {
             return .status
         }
         if normalizedValue.hasSuffix("%"), Double(normalizedValue.dropLast()) != nil {

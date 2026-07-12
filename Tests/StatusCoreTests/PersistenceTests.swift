@@ -1295,7 +1295,7 @@ import Testing
             id: "reachable",
             label: "Reachable",
             value: "true",
-            kind: .text,
+            kind: .status,
             resourceName: "status.hakobs.com",
             resourceType: "website",
             actionURL: URL(string: "https://status.hakobs.com")

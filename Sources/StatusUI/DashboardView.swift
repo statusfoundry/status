@@ -452,13 +452,23 @@ private struct DashboardPrimaryTileItem: View {
 
     private var statusColor: Color {
         let value = DashboardTileDisplayValue(item: item).text.lowercased()
-        if value.contains("fail") || value.contains("reject") || value.contains("down") || value.contains("critical") {
+        if value == "no" ||
+            value == "false" ||
+            value.contains("fail") ||
+            value.contains("reject") ||
+            value.contains("down") ||
+            value.contains("critical") {
             return .red
         }
         if value.contains("warn") || value.contains("review") || value.contains("pending") || value.contains("slow") {
             return .orange
         }
-        if value.contains("ok") || value.contains("success") || value.contains("ready") || value.contains("up") {
+        if value == "yes" ||
+            value == "true" ||
+            value.contains("ok") ||
+            value.contains("success") ||
+            value.contains("ready") ||
+            value.contains("up") {
             return .green
         }
         return .blue
