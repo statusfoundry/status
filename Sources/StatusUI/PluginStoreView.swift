@@ -1740,7 +1740,7 @@ private struct PluginAppDetailSummaryStrip: View {
     }
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 210), spacing: 10)], spacing: 10) {
             PluginAppDetailSummaryTile(
                 title: "Status",
                 value: facts.statusValue,
@@ -1758,7 +1758,7 @@ private struct PluginAppDetailSummaryStrip: View {
             PluginAppDetailSummaryTile(
                 title: "Events",
                 value: "\(facts.emittedEventCount)",
-                detail: Text("Emitted by last refresh"),
+                detail: Text("Last refresh"),
                 systemImage: "waveform.path.ecg",
                 tint: .purple
             )
@@ -1834,18 +1834,18 @@ private struct PluginAppDetailSummaryTile: View {
                 Text(value)
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .minimumScaleFactor(0.82)
-                    .truncationMode(.middle)
+                    .truncationMode(.tail)
                 detail
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .truncationMode(.tail)
             }
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 76, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
         .padding(12)
         .background(Color.statusSurface)
         .clipShape(RoundedRectangle(cornerRadius: 8))
