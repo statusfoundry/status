@@ -4860,9 +4860,16 @@ struct PluginAppSetupChecklist: Equatable, Sendable {
         permissions: [InstalledPluginPermission],
         runtimeRequiredPermissions: [PluginPermission]
     ) {
+        let isSaved = selectedAccount != nil
+        let hasCredential = selectedAccount?.credentialRef != nil
+        let needsCredential = plugin.auth.map { $0.type != .none } ?? false
         let missingFields = setupFields
             .filter { field in
-                field.required && setupValues[field.id, default: field.defaultValue ?? ""]
+                guard field.required else { return false }
+                if hasCredential && (field.type == .secret || field.type == .secretFile) {
+                    return false
+                }
+                return setupValues[field.id, default: field.defaultValue ?? ""]
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                     .isEmpty
             }
@@ -4871,9 +4878,6 @@ struct PluginAppSetupChecklist: Equatable, Sendable {
             permissions: permissions,
             requiredPermissions: runtimeRequiredPermissions
         )
-        let isSaved = selectedAccount != nil
-        let hasCredential = selectedAccount?.credentialRef != nil
-        let needsCredential = plugin.auth.map { $0.type != .none } ?? false
         let authLabel = plugin.auth?.type == .oauth2 ? "Connect OAuth account" : "Store credentials"
         let authDetail = plugin.auth?.type == .oauth2
             ? "Connect the provider account before refreshing."

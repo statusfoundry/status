@@ -40,7 +40,7 @@ import Testing
     let incomplete = PluginAppSetupChecklist(
         plugin: plugin,
         selectedAccount: nil,
-        setupFields: plugin.setup?.fields ?? [],
+        setupFields: setupChecklistFields(plugin),
         setupValues: ["owner": "statusfoundry", "repo": ""],
         permissions: setupChecklistPermissions([.network, .keychain, .backgroundRefresh], granted: []),
         runtimeRequiredPermissions: [.network, .keychain]
@@ -48,7 +48,7 @@ import Testing
 
     #expect(incomplete.items.map { $0.id } == ["save", "auth", "permissions", "refresh"])
     #expect(incomplete.items.map { $0.isComplete } == [false, false, false, false])
-    #expect(incomplete.items[0].detail == "Complete Repository before saving.")
+    #expect(incomplete.items[0].detail == "Complete Personal access token, Repository before saving.")
 
     let complete = PluginAppSetupChecklist(
         plugin: plugin,
@@ -60,7 +60,7 @@ import Testing
             authType: AuthKind.bearerToken.rawValue,
             credentialRef: "keychain://github"
         ),
-        setupFields: plugin.setup?.fields ?? [],
+        setupFields: setupChecklistFields(plugin),
         setupValues: ["owner": "statusfoundry", "repo": "status"],
         permissions: setupChecklistPermissions([.network, .keychain, .backgroundRefresh], granted: [.network, .keychain]),
         runtimeRequiredPermissions: [.network, .keychain]
@@ -92,7 +92,7 @@ import Testing
             authType: AuthKind.oauth2.rawValue,
             credentialRef: nil
         ),
-        setupFields: plugin.setup?.fields ?? [],
+        setupFields: setupChecklistFields(plugin),
         setupValues: [PluginOAuth.clientIDSetupFieldKey: "client.apps.googleusercontent.com"],
         permissions: setupChecklistPermissions([.network, .keychain, .oauth], granted: [.network, .keychain, .oauth]),
         runtimeRequiredPermissions: [.network, .keychain, .oauth]
@@ -1907,6 +1907,10 @@ private func setupChecklistPermissions(
             granted: granted.contains(permission)
         )
     }
+}
+
+private func setupChecklistFields(_ plugin: InstalledPlugin) -> [PackagedPluginSetupField] {
+    (plugin.auth?.fields ?? []) + (plugin.setup?.fields ?? [])
 }
 
 private func registryPluginSummary(id: String, latestVersion: String?) -> RegistryPluginSummary {
