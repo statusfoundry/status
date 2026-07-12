@@ -1618,7 +1618,11 @@ public struct PluginAppDetailView: View {
                     PluginRuntimeStatusView(status: runtimeStatus)
                 }
                 if let runUnavailableReason {
-                    RunUnavailableView(reason: runUnavailableReason)
+                    RunUnavailableView(
+                        reason: runUnavailableReason,
+                        openSettings: openSettings,
+                        appName: app?.accountName ?? plugin.name
+                    )
                 }
                 if resources.isEmpty || plugin.views.isEmpty {
                     PluginFallbackAppDataPanel(plugin: plugin, resources: resources)
@@ -1901,6 +1905,8 @@ private struct PluginAppDetailSummaryTile: View {
 
 private struct RunUnavailableView: View {
     let reason: String
+    let openSettings: (() -> Void)?
+    let appName: String
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -1917,6 +1923,17 @@ private struct RunUnavailableView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if let openSettings {
+                    Button {
+                        openSettings()
+                    } label: {
+                        Label("Open Settings", systemImage: "gearshape")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel(Text("Open settings for \(appName)"))
+                    .padding(.top, 2)
+                }
             }
             Spacer(minLength: 0)
         }
