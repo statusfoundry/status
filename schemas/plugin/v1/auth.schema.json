@@ -45,16 +45,40 @@
     },
     "oauth2": {
       "$ref": "#/$defs/oauth2",
-      "description": "OAuth provider endpoints and scopes for native authorization-code + PKCE. Required when type is oauth2."
+      "description": "OAuth provider endpoints and scopes for native authorization-code + PKCE or device-code flow. Required when type is oauth2."
     }
   },
   "$defs": {
     "oauth2": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["authorizationUrl", "tokenUrl", "redirectUri"],
+      "required": ["tokenUrl"],
+      "allOf": [
+        {
+          "if": {
+            "properties": { "grantType": { "const": "device-code" } },
+            "required": ["grantType"]
+          },
+          "then": {
+            "required": ["deviceAuthorizationUrl"]
+          },
+          "else": {
+            "required": ["authorizationUrl", "redirectUri"]
+          }
+        }
+      ],
       "properties": {
+        "grantType": {
+          "type": "string",
+          "enum": ["authorization-code", "device-code"],
+          "default": "authorization-code"
+        },
         "authorizationUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "deviceAuthorizationUrl": {
           "type": "string",
           "format": "uri",
           "pattern": "^https://"

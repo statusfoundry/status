@@ -12,6 +12,6 @@
   "accentColor": "#4B5563",
   "minCoreVersion": "0.1.0",
   "platforms": ["macOS", "iOS"],
-  "permissions": ["network", "keychain", "background-refresh"],
-  "domains": ["api.github.com"]
+  "permissions": ["network", "keychain", "oauth", "background-refresh"],
+  "domains": ["api.github.com", "github.com"]
 }

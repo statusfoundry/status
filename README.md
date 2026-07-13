@@ -83,7 +83,7 @@ Plugin package schemas live in [`schemas/plugin/v1/`](schemas/plugin/v1/).
 ## Repository layout
 
 ```txt
-Apps/
+_apps/
   StatusMac/
   StatusiOS/
 Sources/

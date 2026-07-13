@@ -494,13 +494,26 @@ function validateAuth(authFile, manifest, sourceName) {
     fail(`${sourceName}: oauth2 auth requires oauth2 endpoint configuration`);
   }
   if (authFile.type === "oauth2") {
-    validateOAuthRedirectURI(authFile.oauth2.redirectUri, authFile.provider, sourceName);
-    validateDeclaredHost(
-      manifest,
-      hostFromURL(authFile.oauth2.authorizationUrl, sourceName, "auth.oauth2.authorizationUrl"),
-      sourceName,
-      "auth.oauth2.authorizationUrl"
-    );
+    const grantType = authFile.oauth2.grantType ?? "authorization-code";
+    if (grantType !== "authorization-code" && grantType !== "device-code") {
+      fail(`${sourceName}: auth.oauth2.grantType must be authorization-code or device-code`);
+    }
+    if (grantType === "authorization-code") {
+      validateOAuthRedirectURI(authFile.oauth2.redirectUri, authFile.provider, sourceName);
+      validateDeclaredHost(
+        manifest,
+        hostFromURL(authFile.oauth2.authorizationUrl, sourceName, "auth.oauth2.authorizationUrl"),
+        sourceName,
+        "auth.oauth2.authorizationUrl"
+      );
+    } else {
+      validateDeclaredHost(
+        manifest,
+        hostFromURL(authFile.oauth2.deviceAuthorizationUrl, sourceName, "auth.oauth2.deviceAuthorizationUrl"),
+        sourceName,
+        "auth.oauth2.deviceAuthorizationUrl"
+      );
+    }
     validateDeclaredHost(
       manifest,
       hostFromURL(authFile.oauth2.tokenUrl, sourceName, "auth.oauth2.tokenUrl"),

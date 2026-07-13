@@ -124,6 +124,7 @@ public final class PluginStoreViewModel: ObservableObject {
     @Published public private(set) var dashboardTileFields: [String: [String]]
     @Published public private(set) var savingDashboardTileFieldKey: String?
     @Published public private(set) var oauthConnectionURLs: [String: URL]
+    @Published public private(set) var oauthDeviceAuthorizationRequests: [String: PluginOAuthDeviceAuthorizationRequest]
     @Published public private(set) var oauthConnectionErrors: [String: String]
     @Published public private(set) var completingOAuthConnectionKey: String?
     @Published public private(set) var testingRequestKey: String?
@@ -154,6 +155,7 @@ public final class PluginStoreViewModel: ObservableObject {
     private let saveConfigurationValues: (InstalledPlugin, String?, String?, [String: String]) async throws -> String
     private let deleteConfiguration: (InstalledPlugin, PluginAccountConfiguration) async throws -> String
     private let completeOAuthConnection: (InstalledPlugin, String?, String?, [String: String], PluginOAuthAuthorizationRequest, URL) async throws -> String
+    private let saveOAuthTokenSet: (InstalledPlugin, String?, String?, [String: String], PluginOAuthTokenSet) async throws -> String
     private let testPluginRequest: (InstalledPlugin, PluginAccountConfiguration, String) async throws -> String
     private let previewProviderActionRequest: (ActionRuntimeProviderAction) async throws -> String
     private var oauthConnectionRequests: [String: PluginOAuthAuthorizationRequest]
@@ -188,6 +190,9 @@ public final class PluginStoreViewModel: ObservableObject {
         completeOAuthConnection: @escaping (InstalledPlugin, String?, String?, [String: String], PluginOAuthAuthorizationRequest, URL) async throws -> String = { _, _, _, _, _, _ in
             "OAuth callback received."
         },
+        saveOAuthTokenSet: @escaping (InstalledPlugin, String?, String?, [String: String], PluginOAuthTokenSet) async throws -> String = { _, _, _, _, _ in
+            "OAuth account saved."
+        },
         testPluginRequest: @escaping (InstalledPlugin, PluginAccountConfiguration, String) async throws -> String = { _, _, _ in "" },
         previewProviderActionRequest: @escaping (ActionRuntimeProviderAction) async throws -> String = { _ in "" }
     ) {
@@ -210,6 +215,7 @@ public final class PluginStoreViewModel: ObservableObject {
         self.appRules = [:]
         self.dashboardTileFields = [:]
         self.oauthConnectionURLs = [:]
+        self.oauthDeviceAuthorizationRequests = [:]
         self.oauthConnectionErrors = [:]
         self.completingOAuthConnectionKey = nil
         self.testingRequestKey = nil
@@ -240,6 +246,7 @@ public final class PluginStoreViewModel: ObservableObject {
         self.saveConfigurationValues = saveConfigurationValues
         self.deleteConfiguration = deleteConfiguration
         self.completeOAuthConnection = completeOAuthConnection
+        self.saveOAuthTokenSet = saveOAuthTokenSet
         self.testPluginRequest = testPluginRequest
         self.previewProviderActionRequest = previewProviderActionRequest
     }
@@ -689,9 +696,10 @@ public final class PluginStoreViewModel: ObservableObject {
     }
 
     @discardableResult
-    public func beginOAuthConnection(_ plugin: InstalledPlugin) -> URL? {
+    public func beginOAuthConnection(_ plugin: InstalledPlugin) async -> URL? {
         let key = setupKey(for: plugin)
         oauthConnectionURLs[key] = nil
+        oauthDeviceAuthorizationRequests[key] = nil
         oauthConnectionErrors[key] = nil
         do {
             guard let auth = plugin.auth, auth.type == .oauth2 else {
@@ -703,17 +711,72 @@ public final class PluginStoreViewModel: ObservableObject {
                 oauthConnectionErrors[key] = "Grant \(missingPermissions.map(\.label).joined(separator: ", ")) permission before connecting this app."
                 return nil
             }
-            let request = try PluginOAuth.authorizationRequest(
-                pluginID: plugin.id,
-                auth: auth,
-                clientIDOverride: oauthClientIDOverride(for: plugin, setupKey: key)
-            )
-            oauthConnectionRequests[key] = request
-            oauthConnectionURLs[key] = request.url
-            return request.url
+            let clientIDOverride = try oauthClientIDOverride(for: plugin, setupKey: key)
+            if auth.oauth2?.grantType == .deviceCode {
+                let request = try await PluginOAuth.deviceAuthorizationRequest(
+                    pluginID: plugin.id,
+                    auth: auth,
+                    clientIDOverride: clientIDOverride
+                )
+                oauthDeviceAuthorizationRequests[key] = request
+                oauthConnectionURLs[key] = request.verificationURL
+                return request.verificationURL
+            } else {
+                let request = try PluginOAuth.authorizationRequest(
+                    pluginID: plugin.id,
+                    auth: auth,
+                    clientIDOverride: clientIDOverride
+                )
+                oauthConnectionRequests[key] = request
+                oauthConnectionURLs[key] = request.url
+                return request.url
+            }
         } catch {
             oauthConnectionErrors[key] = error.localizedDescription
             return nil
+        }
+    }
+
+    public func completeOAuthDeviceConnection(_ plugin: InstalledPlugin) async {
+        let key = setupKey(for: plugin)
+        guard let request = oauthDeviceAuthorizationRequests[key] else {
+            oauthConnectionErrors[key] = "Start OAuth connection first."
+            return
+        }
+        guard completingOAuthConnectionKey == nil else { return }
+        completingOAuthConnectionKey = key
+        setupResults[key] = nil
+        setupErrors[key] = nil
+        oauthConnectionErrors[key] = nil
+        defer { completingOAuthConnectionKey = nil }
+
+        do {
+            guard let auth = plugin.auth else {
+                throw PluginOAuthError.missingOAuthConfiguration(plugin.id)
+            }
+            let tokenSet = try await PluginOAuth.deviceTokenSet(
+                pluginID: plugin.id,
+                auth: auth,
+                request: request
+            )
+            let accountID = persistedAccountID(from: accountID(fromSetupKey: key))
+            let accountName = accountDisplayNames[key]
+            let values = setupValues[key, default: defaultSetupValues(for: plugin)]
+            let previousAccountIDs = Set(configuredAccounts[plugin.id, default: []].map(\.id))
+            let result = try await saveOAuthTokenSet(plugin, accountID, accountName, values, tokenSet)
+            oauthDeviceAuthorizationRequests[key] = nil
+            oauthConnectionURLs[key] = nil
+            await reload()
+            if accountID == nil,
+               let savedAccount = newlySavedAccount(for: plugin, previousAccountIDs: previousAccountIDs, displayName: accountName) {
+                selectAccount(savedAccount.id, for: plugin)
+                setupResults[setupKey(pluginID: plugin.id, accountID: savedAccount.id)] = result
+            } else {
+                setupResults[key] = result
+            }
+        } catch {
+            oauthConnectionErrors[key] = error.localizedDescription
+            setupErrors[key] = error.localizedDescription
         }
     }
 
@@ -751,10 +814,16 @@ public final class PluginStoreViewModel: ObservableObject {
         guard plugin.setup?.fields.contains(where: { $0.id == PluginOAuth.clientIDSetupFieldKey }) == true else {
             return nil
         }
+        guard let field = plugin.setup?.fields.first(where: { $0.id == PluginOAuth.clientIDSetupFieldKey }) else {
+            return nil
+        }
         guard let value = setupValues[key, default: defaultSetupValues(for: plugin)][PluginOAuth.clientIDSetupFieldKey]?
             .trimmingCharacters(in: .whitespacesAndNewlines),
             value.isEmpty == false else {
-            throw PluginOAuthError.missingApplicationID(plugin.id)
+            if field.required {
+                throw PluginOAuthError.missingApplicationID(plugin.id)
+            }
+            return nil
         }
         return value
     }
@@ -1126,6 +1195,7 @@ public struct PluginStoreContainerView: View {
             dashboardTileFields: viewModel.dashboardTileFields,
             savingDashboardTileFieldKey: viewModel.savingDashboardTileFieldKey,
             oauthConnectionURLs: viewModel.oauthConnectionURLs,
+            oauthDeviceAuthorizationRequests: viewModel.oauthDeviceAuthorizationRequests,
             oauthConnectionErrors: viewModel.oauthConnectionErrors,
             testingRequestKey: viewModel.testingRequestKey,
             testRequestResults: viewModel.testRequestResults,
@@ -1158,7 +1228,10 @@ public struct PluginStoreContainerView: View {
                 }
             },
             beginOAuthConnection: { plugin in
-                viewModel.beginOAuthConnection(plugin)
+                await viewModel.beginOAuthConnection(plugin)
+            },
+            completeOAuthDeviceConnection: { plugin in
+                await viewModel.completeOAuthDeviceConnection(plugin)
             },
             testRequest: { plugin, requestID in
                 Task {
@@ -1479,6 +1552,7 @@ public struct PluginSettingsContainerView: View {
             notificationPreferencesViewModel: notificationPreferencesViewModel,
             notificationPreferenceGroups: notificationPreferenceGroups(plugin, selectedAccountID),
             oauthConnectionURL: viewModel.oauthConnectionURLs[key],
+            oauthDeviceAuthorizationRequest: viewModel.oauthDeviceAuthorizationRequests[key],
             oauthConnectionError: viewModel.oauthConnectionErrors[key],
             testingRequestKey: viewModel.testingRequestKey,
             testRequestResults: viewModel.testRequestResults,
@@ -1508,7 +1582,10 @@ public struct PluginSettingsContainerView: View {
                 }
             },
             beginOAuthConnection: { plugin in
-                viewModel.beginOAuthConnection(plugin)
+                await viewModel.beginOAuthConnection(plugin)
+            },
+            completeOAuthDeviceConnection: { plugin in
+                await viewModel.completeOAuthDeviceConnection(plugin)
             },
             testRequest: { plugin, requestID in
                 Task { await viewModel.testRequest(requestID, for: plugin) }
@@ -2041,7 +2118,7 @@ private struct ResourceFieldValue: View {
                 }
                 .font(.caption.weight(.semibold))
             } else {
-                Text(value)
+                Text(displayValue)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(valueColor)
                     .lineLimit(1)
@@ -2052,33 +2129,20 @@ private struct ResourceFieldValue: View {
     }
 
     private var valueColor: Color {
-        let normalizedField = field.lowercased()
-        let normalizedValue = value.lowercased()
-        guard normalizedField.contains("status") ||
-            normalizedField.contains("state") ||
-            normalizedField.contains("result") ||
-            normalizedField.contains("severity") else {
+        switch StatusFieldValueFormatter.tone(fieldID: field, value: value) {
+        case .positive:
+            return .green
+        case .warning:
+            return .orange
+        case .negative:
+            return .red
+        case .neutral, nil:
             return .secondary
         }
-        if normalizedValue.contains("fail") ||
-            normalizedValue.contains("reject") ||
-            normalizedValue.contains("critical") ||
-            normalizedValue.contains("down") {
-            return .red
-        }
-        if normalizedValue.contains("review") ||
-            normalizedValue.contains("pending") ||
-            normalizedValue.contains("warning") ||
-            normalizedValue.contains("slow") {
-            return .orange
-        }
-        if normalizedValue.contains("ok") ||
-            normalizedValue.contains("success") ||
-            normalizedValue.contains("ready") ||
-            normalizedValue.contains("up") {
-            return .green
-        }
-        return .secondary
+    }
+
+    private var displayValue: String {
+        StatusFieldValueFormatter.displayText(fieldID: field, value: value)
     }
 
     private func displayLabel(for field: String) -> String {
@@ -2114,6 +2178,7 @@ public struct PluginStoreView: View {
     private let dashboardTileFields: [String: [String]]
     private let savingDashboardTileFieldKey: String?
     private let oauthConnectionURLs: [String: URL]
+    private let oauthDeviceAuthorizationRequests: [String: PluginOAuthDeviceAuthorizationRequest]
     private let oauthConnectionErrors: [String: String]
     private let testingRequestKey: String?
     private let testRequestResults: [String: String]
@@ -2125,7 +2190,8 @@ public struct PluginStoreView: View {
     private let addAccount: (InstalledPlugin) -> Void
     private let saveSetup: (InstalledPlugin) -> Void
     private let removeSelectedAccount: (InstalledPlugin) -> Void
-    private let beginOAuthConnection: (InstalledPlugin) -> URL?
+    private let beginOAuthConnection: (InstalledPlugin) async -> URL?
+    private let completeOAuthDeviceConnection: (InstalledPlugin) async -> Void
     private let testRequest: (InstalledPlugin, String) -> Void
     private let canRun: (InstalledPlugin) -> Bool
     private let run: (InstalledPlugin) -> Void
@@ -2183,6 +2249,7 @@ public struct PluginStoreView: View {
         dashboardTileFields: [String: [String]] = [:],
         savingDashboardTileFieldKey: String? = nil,
         oauthConnectionURLs: [String: URL] = [:],
+        oauthDeviceAuthorizationRequests: [String: PluginOAuthDeviceAuthorizationRequest] = [:],
         oauthConnectionErrors: [String: String] = [:],
         testingRequestKey: String? = nil,
         testRequestResults: [String: String] = [:],
@@ -2194,7 +2261,8 @@ public struct PluginStoreView: View {
         addAccount: @escaping (InstalledPlugin) -> Void = { _ in },
         saveSetup: @escaping (InstalledPlugin) -> Void = { _ in },
         removeSelectedAccount: @escaping (InstalledPlugin) -> Void = { _ in },
-        beginOAuthConnection: @escaping (InstalledPlugin) -> URL? = { _ in nil },
+        beginOAuthConnection: @escaping (InstalledPlugin) async -> URL? = { _ in nil },
+        completeOAuthDeviceConnection: @escaping (InstalledPlugin) async -> Void = { _ in },
         testRequest: @escaping (InstalledPlugin, String) -> Void = { _, _ in },
         canRun: @escaping (InstalledPlugin) -> Bool = { _ in false },
         run: @escaping (InstalledPlugin) -> Void = { _ in },
@@ -2252,6 +2320,7 @@ public struct PluginStoreView: View {
         self.dashboardTileFields = dashboardTileFields
         self.savingDashboardTileFieldKey = savingDashboardTileFieldKey
         self.oauthConnectionURLs = oauthConnectionURLs
+        self.oauthDeviceAuthorizationRequests = oauthDeviceAuthorizationRequests
         self.oauthConnectionErrors = oauthConnectionErrors
         self.testingRequestKey = testingRequestKey
         self.testRequestResults = testRequestResults
@@ -2264,6 +2333,7 @@ public struct PluginStoreView: View {
         self.saveSetup = saveSetup
         self.removeSelectedAccount = removeSelectedAccount
         self.beginOAuthConnection = beginOAuthConnection
+        self.completeOAuthDeviceConnection = completeOAuthDeviceConnection
         self.testRequest = testRequest
         self.canRun = canRun
         self.run = run
@@ -2407,6 +2477,7 @@ public struct PluginStoreView: View {
             notificationPreferencesViewModel: notificationPreferencesViewModel,
             notificationPreferenceGroups: notificationPreferenceGroups(plugin, selectedAccountID),
             oauthConnectionURL: oauthConnectionURLs[setupKey(pluginID: plugin.id, accountID: selectedAccountID)],
+            oauthDeviceAuthorizationRequest: oauthDeviceAuthorizationRequests[setupKey(pluginID: plugin.id, accountID: selectedAccountID)],
             oauthConnectionError: oauthConnectionErrors[setupKey(pluginID: plugin.id, accountID: selectedAccountID)],
             testingRequestKey: testingRequestKey,
             testRequestResults: testRequestResults,
@@ -2418,6 +2489,7 @@ public struct PluginStoreView: View {
             saveSetup: saveSetup,
             removeSelectedAccount: removeSelectedAccount,
             beginOAuthConnection: beginOAuthConnection,
+            completeOAuthDeviceConnection: completeOAuthDeviceConnection,
             testRequest: testRequest,
             canRun: canRun(plugin),
             isRunning: runningPluginID == plugin.id,
@@ -2841,6 +2913,7 @@ private struct PluginSettingsPanel: View {
     @ObservedObject var notificationPreferencesViewModel: NotificationPreferencesViewModel
     let notificationPreferenceGroups: [NotificationPreferencePluginGroup]
     let oauthConnectionURL: URL?
+    let oauthDeviceAuthorizationRequest: PluginOAuthDeviceAuthorizationRequest?
     let oauthConnectionError: String?
     let testingRequestKey: String?
     let testRequestResults: [String: String]
@@ -2851,7 +2924,8 @@ private struct PluginSettingsPanel: View {
     let addAccount: (InstalledPlugin) -> Void
     let saveSetup: (InstalledPlugin) -> Void
     let removeSelectedAccount: (InstalledPlugin) -> Void
-    let beginOAuthConnection: (InstalledPlugin) -> URL?
+    let beginOAuthConnection: (InstalledPlugin) async -> URL?
+    let completeOAuthDeviceConnection: (InstalledPlugin) async -> Void
     let testRequest: (InstalledPlugin, String) -> Void
     let canRun: Bool
     let isRunning: Bool
@@ -2997,13 +3071,15 @@ private struct PluginSettingsPanel: View {
                         PluginOAuthConnectionPanel(
                             plugin: plugin,
                             authorizationURL: oauthConnectionURL,
+                            deviceAuthorizationRequest: oauthDeviceAuthorizationRequest,
                             error: oauthConnectionError,
                             readiness: oauthConnectionReadiness,
                             isGrantingPermissions: savingPermissionID != nil,
                             grantPermissions: { permissions in
                                 setPermissionGrants(plugin, permissions, true)
                             },
-                            connect: { beginOAuthConnection(plugin) }
+                            connect: { await beginOAuthConnection(plugin) },
+                            completeDeviceConnection: { await completeOAuthDeviceConnection(plugin) }
                         )
                     }
                     HStack {
@@ -5008,21 +5084,21 @@ struct PluginSetupGuide: Equatable, Sendable {
         switch plugin.id {
         case "com.status.github":
             self.title = "GitHub setup"
-            self.detail = "The current GitHub app uses a fine-grained personal access token. Do not create a GitHub OAuth app for this plugin yet; GitHub's web OAuth flow needs a client secret that should not be shipped in the native app."
+            self.detail = "GitHub uses OAuth device flow. Status opens GitHub, shows a short user code, and stores the resulting token set in Keychain without shipping a client secret."
             self.steps = [
-                "Create a fine-grained token named Status Local Dev for the repository you are adding.",
-                "Set repository access to selected repositories only, then choose the same owner and repository you enter in Status.",
-                "Grant read-only Metadata, Actions, Pull requests, and Issues access. Add Contents read-only if GitHub requires it for repository activity reads.",
-                "Paste the token here, save the app, grant Network, Keychain, and Background Refresh permissions, then refresh."
+                "Enter the repository owner and name you want Status to watch.",
+                "Grant Network, Keychain, OAuth, and Background Refresh permissions.",
+                "Choose Connect account, enter the displayed code on GitHub, then choose Complete connection in Status.",
+                "Run Refresh repository activity and Refresh workflow runs."
             ]
             self.links = [
                 PluginSetupGuideLink(
-                    label: "Create GitHub token",
-                    url: URL(string: "https://github.com/settings/personal-access-tokens/new")!
+                    label: "GitHub OAuth Apps",
+                    url: URL(string: "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps")!
                 ),
                 PluginSetupGuideLink(
-                    label: "Token permissions",
-                    url: URL(string: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens")!
+                    label: "Device flow",
+                    url: URL(string: "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow")!
                 )
             ]
         case "com.status.youtube":
@@ -5132,11 +5208,13 @@ private struct PluginOAuthConnectionPanel: View {
 
     let plugin: InstalledPlugin
     let authorizationURL: URL?
+    let deviceAuthorizationRequest: PluginOAuthDeviceAuthorizationRequest?
     let error: String?
     let readiness: PluginOAuthConnectionReadiness
     let isGrantingPermissions: Bool
     let grantPermissions: ([PluginPermission]) -> Void
-    let connect: () -> URL?
+    let connect: () async -> URL?
+    let completeDeviceConnection: () async -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -5148,14 +5226,37 @@ private struct PluginOAuthConnectionPanel: View {
                 .foregroundStyle(readiness.canConnect ? Color.secondary : Color.orange)
                 .fixedSize(horizontal: false, vertical: true)
             Button {
-                if let url = connect() {
-                    openURL(url)
+                Task {
+                    if let url = await connect() {
+                        openURL(url)
+                    }
                 }
             } label: {
                 Label("Connect account", systemImage: "person.crop.circle.badge.checkmark")
             }
             .buttonStyle(.bordered)
             .disabled(readiness.canConnect == false)
+            if let deviceAuthorizationRequest {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Enter this code on GitHub:")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(deviceAuthorizationRequest.userCode)
+                        .font(.system(.title3, design: .monospaced).weight(.semibold))
+                        .textSelection(.enabled)
+                    Button {
+                        Task {
+                            await completeDeviceConnection()
+                        }
+                    } label: {
+                        Label("Complete connection", systemImage: "checkmark.circle")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding(8)
+                .background(Color.statusBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
             if readiness.missingPermissions.isEmpty == false {
                 Button {
                     grantPermissions(readiness.missingPermissions)

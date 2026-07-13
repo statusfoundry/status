@@ -464,14 +464,23 @@ public struct PackagedPluginAuth: Codable, Equatable, Sendable {
 }
 
 public struct PackagedPluginOAuth2: Codable, Equatable, Sendable {
-    public var authorizationURL: URL
+    public enum GrantType: String, Codable, Equatable, Sendable {
+        case authorizationCode = "authorization-code"
+        case deviceCode = "device-code"
+    }
+
+    public var grantType: GrantType
+    public var authorizationURL: URL?
+    public var deviceAuthorizationURL: URL?
     public var tokenURL: URL
-    public var redirectURI: String
+    public var redirectURI: String?
     public var scopes: [String]
     public var additionalAuthorizationParameters: [String: String]
 
     enum CodingKeys: String, CodingKey {
+        case grantType
         case authorizationURL = "authorizationUrl"
+        case deviceAuthorizationURL = "deviceAuthorizationUrl"
         case tokenURL = "tokenUrl"
         case redirectURI = "redirectUri"
         case scopes
@@ -479,13 +488,17 @@ public struct PackagedPluginOAuth2: Codable, Equatable, Sendable {
     }
 
     public init(
-        authorizationURL: URL,
+        grantType: GrantType = .authorizationCode,
+        authorizationURL: URL? = nil,
+        deviceAuthorizationURL: URL? = nil,
         tokenURL: URL,
-        redirectURI: String,
+        redirectURI: String? = nil,
         scopes: [String] = [],
         additionalAuthorizationParameters: [String: String] = [:]
     ) {
+        self.grantType = grantType
         self.authorizationURL = authorizationURL
+        self.deviceAuthorizationURL = deviceAuthorizationURL
         self.tokenURL = tokenURL
         self.redirectURI = redirectURI
         self.scopes = scopes
@@ -494,9 +507,11 @@ public struct PackagedPluginOAuth2: Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        authorizationURL = try container.decode(URL.self, forKey: .authorizationURL)
+        grantType = try container.decodeIfPresent(GrantType.self, forKey: .grantType) ?? .authorizationCode
+        authorizationURL = try container.decodeIfPresent(URL.self, forKey: .authorizationURL)
+        deviceAuthorizationURL = try container.decodeIfPresent(URL.self, forKey: .deviceAuthorizationURL)
         tokenURL = try container.decode(URL.self, forKey: .tokenURL)
-        redirectURI = try container.decode(String.self, forKey: .redirectURI)
+        redirectURI = try container.decodeIfPresent(String.self, forKey: .redirectURI)
         scopes = try container.decodeIfPresent([String].self, forKey: .scopes) ?? []
         additionalAuthorizationParameters = try container.decodeIfPresent([String: String].self, forKey: .additionalAuthorizationParameters) ?? [:]
     }

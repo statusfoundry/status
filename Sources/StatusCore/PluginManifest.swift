@@ -293,8 +293,20 @@ public enum PluginManifestValidator {
             guard let oauth = auth.oauth2 else {
                 throw PluginValidationError.oauthMissingConfiguration(manifest.id)
             }
-            try validateOAuthRedirectURI(oauth.redirectURI, provider: provider)
-            try validateDeclaredDomain(oauth.authorizationURL.host?.lowercased() ?? "", declaredDomains: declaredDomains)
+            switch oauth.grantType {
+            case .authorizationCode:
+                guard let redirectURI = oauth.redirectURI,
+                      let authorizationURL = oauth.authorizationURL else {
+                    throw PluginValidationError.oauthMissingConfiguration(manifest.id)
+                }
+                try validateOAuthRedirectURI(redirectURI, provider: provider)
+                try validateDeclaredDomain(authorizationURL.host?.lowercased() ?? "", declaredDomains: declaredDomains)
+            case .deviceCode:
+                guard let deviceAuthorizationURL = oauth.deviceAuthorizationURL else {
+                    throw PluginValidationError.oauthMissingConfiguration(manifest.id)
+                }
+                try validateDeclaredDomain(deviceAuthorizationURL.host?.lowercased() ?? "", declaredDomains: declaredDomains)
+            }
             try validateDeclaredDomain(oauth.tokenURL.host?.lowercased() ?? "", declaredDomains: declaredDomains)
         }
 

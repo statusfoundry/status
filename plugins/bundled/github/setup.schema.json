@@ -3,6 +3,14 @@
   "description": "Configure one GitHub repository for read-only workflow and activity checks. Use Owner for the GitHub user or organization, and Repository for the repository name only.",
   "fields": [
     {
+      "key": "_status.oauth.clientId",
+      "label": "GitHub OAuth client ID",
+      "type": "text",
+      "placeholder": "Ov23li...",
+      "help": "Optional for local development. Official Status builds ship the public GitHub OAuth client ID; use this field only to override it with your own OAuth App client ID.",
+      "required": false
+    },
+    {
       "key": "owner",
       "label": "Owner",
       "type": "text",

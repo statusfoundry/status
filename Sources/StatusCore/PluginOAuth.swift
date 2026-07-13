@@ -66,6 +66,31 @@ public struct PluginOAuthAuthorizationRequest: Equatable, Sendable {
     }
 }
 
+public struct PluginOAuthDeviceAuthorizationRequest: Equatable, Sendable {
+    public var verificationURL: URL
+    public var userCode: String
+    public var deviceCode: String
+    public var expiresAt: Date
+    public var interval: TimeInterval
+    public var clientID: String?
+
+    public init(
+        verificationURL: URL,
+        userCode: String,
+        deviceCode: String,
+        expiresAt: Date,
+        interval: TimeInterval = 5,
+        clientID: String? = nil
+    ) {
+        self.verificationURL = verificationURL
+        self.userCode = userCode
+        self.deviceCode = deviceCode
+        self.expiresAt = expiresAt
+        self.interval = interval
+        self.clientID = clientID
+    }
+}
+
 public struct PluginOAuthTokenResponse: Codable, Equatable, Sendable {
     public var accessToken: String?
     public var refreshToken: String?
@@ -96,6 +121,32 @@ public struct PluginOAuthTokenResponse: Codable, Equatable, Sendable {
     }
 }
 
+private struct PluginOAuthDeviceAuthorizationResponse: Codable {
+    var deviceCode: String
+    var userCode: String
+    var verificationURI: String
+    var expiresIn: TimeInterval
+    var interval: TimeInterval?
+
+    enum CodingKeys: String, CodingKey {
+        case deviceCode = "device_code"
+        case userCode = "user_code"
+        case verificationURI = "verification_uri"
+        case expiresIn = "expires_in"
+        case interval
+    }
+}
+
+private struct PluginOAuthDeviceTokenErrorResponse: Codable {
+    var error: String
+    var errorDescription: String?
+
+    enum CodingKeys: String, CodingKey {
+        case error
+        case errorDescription = "error_description"
+    }
+}
+
 public enum PluginOAuthError: Error, Equatable, LocalizedError, Sendable {
     case missingOAuthConfiguration(String)
     case invalidAuthorizationURL(String)
@@ -108,6 +159,8 @@ public enum PluginOAuthError: Error, Equatable, LocalizedError, Sendable {
     case authorizationDenied(String)
     case tokenExchangeFailed(statusCode: Int)
     case tokenRefreshFailed(statusCode: Int)
+    case authorizationPending
+    case authorizationExpired
     case invalidTokenResponse
 
     public var errorDescription: String? {
@@ -134,6 +187,10 @@ public enum PluginOAuthError: Error, Equatable, LocalizedError, Sendable {
             "OAuth token exchange failed with HTTP \(statusCode)."
         case .tokenRefreshFailed(let statusCode):
             "OAuth token refresh failed with HTTP \(statusCode)."
+        case .authorizationPending:
+            "OAuth authorization is not complete yet."
+        case .authorizationExpired:
+            "OAuth authorization expired. Start the connection again."
         case .invalidTokenResponse:
             "OAuth token response did not include an access token."
         }
@@ -158,18 +215,23 @@ public enum PluginOAuth {
         guard auth.type == .oauth2, let config = auth.oauth2 else {
             throw PluginOAuthError.missingOAuthConfiguration(pluginID)
         }
+        guard config.grantType == .authorizationCode,
+              let authorizationURL = config.authorizationURL,
+              let redirectURI = config.redirectURI else {
+            throw PluginOAuthError.missingOAuthConfiguration(pluginID)
+        }
         guard let clientID = resolvedClientID(auth: auth, override: clientIDOverride) else {
             throw PluginOAuthError.missingApplicationID(pluginID)
         }
-        try validateConfiguredRedirectURI(config.redirectURI, provider: auth.provider, pluginID: pluginID)
-        guard var components = URLComponents(url: config.authorizationURL, resolvingAgainstBaseURL: false) else {
-            throw PluginOAuthError.invalidAuthorizationURL(config.authorizationURL.absoluteString)
+        try validateConfiguredRedirectURI(redirectURI, provider: auth.provider, pluginID: pluginID)
+        guard var components = URLComponents(url: authorizationURL, resolvingAgainstBaseURL: false) else {
+            throw PluginOAuthError.invalidAuthorizationURL(authorizationURL.absoluteString)
         }
 
         var queryItems = components.queryItems ?? []
         queryItems.append(URLQueryItem(name: "response_type", value: "code"))
         queryItems.append(URLQueryItem(name: "client_id", value: clientID))
-        queryItems.append(URLQueryItem(name: "redirect_uri", value: config.redirectURI))
+        queryItems.append(URLQueryItem(name: "redirect_uri", value: redirectURI))
         queryItems.append(URLQueryItem(name: "state", value: state))
         queryItems.append(URLQueryItem(name: "code_challenge", value: codeChallenge(for: codeVerifier)))
         queryItems.append(URLQueryItem(name: "code_challenge_method", value: "S256"))
@@ -181,9 +243,60 @@ public enum PluginOAuth {
         }
         components.queryItems = queryItems
         guard let url = components.url else {
-            throw PluginOAuthError.invalidAuthorizationURL(config.authorizationURL.absoluteString)
+            throw PluginOAuthError.invalidAuthorizationURL(authorizationURL.absoluteString)
         }
         return PluginOAuthAuthorizationRequest(url: url, codeVerifier: codeVerifier, state: state, clientID: clientID)
+    }
+
+    public static func deviceAuthorizationRequest(
+        pluginID: String,
+        auth: PackagedPluginAuth,
+        clientIDOverride: String? = nil,
+        transport: PluginRequestHTTPTransport = URLSessionPluginRequestTransport(),
+        now: Date = Date()
+    ) async throws -> PluginOAuthDeviceAuthorizationRequest {
+        guard auth.type == .oauth2, let config = auth.oauth2, config.grantType == .deviceCode else {
+            throw PluginOAuthError.missingOAuthConfiguration(pluginID)
+        }
+        guard let clientID = resolvedClientID(auth: auth, override: clientIDOverride) else {
+            throw PluginOAuthError.missingApplicationID(pluginID)
+        }
+        guard let deviceAuthorizationURL = config.deviceAuthorizationURL else {
+            throw PluginOAuthError.missingOAuthConfiguration(pluginID)
+        }
+        var fields = [
+            "client_id": clientID
+        ]
+        if config.scopes.isEmpty == false {
+            fields["scope"] = config.scopes.joined(separator: " ")
+        }
+        let response = try await transport.response(
+            for: PluginHTTPRequest(
+                method: "POST",
+                url: deviceAuthorizationURL,
+                headers: [
+                    "Accept": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                ],
+                body: Data(formURLEncoded(fields).utf8),
+                timeoutSeconds: 30
+            )
+        )
+        guard (200..<300).contains(response.statusCode) else {
+            throw PluginOAuthError.tokenExchangeFailed(statusCode: response.statusCode)
+        }
+        let deviceResponse = try JSONDecoder().decode(PluginOAuthDeviceAuthorizationResponse.self, from: response.data)
+        guard let verificationURL = URL(string: deviceResponse.verificationURI) else {
+            throw PluginOAuthError.invalidAuthorizationURL(deviceResponse.verificationURI)
+        }
+        return PluginOAuthDeviceAuthorizationRequest(
+            verificationURL: verificationURL,
+            userCode: deviceResponse.userCode,
+            deviceCode: deviceResponse.deviceCode,
+            expiresAt: now.addingTimeInterval(deviceResponse.expiresIn),
+            interval: deviceResponse.interval ?? 5,
+            clientID: clientID
+        )
     }
 
     public static func tokenSet(
@@ -197,16 +310,20 @@ public enum PluginOAuth {
         guard auth.type == .oauth2, let config = auth.oauth2 else {
             throw PluginOAuthError.missingOAuthConfiguration(pluginID)
         }
+        guard config.grantType == .authorizationCode,
+              let redirectURI = config.redirectURI else {
+            throw PluginOAuthError.missingOAuthConfiguration(pluginID)
+        }
         guard let clientID = resolvedClientID(auth: auth, override: request.clientID) else {
             throw PluginOAuthError.missingApplicationID(pluginID)
         }
-        try validateConfiguredRedirectURI(config.redirectURI, provider: auth.provider, pluginID: pluginID)
-        try validateCallbackRedirect(callbackURL, redirectURI: config.redirectURI)
+        try validateConfiguredRedirectURI(redirectURI, provider: auth.provider, pluginID: pluginID)
+        try validateCallbackRedirect(callbackURL, redirectURI: redirectURI)
         let callback = try callbackParameters(callbackURL, expectedState: request.state)
         let body = formURLEncoded([
             "grant_type": "authorization_code",
             "code": callback.code,
-            "redirect_uri": config.redirectURI,
+            "redirect_uri": redirectURI,
             "client_id": clientID,
             "code_verifier": request.codeVerifier
         ])
@@ -224,6 +341,57 @@ public enum PluginOAuth {
         )
         guard (200..<300).contains(response.statusCode) else {
             throw PluginOAuthError.tokenExchangeFailed(statusCode: response.statusCode)
+        }
+        var tokenSet = try tokenSet(from: response.data, now: now)
+        tokenSet.clientID = clientID
+        return tokenSet
+    }
+
+    public static func deviceTokenSet(
+        pluginID: String,
+        auth: PackagedPluginAuth,
+        request: PluginOAuthDeviceAuthorizationRequest,
+        transport: PluginRequestHTTPTransport = URLSessionPluginRequestTransport(),
+        now: Date = Date()
+    ) async throws -> PluginOAuthTokenSet {
+        guard auth.type == .oauth2, let config = auth.oauth2, config.grantType == .deviceCode else {
+            throw PluginOAuthError.missingOAuthConfiguration(pluginID)
+        }
+        guard now < request.expiresAt else {
+            throw PluginOAuthError.authorizationExpired
+        }
+        guard let clientID = resolvedClientID(auth: auth, override: request.clientID) else {
+            throw PluginOAuthError.missingApplicationID(pluginID)
+        }
+        let body = formURLEncoded([
+            "client_id": clientID,
+            "device_code": request.deviceCode,
+            "grant_type": "urn:ietf:params:oauth:grant-type:device_code"
+        ])
+        let response = try await transport.response(
+            for: PluginHTTPRequest(
+                method: "POST",
+                url: config.tokenURL,
+                headers: [
+                    "Accept": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                ],
+                body: Data(body.utf8),
+                timeoutSeconds: 30
+            )
+        )
+        guard (200..<300).contains(response.statusCode) else {
+            throw PluginOAuthError.tokenExchangeFailed(statusCode: response.statusCode)
+        }
+        if let error = try? JSONDecoder().decode(PluginOAuthDeviceTokenErrorResponse.self, from: response.data) {
+            switch error.error {
+            case "authorization_pending", "slow_down":
+                throw PluginOAuthError.authorizationPending
+            case "expired_token":
+                throw PluginOAuthError.authorizationExpired
+            default:
+                throw PluginOAuthError.authorizationDenied(error.errorDescription ?? error.error)
+            }
         }
         var tokenSet = try tokenSet(from: response.data, now: now)
         tokenSet.clientID = clientID

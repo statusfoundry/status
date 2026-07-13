@@ -225,6 +225,16 @@ private struct IOSRootView: View {
                 request: request,
                 callbackURL: callbackURL
             )
+        } saveOAuthTokenSet: { plugin, accountID, displayName, values, tokenSet in
+            try PluginSetupConfiguration.saveOAuthTokenSet(
+                tokenSet,
+                setupValues: values,
+                for: plugin,
+                service: PluginRuntimeService(store: LocalStatusStore.openApplicationSupportStore()),
+                credentialStore: KeychainCredentialStore(),
+                accountID: accountID,
+                displayNameOverride: displayName
+            )
         } testPluginRequest: { plugin, account, requestID in
             try await testConfiguredPluginRequest(pluginID: plugin.id, requestID: requestID, accountID: account.id)
         } previewProviderActionRequest: { action in

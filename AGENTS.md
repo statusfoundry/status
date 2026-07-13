@@ -145,6 +145,7 @@ When designing or implementing plugins:
 - declare all permissions;
 - normalize into common resources/events/metrics;
 - keep UI data-driven using app-owned views;
+- use https://open-brands.org/ for plugin logos when a proper brand asset is available;
 - make dangerous actions impossible by default;
 - add suggested rules only when genuinely useful.
 

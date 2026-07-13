@@ -13,9 +13,9 @@ Create one configured app per repository you want to watch:
 - **Owner** — GitHub user or organization name
 - **Repository** — repository name
 
-Status stores a GitHub fine-grained personal access token in Keychain when you complete auth setup. The plugin only calls declared `api.github.com` endpoints.
+Status connects GitHub with OAuth device flow. The plugin declares GitHub's device authorization and token endpoints, Status opens GitHub for user approval, and the resulting token set is stored in Keychain. The plugin only calls declared `api.github.com` endpoints.
 
-GitHub OAuth is not enabled in this package yet. Do not create a GitHub OAuth app for the current plugin. GitHub's native-friendly device flow needs a separate Status auth flow, while GitHub OAuth App web flow requires a client secret and is not appropriate to store in a declarative plugin. For the current working app, use a read-only fine-grained token.
+Official builds should ship the public GitHub OAuth client ID in `auth.json` so users do not need to paste an app ID. Local development builds can override that public client ID in setup with a GitHub OAuth App that has device flow enabled. No GitHub client secret belongs in the plugin package or native app.
 
 ## What it exposes
 
@@ -53,9 +53,10 @@ Read-only in v1. No merge, close, or branch mutation actions.
 ## Permissions and domains
 
 - `network` — poll GitHub HTTPS APIs
-- `keychain` — store the GitHub token securely
+- `keychain` — store the GitHub OAuth token securely
+- `oauth` — connect GitHub through OAuth device flow
 - `background-refresh` — run scheduled workflow checks
-- **Domains:** `api.github.com`
+- **Domains:** `api.github.com`, `github.com`
 
 ## What it does not do
 
@@ -67,9 +68,6 @@ Read-only in v1. No merge, close, or branch mutation actions.
 
 1. Install **GitHub** from the Status plugin store.
 2. Create a configured app and enter owner and repository.
-3. Create a fine-grained GitHub personal access token named `Status Local Dev`.
-4. Set repository access to selected repositories only, then select the repository you entered in Status.
-5. Grant read-only Metadata, Actions, Pull requests, and Issues access. Add Contents read-only if GitHub requires it for repository activity reads.
-6. Add that token to the configured app in Status.
-7. Grant network, keychain, and background refresh permissions.
-8. Run **Refresh repository activity** and **Refresh workflow runs**, then enable **Check workflow runs** if you want scheduled polling.
+3. Grant network, keychain, OAuth, and background refresh permissions.
+4. Choose **Connect account**, enter the displayed code on GitHub, then choose **Complete connection** in Status.
+5. Run **Refresh repository activity** and **Refresh workflow runs**, then enable **Check workflow runs** if you want scheduled polling.

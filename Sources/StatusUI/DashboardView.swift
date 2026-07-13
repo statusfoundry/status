@@ -451,27 +451,16 @@ private struct DashboardPrimaryTileItem: View {
     }
 
     private var statusColor: Color {
-        let value = DashboardTileDisplayValue(item: item).text.lowercased()
-        if value == "no" ||
-            value == "false" ||
-            value.contains("fail") ||
-            value.contains("reject") ||
-            value.contains("down") ||
-            value.contains("critical") {
+        switch StatusFieldValueFormatter.tone(fieldID: item.id, value: item.value) {
+        case .negative:
             return .red
-        }
-        if value.contains("warn") || value.contains("review") || value.contains("pending") || value.contains("slow") {
+        case .warning:
             return .orange
-        }
-        if value == "yes" ||
-            value == "true" ||
-            value.contains("ok") ||
-            value.contains("success") ||
-            value.contains("ready") ||
-            value.contains("up") {
+        case .positive:
             return .green
+        case .neutral, nil:
+            return .blue
         }
-        return .blue
     }
 }
 
@@ -545,45 +534,13 @@ struct DashboardTileDisplayValue: Equatable {
     var text: String
 
     init(item: DashboardTileItem) {
-        self.text = Self.format(item: item)
-    }
-
-    private static func format(item: DashboardTileItem) -> String {
-        let trimmed = item.value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.caseInsensitiveCompare("true") == .orderedSame {
-            return "Yes"
-        }
-        if trimmed.caseInsensitiveCompare("false") == .orderedSame {
-            return "No"
-        }
-        if item.kind == .link, let url = item.actionURL ?? URL(string: trimmed) {
-            return formattedURL(url)
-        }
-        if isMillisecondsField(item.id) || isMillisecondsField(item.label),
-           Double(trimmed) != nil,
-           trimmed.lowercased().hasSuffix("ms") == false {
-            return "\(trimmed) ms"
-        }
-        return trimmed
-    }
-
-    private static func isMillisecondsField(_ value: String) -> Bool {
-        let normalized = value
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: "_", with: "")
-            .replacingOccurrences(of: "-", with: "")
-            .lowercased()
-        return normalized.hasSuffix("ms") ||
-            normalized.contains("milliseconds") ||
-            normalized.contains("responsetime")
-    }
-
-    private static func formattedURL(_ url: URL) -> String {
-        guard let host = url.host(percentEncoded: false), host.isEmpty == false else {
-            return url.absoluteString
-        }
-        let path = url.path(percentEncoded: false)
-        return path == "/" || path.isEmpty ? host : "\(host)\(path)"
+        self.text = StatusFieldValueFormatter.displayText(
+            fieldID: item.id,
+            label: item.label,
+            value: item.value,
+            kind: item.kind,
+            actionURL: item.actionURL
+        )
     }
 }
 

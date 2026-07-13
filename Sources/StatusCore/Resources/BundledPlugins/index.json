@@ -14,8 +14,8 @@
       "domains": [
         "api.appstoreconnect.apple.com"
       ],
-      "sha256": "14f835c129d275a53cf614b69ee8ea509244875c3e826d508fa6b2a0ba893107",
-      "signature": "2ejHXOwcH3BTm2ea7gU/HYvs+ogQnjLEjRly589BCwT5T+gaJeyh5p/fMJyOtdNh2esUqExGz1JO57S65kFxDQ==",
+      "sha256": "e878d53f899f1fab48d75f6892e63e437adcd7c7cc1346f335a3612d6eb492c6",
+      "signature": "41dYsGDBvBCYW9KOx+IPiRx9UJkeSgqbajU/e5yg6AJVvKm6aa3q3wlw4kAutm8rTQAfal2h9aJIsOFH3U+LDw==",
       "signedBy": "status-foundry-dev",
       "releasedAt": "2026-07-07T12:00:00Z",
       "packageResourceName": "com.status.appstoreconnect-0.1.0.statusplugin.zip",
@@ -31,10 +31,11 @@
         "iOS"
       ],
       "domains": [
-        "api.github.com"
+        "api.github.com",
+        "github.com"
       ],
-      "sha256": "b6498c94f71168720f19af2d8ff9f501d409ef046170d107fd80eacef429563e",
-      "signature": "7Lp71bx+lwZzTbYVa1GUXMGge+G7GN5JhQgJZM/kfAJQ+hrC2KH3b95lweHli+jSg+Gbc4cki2OMv+lpMB3eCA==",
+      "sha256": "59c868f227b0f285dedd5416f361118d01483d84d080bbff34e6073af8c72cd8",
+      "signature": "/IXSpUGmczyO/5dt0AV50N0QRd7wpMiwJD/VV6wYrPpAnZntjtS3Kw45EGHp/dnHWkgnMrr1I82DgQvrQV4vBA==",
       "signedBy": "status-foundry-dev",
       "releasedAt": "2026-07-07T12:00:00Z",
       "packageResourceName": "com.status.github-0.1.0.statusplugin.zip",
@@ -52,8 +53,8 @@
       "domains": [
         "gitlab.com"
       ],
-      "sha256": "80e504fc02e23cab6729e9d36f159eae340cde226387ea58b98913ea72f0a5c6",
-      "signature": "k9r8D7U2udFo9gzBwaszmJzgZh6zGDTGaFJDpMyX2Ogj5xht5Eh8WdLlhqTavb/9i5oPoLXNU5jvckF3j37ZDQ==",
+      "sha256": "5d6f2abb28d46ea6de92b0f960434ad6a232461a237692c9542cc9e885570d9f",
+      "signature": "HL6dpEsM6h3s+bNi7NPS6XDdEwvlI1Ygjv3oFGW5U0TtfukedT4wCMlcvdVquGa8GsiqnkUghW8A1K2FGhTXDA==",
       "signedBy": "status-foundry-dev",
       "releasedAt": "2026-07-09T12:00:00Z",
       "packageResourceName": "com.status.gitlab-0.1.0.statusplugin.zip",
@@ -73,8 +74,8 @@
         "oauth2.googleapis.com",
         "androidpublisher.googleapis.com"
       ],
-      "sha256": "531265e46e79865291d36d2c65283d39e38ba5b4a8e188f238d1adc7ee322dd4",
-      "signature": "BAQUs/tiOLDTwstl/eEGYruV6IyZMXTAM2i5cPMNnoBbbodxvFq22D8qanPpFuhix6d8zbiUgaAxZRpITPHeBw==",
+      "sha256": "032a1e510ea0b3402c7587b1f151c882615327234df5fdbb721a2665cf37a4a0",
+      "signature": "WeL6C6pZEBT32hJJ1KwuKl8XtnCkDVF3TyHQjoWPr1GnoJ5xF74lc7q37HgVymXGNgvFZPSIq14SWJzTQgwgAg==",
       "signedBy": "status-foundry-dev",
       "releasedAt": "2026-07-09T12:00:00Z",
       "packageResourceName": "com.status.googleplay-0.1.0.statusplugin.zip",
@@ -90,8 +91,8 @@
         "iOS"
       ],
       "domains": [],
-      "sha256": "ba63ed1fe54f282d6eacfe297251b98ec944b61c910263d0e7480c8f7045543e",
-      "signature": "AXhh/PlSa0IQ6NiyX+dBL/JkhCYQjTSFqPO03ZWuMFLzY/7HiUfZSpzkVjOKEC1AofEzDYBSpBNJHPjM7U5VAg==",
+      "sha256": "ea390fa8303d349ea8a791fd4ff2670f434921cf998cab2dd0708aa4f01534b2",
+      "signature": "MeVfX/jPMriIOWCpGt1EXb9bMiJLP4yauNOLlwAuGMS2c7No7ktJ5//ogQmdzfuPZ50N7suCwh6L/YN0V0dWAQ==",
       "signedBy": "status-foundry-dev",
       "releasedAt": "2026-07-09T12:00:00Z",
       "packageResourceName": "com.status.jira-0.1.0.statusplugin.zip",
@@ -128,8 +129,8 @@
         "oauth2.googleapis.com",
         "www.googleapis.com"
       ],
-      "sha256": "9c2c4e414562bba886b6cfd445762ef52ba75b2e5320111cf6c6565533465521",
-      "signature": "23NaVe0jZSs1fvrWGhPONRioQ5HMDdb4189SKgD4pdCZQTtcRXQhL/aGIX1HXqcf47SyNBOwemUcKzdEkJgcAA==",
+      "sha256": "7ef0b153ab0d08805df402da42f8048dfbc3f52d0247e0ce1366937beb0c8a78",
+      "signature": "VK0sYYZlrvIq/IOvAe3+kqZfogSByBniyKtlmBYvwlfU7Y2o1VGM/bmJz8enXwiLzbJKjX/p/bITqqmmmaVKAA==",
       "signedBy": "status-foundry-dev",
       "releasedAt": "2026-07-09T12:00:00Z",
       "packageResourceName": "com.status.youtube-0.1.0.statusplugin.zip",

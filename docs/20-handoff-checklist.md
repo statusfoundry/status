@@ -66,7 +66,7 @@ Package.swift or workspace/project files
 Sources/
   StatusCore/
   StatusUI/
-Apps/
+_apps/
   StatusMac/
   StatusiOS/
 schemas/

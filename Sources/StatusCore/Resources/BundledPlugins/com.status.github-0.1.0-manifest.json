@@ -18,9 +18,11 @@
   "permissions": [
     "network",
     "keychain",
+    "oauth",
     "background-refresh"
   ],
   "domains": [
-    "api.github.com"
+    "api.github.com",
+    "github.com"
   ]
 }

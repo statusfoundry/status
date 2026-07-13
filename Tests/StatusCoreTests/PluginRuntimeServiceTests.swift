@@ -2308,6 +2308,49 @@ import Testing
     #expect(tokenSet.clientID == "youtube-client.apps.googleusercontent.com")
 }
 
+@Test func pluginOAuthUsesDeviceFlowForGitHubWithoutClientSecret() async throws {
+    let deviceURL = try #require(URL(string: "https://github.com/login/device/code"))
+    let tokenURL = try #require(URL(string: "https://github.com/login/oauth/access_token"))
+    let auth = PackagedPluginAuth(
+        type: .oauth2,
+        provider: "github",
+        applicationId: "github-client-id",
+        oauth2: PackagedPluginOAuth2(
+            grantType: .deviceCode,
+            deviceAuthorizationURL: deviceURL,
+            tokenURL: tokenURL,
+            scopes: ["repo"]
+        )
+    )
+    let now = Date(timeIntervalSince1970: 1_783_433_520)
+
+    let deviceRequest = try await PluginOAuth.deviceAuthorizationRequest(
+        pluginID: "com.status.github",
+        auth: auth,
+        transport: RuntimeOAuthDeviceFlowTransport(deviceURL: deviceURL, tokenURL: tokenURL),
+        now: now
+    )
+
+    #expect(deviceRequest.verificationURL.absoluteString == "https://github.com/login/device")
+    #expect(deviceRequest.userCode == "ABCD-1234")
+    #expect(deviceRequest.deviceCode == "device-code-123")
+    #expect(deviceRequest.expiresAt == now.addingTimeInterval(900))
+    #expect(deviceRequest.interval == 5)
+
+    let tokenSet = try await PluginOAuth.deviceTokenSet(
+        pluginID: "com.status.github",
+        auth: auth,
+        request: deviceRequest,
+        transport: RuntimeOAuthDeviceFlowTransport(deviceURL: deviceURL, tokenURL: tokenURL),
+        now: now
+    )
+
+    #expect(tokenSet.accessToken == "github_oauth_access")
+    #expect(tokenSet.tokenType == "Bearer")
+    #expect(tokenSet.scope == "repo")
+    #expect(tokenSet.clientID == "github-client-id")
+}
+
 @Test func pluginOAuthRejectsInvalidConfiguredRedirectBeforeAuthorizationURL() throws {
     let auth = PackagedPluginAuth(
         type: .oauth2,
@@ -2896,6 +2939,51 @@ private struct RuntimeOAuthCodeExchangeTransport: PluginRequestHTTPTransport {
               "refresh_token": "oauth_refresh",
               "token_type": "Bearer",
               "expires_in": 3600,
+              "scope": "repo"
+            }
+            """.utf8),
+            statusCode: 200,
+            url: tokenURL
+        )
+    }
+}
+
+private struct RuntimeOAuthDeviceFlowTransport: PluginRequestHTTPTransport {
+    var deviceURL: URL
+    var tokenURL: URL
+
+    func response(for request: PluginHTTPRequest) async throws -> PluginHTTPResponse {
+        #expect(request.method == "POST")
+        #expect(request.headers["Accept"] == "application/json")
+        #expect(request.headers["Content-Type"] == "application/x-www-form-urlencoded")
+        let body = try #require(request.body.flatMap { String(data: $0, encoding: .utf8) })
+        #expect(body.contains("client_id=github-client-id"))
+
+        if request.url == deviceURL {
+            #expect(body.contains("scope=repo"))
+            return PluginHTTPResponse(
+                data: Data("""
+                {
+                  "device_code": "device-code-123",
+                  "user_code": "ABCD-1234",
+                  "verification_uri": "https://github.com/login/device",
+                  "expires_in": 900,
+                  "interval": 5
+                }
+                """.utf8),
+                statusCode: 200,
+                url: deviceURL
+            )
+        }
+
+        #expect(request.url == tokenURL)
+        #expect(body.contains("device_code=device-code-123"))
+        #expect(body.contains("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code"))
+        return PluginHTTPResponse(
+            data: Data("""
+            {
+              "access_token": "github_oauth_access",
+              "token_type": "Bearer",
               "scope": "repo"
             }
             """.utf8),

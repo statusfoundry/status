@@ -18,7 +18,7 @@ targets:
     type: application
     platform: macOS
     sources:
-      - Apps/StatusMac
+      - _apps/StatusMac
     dependencies:
       - package: StatusPackage
         product: StatusUI
@@ -26,12 +26,12 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.statusfoundry.status.mac
         PRODUCT_NAME: Status
-        INFOPLIST_FILE: Apps/StatusMac/Info.plist
+        INFOPLIST_FILE: _apps/StatusMac/Info.plist
   StatusiOS:
     type: application
     platform: iOS
     sources:
-      - Apps/StatusiOS
+      - _apps/StatusiOS
     dependencies:
       - package: StatusPackage
         product: StatusUI
@@ -39,7 +39,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.statusfoundry.status.ios
         PRODUCT_NAME: Status
-        INFOPLIST_FILE: Apps/StatusiOS/Info.plist
+        INFOPLIST_FILE: _apps/StatusiOS/Info.plist
 schemes:
   StatusMac:
     build:

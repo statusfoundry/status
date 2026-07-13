@@ -257,13 +257,13 @@ jwt-api-key
 private-key-jwt
 ```
 
-`oauth2` is available for plugins that declare the `oauth` and `keychain` permissions and provide provider/client metadata. OAuth support is native and app-owned: plugins declare endpoints and scopes, while Status generates PKCE authorization requests, stores token sets in Keychain by reference, refreshes expired tokens through the declared token endpoint, and injects bearer headers at request time.
+`oauth2` is available for plugins that declare the `oauth` and `keychain` permissions and provide provider/client metadata. OAuth support is native and app-owned: plugins declare endpoints and scopes, while Status generates PKCE authorization requests or OAuth device-flow requests, stores token sets in Keychain by reference, refreshes expired tokens through the declared token endpoint, and injects bearer headers at request time.
 
 Bundled and registry plugin icons follow the same fail-closed model. `icon.svg` is treated as signed package content and is validated before the app renders it or the website/registry expose it. Status rejects scripts, event handlers, embedded HTML, remote references, external image loads, inline styles, and unsafe `href` values. Static gradients, masks, clip paths, symbols, and `use` references are allowed only when they resolve to internal fragment IDs inside the same SVG document. The validator also caps SVG size and structural complexity so provider marks stay safe to render inside native WebKit-backed views.
 
 All auth types share the same model: the plugin declares the fields, the app renders the setup form natively, secrets go to Keychain, and the request engine injects credentials at request time. Plugins never read secrets directly.
 
-Current implementation status: bearer-token, api-key header, basic-auth, JWT API-key, and OAuth authorization/token injection/refresh are implemented for installed declarative plugins. The native setup form masks secret input, `PluginSetupConfiguration` writes bearer token bytes, credential bundles, or OAuth token sets to `CredentialStore`, SQLite stores only the `credential_ref`, and `PluginRuntimeService` resolves that reference into the appropriate request header at request time. Basic auth supports the Jira-style email/API-token credential bundle. JWT signing currently covers the App Store Connect ES256 API-key flow. OAuth setup uses app-owned PKCE authorization URLs, validates callback `state` and the declared redirect scheme/host/path, exchanges authorization codes for token sets through the plugin-declared token endpoint, and stores the resulting token set in Keychain.
+Current implementation status: bearer-token, api-key header, basic-auth, JWT API-key, and OAuth authorization/token injection/refresh are implemented for installed declarative plugins. The native setup form masks secret input, `PluginSetupConfiguration` writes bearer token bytes, credential bundles, or OAuth token sets to `CredentialStore`, SQLite stores only the `credential_ref`, and `PluginRuntimeService` resolves that reference into the appropriate request header at request time. Basic auth supports the Jira-style email/API-token credential bundle. JWT signing currently covers the App Store Connect ES256 API-key flow. OAuth setup uses app-owned PKCE authorization URLs or provider device-flow endpoints, validates callback `state` and the declared redirect scheme/host/path for callback flows, exchanges authorization or device codes for token sets through the plugin-declared token endpoint, and stores the resulting token set in Keychain.
 
 ### MVP auth paths per integration
 
@@ -278,8 +278,8 @@ Network check      → none
 Weather            → none, or provider api-key
 App Store Connect  → jwt-api-key (issuer ID + key ID + .p8 private key;
                      app builds short-lived ES256 JWTs per request window)
-GitHub             → bearer-token (fine-grained personal access token;
-                     classic PAT acceptable for early local testing)
+GitHub             → oauth2 device-code flow with a public OAuth client ID;
+                     no client secret or PAT in the plugin package
 Jira               → basic-auth (Atlassian account email + API token)
 ```
 
@@ -288,12 +288,12 @@ Later phases, for reference: Cloudflare uses an API token (bearer), Stripe uses 
 ### OAuth design
 
 - Client ID ownership: does Status register one client per provider and embed it in the app, or does the user supply their own client? Embedded client IDs are public by nature on native apps; the design must not rely on a confidential client secret.
-- PKCE: native flows must use authorization code + PKCE (S256), no implicit flow.
+- PKCE/device flow: native callback flows must use authorization code + PKCE (S256), no implicit flow. Providers that do not support PKCE for native clients should use OAuth device flow instead of shipping a client secret.
 - Redirect URI scheme: a custom URL scheme or universal link owned by the app, registered with each provider, and how the app validates state on callback.
 - Refresh responsibility: the core request engine owns token refresh, transparently, per account. Plugins never see refresh tokens.
 - Keychain storage: access token, refresh token, expiry, and scopes stored per account in Keychain, same rules as all other secrets.
 
-Implementation boundary: core and the native shells now support OAuth package metadata, PKCE authorization URL creation, `com.statusfoundry.status.oauth:/...` callback delivery, callback `state` and redirect validation, authorization-code exchange, Keychain-backed token-set storage, expired-token refresh, and request header injection. GitHub/GitLab/Jira can still keep PAT/API-token setup paths as practical low-friction options, but OAuth-only plugins no longer need a plugin-owned executable flow.
+Implementation boundary: core and the native shells now support OAuth package metadata, PKCE authorization URL creation, `com.statusfoundry.status.oauth:/...` callback delivery, callback `state` and redirect validation, authorization-code exchange, device-code authorization, Keychain-backed token-set storage, expired-token refresh, and request header injection. GitHub uses device flow so Status can prefer OAuth without embedding a GitHub client secret.
 
 ### Token refresh and failure behavior
 

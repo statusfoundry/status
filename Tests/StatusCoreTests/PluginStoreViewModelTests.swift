@@ -151,11 +151,11 @@ import Testing
     #expect(required.requiredPermissions == [.network])
 }
 
-@Test func pluginSetupGuideExplainsGitHubTokenAndYouTubeOAuthSetup() throws {
+@Test func pluginSetupGuideExplainsGitHubAndYouTubeOAuthSetup() throws {
     let github = try #require(PluginSetupGuide(plugin: setupChecklistPlugin(
         id: "com.status.github",
         name: "GitHub",
-        auth: PackagedPluginAuth(type: .bearerToken, provider: "github"),
+        auth: PackagedPluginAuth(type: .oauth2, provider: "github"),
         setup: nil
     )))
     let youtube = try #require(PluginSetupGuide(plugin: setupChecklistPlugin(
@@ -165,11 +165,11 @@ import Testing
         setup: nil
     )))
 
-    #expect(github.detail.contains("fine-grained personal access token"))
-    #expect(github.detail.contains("Do not create a GitHub OAuth app"))
-    #expect(github.steps.contains { $0.contains("selected repositories only") })
-    #expect(github.steps.contains { $0.contains("read-only Metadata, Actions, Pull requests, and Issues") })
-    #expect(github.links.first?.url.absoluteString == "https://github.com/settings/personal-access-tokens/new")
+    #expect(github.detail.contains("OAuth device flow"))
+    #expect(github.detail.contains("without shipping a client secret"))
+    #expect(github.steps.contains { $0.contains("Connect account") })
+    #expect(github.steps.contains { $0.contains("Complete connection") })
+    #expect(github.links.first?.url.absoluteString == "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps")
     #expect(youtube.detail.contains("Google OAuth 2 with PKCE"))
     #expect(youtube.steps.contains { $0.contains("com.statusfoundry.status.oauth:/youtube") })
 }
@@ -196,6 +196,22 @@ import Testing
             )
         ).text == "status.hakobs.com"
     )
+}
+
+@Test func statusFieldValueFormatterFormatsResourceValuesConsistently() {
+    #expect(StatusFieldValueFormatter.displayText(fieldID: "reachable", value: "true") == "Yes")
+    #expect(StatusFieldValueFormatter.displayText(fieldID: "responseTimeMs", value: "341") == "341 ms")
+    #expect(
+        StatusFieldValueFormatter.displayText(
+            fieldID: "actionUrl",
+            value: "https://github.com/statusfoundry/status",
+            kind: .link
+        ) == "github.com/statusfoundry/status"
+    )
+    #expect(StatusFieldValueFormatter.tone(fieldID: "reachable", value: "true") == .positive)
+    #expect(StatusFieldValueFormatter.tone(fieldID: "reachable", value: "false") == .negative)
+    #expect(StatusFieldValueFormatter.tone(fieldID: "status", value: "pending review") == .warning)
+    #expect(StatusFieldValueFormatter.tone(fieldID: "lastCommit", value: "Fix dashboard") == nil)
 }
 
 @MainActor
@@ -1608,7 +1624,7 @@ import Testing
     )
 
     await viewModel.reload()
-    let launchedURL = viewModel.beginOAuthConnection(plugin)
+    let launchedURL = await viewModel.beginOAuthConnection(plugin)
 
     let selectedAccountID = viewModel.selectedAccountIDs[plugin.id]
     let url = try #require(viewModel.oauthConnectionURLs["\(plugin.id):\(selectedAccountID ?? "__new__:")"])
@@ -1651,7 +1667,7 @@ import Testing
 
     await viewModel.reload()
     viewModel.updateSetupValue(plugin, fieldID: PluginOAuth.clientIDSetupFieldKey, value: "custom-client-id")
-    let launchedURL = viewModel.beginOAuthConnection(plugin)
+    let launchedURL = await viewModel.beginOAuthConnection(plugin)
 
     let key = "\(plugin.id):\(viewModel.selectedAccountIDs[plugin.id] ?? "__new__:")"
     let url = try #require(viewModel.oauthConnectionURLs[key])
@@ -1680,7 +1696,7 @@ import Testing
     )
 
     await viewModel.reload()
-    let launchedURL = viewModel.beginOAuthConnection(plugin)
+    let launchedURL = await viewModel.beginOAuthConnection(plugin)
 
     let selectedAccountID = viewModel.selectedAccountIDs[plugin.id]
     let key = "\(plugin.id):\(selectedAccountID ?? "__new__:")"
@@ -1735,7 +1751,7 @@ import Testing
     viewModel.updateSetupValue(plugin, fieldID: "owner", value: "statusfoundry")
     viewModel.updateSetupValue(plugin, fieldID: "repo", value: "status")
     viewModel.updateAccountDisplayName(plugin, value: "Status Repo")
-    viewModel.beginOAuthConnection(plugin)
+    await viewModel.beginOAuthConnection(plugin)
 
     let selectedAccountID = viewModel.selectedAccountIDs[plugin.id]
     let key = "\(plugin.id):\(selectedAccountID ?? "__new__:")"
@@ -1816,7 +1832,7 @@ import Testing
     viewModel.updateSetupValue(plugin, fieldID: "owner", value: "statusfoundry")
     viewModel.updateSetupValue(plugin, fieldID: "repo", value: "status")
     viewModel.updateAccountDisplayName(plugin, value: "Status Repo")
-    viewModel.beginOAuthConnection(plugin)
+    await viewModel.beginOAuthConnection(plugin)
 
     let selectedAccountID = viewModel.selectedAccountIDs[plugin.id]
     let draftKey = "\(plugin.id):\(selectedAccountID ?? "__new__:")"
@@ -1891,7 +1907,7 @@ import Testing
     )
 
     await viewModel.reload()
-    viewModel.beginOAuthConnection(plugin)
+    await viewModel.beginOAuthConnection(plugin)
 
     let selectedAccountID = viewModel.selectedAccountIDs[plugin.id]
     let key = "\(plugin.id):\(selectedAccountID ?? "__new__:")"
